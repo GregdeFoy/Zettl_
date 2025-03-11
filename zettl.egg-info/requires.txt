@@ -4,5 +4,4 @@ python-dotenv
 requests
 rich
 tqdm
-pyreadline3
-colorama
+anthropic

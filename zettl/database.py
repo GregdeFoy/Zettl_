@@ -317,3 +317,43 @@ class Database:
         
         return notes
 
+    def get_all_tags_with_counts(self) -> List[Dict[str, Any]]:
+        """Get all tags with the count of notes associated with each tag."""
+        cache_key = "all_tags_counts"
+        
+        # Check if in cache
+        cached_result = get_from_cache(cache_key)
+        if cached_result is not None:
+            return cached_result
+        
+        # Get all tags with their note_ids
+        result = self.client.table('tags').select('tag, note_id').execute()
+        
+        if not result.data:
+            # Cache empty result
+            set_in_cache(cache_key, [], ttl=300)
+            return []
+        
+        # Count occurrences of each tag
+        tag_counts = {}
+        for item in result.data:
+            tag = item['tag']
+            if tag in tag_counts:
+                tag_counts[tag] += 1
+            else:
+                tag_counts[tag] = 1
+        
+        # Format the result
+        tags_with_counts = [
+            {"tag": tag, "count": count} 
+            for tag, count in tag_counts.items()
+        ]
+        
+        # Sort by count in descending order
+        tags_with_counts = sorted(tags_with_counts, key=lambda x: x['count'], reverse=True)
+        
+        # Cache the result
+        set_in_cache(cache_key, tags_with_counts, ttl=300)
+        
+        return tags_with_counts
+

@@ -46,3 +46,7 @@ class Notes:
     def get_notes_by_tag(self, tag: str) -> List[Dict[str, Any]]:
         """Get all notes that have a specific tag."""
         return self.db.get_notes_by_tag(tag)
+
+    def get_all_tags_with_counts(self) -> List[Dict[str, Any]]:
+        """Get all tags with the count of notes associated with each tag."""
+        return self.db.get_all_tags_with_counts()

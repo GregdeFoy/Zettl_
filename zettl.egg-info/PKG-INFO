@@ -7,6 +7,5 @@ Requires-Dist: python-dotenv
 Requires-Dist: requests
 Requires-Dist: rich
 Requires-Dist: tqdm
-Requires-Dist: pyreadline3
-Requires-Dist: colorama
+Requires-Dist: anthropic
 Dynamic: requires-dist

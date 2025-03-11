@@ -255,11 +255,23 @@ def link(source_id, target_id, context):
         click.echo(f"Error creating link: {str(e)}", err=True)
 
 @cli.command()
-@click.argument('note_id')
+@click.argument('note_id', required=False)
 @click.argument('tag', required=False)
 def tags(note_id, tag):
-    """Show or add tags to a note."""
+    """Show or add tags to a note. If no note_id is provided, list all tags."""
     try:
+        # If no note_id is provided, list all tags
+        if not note_id:
+            tags_with_counts = notes_manager.get_all_tags_with_counts()
+            if tags_with_counts:
+                click.echo(ZettlFormatter.header(f"All Tags (showing {len(tags_with_counts)})"))
+                for tag_info in tags_with_counts:
+                    formatted_tag = ZettlFormatter.tag(tag_info['tag'])
+                    click.echo(f"{formatted_tag} ({tag_info['count']} notes)")
+            else:
+                click.echo(ZettlFormatter.warning("No tags found."))
+            return
+            
         # If a tag was provided, add it
         if tag:
             notes_manager.add_tag(note_id, tag)
@@ -268,11 +280,11 @@ def tags(note_id, tag):
         # Show all tags for the note
         tags = notes_manager.get_tags(note_id)
         if tags:
-            click.echo(f"Tags for note #{note_id}: {', '.join(tags)}")
+            click.echo(f"Tags for note #{note_id}: {', '.join([ZettlFormatter.tag(t) for t in tags])}")
         else:
             click.echo(f"No tags for note #{note_id}")
     except Exception as e:
-        click.echo(f"Error managing tags: {str(e)}", err=True)
+        click.echo(ZettlFormatter.error(str(e)), err=True)
 
 @cli.command()
 @click.argument('query', required=False)
