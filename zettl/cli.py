@@ -100,6 +100,21 @@ def commands():
                     "zettl llm 22a4b --action concepts   # Extract key concepts from a note\n"
                     "zettl llm 22a4b --action questions  # Generate questions based on a note\n"
                     "zettl llm 22a4b --action critique   # Get constructive feedback on a note"
+        },
+        {
+            "name": "delete",
+            "description": "Delete a note and its associated data",
+            "example": "zettl delete 22a4b\nzettl delete 22a4b --keep-tags"
+        },
+        {
+            "name": "untag",
+            "description": "Remove a tag from a note",
+            "example": "zettl untag 22a4b \"concept\""
+        },
+        {
+            "name": "unlink",
+            "description": "Remove a link between two notes",
+            "example": "zettl unlink 22a4b 18c3d"
         }
     ]
     
@@ -635,6 +650,95 @@ def llm(note_id, action, count, show_source):
                 
     except Exception as e:
         click.echo(ZettlFormatter.error(str(e)), err=True)
+
+@cli.command()
+@click.argument('note_id')
+@click.option('--force', '-f', is_flag=True, help='Skip confirmation prompt')
+@click.option('--keep-links', is_flag=True, help='Keep links to and from this note')
+@click.option('--keep-tags', is_flag=True, help='Keep tags associated with this note')
+def delete(note_id, force, keep_links, keep_tags):
+    """Delete a note and its associated data."""
+    try:
+        # First get the note to show what will be deleted
+        try:
+            note = notes_manager.get_note(note_id)
+            
+            # Get related data counts for information
+            try:
+                tags = notes_manager.get_tags(note_id)
+                related_notes = notes_manager.get_related_notes(note_id)
+                tag_count = len(tags)
+                link_count = len(related_notes)
+            except Exception:
+                tag_count = 0
+                link_count = 0
+                
+            # Show preview of what will be deleted
+            click.echo(ZettlFormatter.header(f"Note to delete: #{note_id}"))
+            content_preview = note['content'][:100] + "..." if len(note['content']) > 100 else note['content']
+            click.echo(f"Content: {content_preview}")
+            click.echo(f"Associated tags: {tag_count}")
+            click.echo(f"Connected notes: {link_count}")
+            
+        except Exception as e:
+            if not force:
+                click.echo(ZettlFormatter.warning(f"Could not retrieve note: {str(e)}"))
+                if not click.confirm("Continue with deletion anyway?"):
+                    click.echo("Deletion cancelled.")
+                    return
+        
+        # Confirm deletion if not forced
+        if not force and not click.confirm(f"Delete note #{note_id}?"):
+            click.echo("Deletion cancelled.")
+            return
+        
+        # Determine cascade setting based on flags
+        cascade = not (keep_links and keep_tags)
+        
+        # Delete with custom handling if specific items should be kept
+        if cascade and (keep_links or keep_tags):
+            # Custom deletion flow
+            if not keep_tags:
+                notes_manager.delete_note_tags(note_id)
+                click.echo(f"Deleted tags for note #{note_id}")
+            
+            if not keep_links:
+                notes_manager.delete_note_links(note_id)
+                click.echo(f"Deleted links for note #{note_id}")
+            
+            # Now delete the note itself (with cascade=False since we handled dependencies)
+            notes_manager.delete_note(note_id, cascade=False)
+        else:
+            # Standard cascade deletion
+            notes_manager.delete_note(note_id, cascade=cascade)
+        
+        click.echo(ZettlFormatter.success(f"Deleted note #{note_id}"))
+        
+    except Exception as e:
+        click.echo(ZettlFormatter.error(f"Error deleting note: {str(e)}"), err=True)
+
+@cli.command()
+@click.argument('note_id')
+@click.argument('tag')
+def untag(note_id, tag):
+    """Remove a tag from a note."""
+    try:
+        notes_manager.delete_tag(note_id, tag)
+        click.echo(ZettlFormatter.success(f"Removed tag '{tag}' from note #{note_id}"))
+    except Exception as e:
+        click.echo(ZettlFormatter.error(f"Error removing tag: {str(e)}"), err=True)
+
+@cli.command()
+@click.argument('source_id')
+@click.argument('target_id')
+def unlink(source_id, target_id):
+    """Remove a link between two notes."""
+    try:
+        notes_manager.delete_link(source_id, target_id)
+        click.echo(ZettlFormatter.success(f"Removed link from note #{source_id} to note #{target_id}"))
+    except Exception as e:
+        click.echo(ZettlFormatter.error(f"Error removing link: {str(e)}"), err=True)
+
 
 @cli.command()
 def workflow():

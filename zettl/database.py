@@ -357,3 +357,148 @@ class Database:
         
         return tags_with_counts
 
+    def delete_note(self, note_id: str, cascade: bool = True) -> None:
+        """
+        Delete a note from the database.
+        
+        Args:
+            note_id: ID of the note to delete
+            cascade: If True, also delete associated tags and links
+            
+        Returns:
+            None
+            
+        Raises:
+            Exception: If note deletion fails
+        """
+        # First verify the note exists
+        self.get_note(note_id)
+        
+        # If cascade is True, delete all associated data first
+        if cascade:
+            # Delete all tags associated with this note
+            self.delete_note_tags(note_id)
+            
+            # Delete all links involving this note
+            self.delete_note_links(note_id)
+        
+        # Delete the note itself
+        result = self.client.table('notes').delete().eq('id', note_id).execute()
+        
+        if not result.data:
+            raise Exception(f"Failed to delete note {note_id}")
+        
+        # Invalidate relevant caches
+        invalidate_cache(f"note:{note_id}")
+        invalidate_cache("list_notes")
+        
+        return None
+
+    def delete_note_tags(self, note_id: str) -> None:
+        """
+        Delete all tags associated with a note.
+        
+        Args:
+            note_id: ID of the note to delete tags for
+            
+        Returns:
+            None
+        """
+        # Delete all tags for this note
+        result = self.client.table('tags').delete().eq('note_id', note_id).execute()
+        
+        # Invalidate relevant caches
+        invalidate_cache(f"tags:{note_id}")
+        
+        return None
+
+    def delete_note_links(self, note_id: str) -> None:
+        """
+        Delete all links involving a note (both incoming and outgoing).
+        
+        Args:
+            note_id: ID of the note to delete links for
+            
+        Returns:
+            None
+        """
+        # First, get all notes connected to this one (to invalidate their caches later)
+        connected_notes = set()
+        
+        # Get outgoing links
+        outgoing_result = self.client.table('links').select('target_id').eq('source_id', note_id).execute()
+        if outgoing_result.data:
+            connected_notes.update([link['target_id'] for link in outgoing_result.data])
+        
+        # Get incoming links
+        incoming_result = self.client.table('links').select('source_id').eq('target_id', note_id).execute()
+        if incoming_result.data:
+            connected_notes.update([link['source_id'] for link in incoming_result.data])
+        
+        # Delete all outgoing links from this note
+        self.client.table('links').delete().eq('source_id', note_id).execute()
+        
+        # Delete all incoming links to this note
+        self.client.table('links').delete().eq('target_id', note_id).execute()
+        
+        # Invalidate caches for connected notes
+        for connected_id in connected_notes:
+            invalidate_cache(f"related_notes:{connected_id}")
+        
+        # Invalidate cache for this note
+        invalidate_cache(f"related_notes:{note_id}")
+        
+        return None
+
+    def delete_tag(self, note_id: str, tag: str) -> None:
+        """
+        Delete a specific tag from a note.
+        
+        Args:
+            note_id: ID of the note to remove the tag from
+            tag: The tag to remove
+            
+        Returns:
+            None
+            
+        Raises:
+            Exception: If tag deletion fails
+        """
+        # Delete the specific tag
+        result = self.client.table('tags').delete().eq('note_id', note_id).eq('tag', tag.lower().strip()).execute()
+        
+        if not result.data:
+            raise Exception(f"Failed to delete tag '{tag}' from note {note_id}")
+        
+        # Invalidate relevant caches
+        invalidate_cache(f"tags:{note_id}")
+        
+        return None
+
+    def delete_link(self, source_id: str, target_id: str) -> None:
+        """
+        Delete a specific link between two notes.
+        
+        Args:
+            source_id: ID of the source note
+            target_id: ID of the target note
+            
+        Returns:
+            None
+            
+        Raises:
+            Exception: If link deletion fails
+        """
+        # Delete the specific link
+        result = self.client.table('links').delete().eq('source_id', source_id).eq('target_id', target_id).execute()
+        
+        if not result.data:
+            raise Exception(f"Failed to delete link from note {source_id} to note {target_id}")
+        
+        # Invalidate relevant caches
+        invalidate_cache(f"related_notes:{source_id}")
+        invalidate_cache(f"related_notes:{target_id}")
+        
+        return None
+
+

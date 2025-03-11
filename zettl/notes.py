@@ -50,3 +50,24 @@ class Notes:
     def get_all_tags_with_counts(self) -> List[Dict[str, Any]]:
         """Get all tags with the count of notes associated with each tag."""
         return self.db.get_all_tags_with_counts()
+
+    def delete_note(self, note_id: str, cascade: bool = True) -> None:
+        """Delete a note and optionally its associated tags and links."""
+        return self.db.delete_note(note_id, cascade)
+        
+    def delete_note_tags(self, note_id: str) -> None:
+        """Delete all tags associated with a note."""
+        return self.db.delete_note_tags(note_id)
+        
+    def delete_note_links(self, note_id: str) -> None:
+        """Delete all links involving a note."""
+        return self.db.delete_note_links(note_id)
+        
+    def delete_tag(self, note_id: str, tag: str) -> None:
+        """Delete a specific tag from a note."""
+        return self.db.delete_tag(note_id, tag)
+        
+    def delete_link(self, source_id: str, target_id: str) -> None:
+        """Delete a specific link between two notes."""
+        return self.db.delete_link(source_id, target_id)
+
