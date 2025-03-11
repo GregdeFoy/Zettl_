@@ -1,0 +1,3 @@
+[console_scripts]
+z = zettl.cli:cli
+zi = zettl.interactive:main
