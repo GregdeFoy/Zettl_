@@ -741,6 +741,150 @@ def unlink(source_id, target_id):
 
 
 @cli.command()
+@click.option('--done', '-d', is_flag=True, help='Include completed todos (tagged with "done")')
+@click.option('--filter', '-f', multiple=True, help='Filter todos by one or more additional tags')
+def todos(done, filter):
+    """List all notes tagged with 'todo' grouped by category."""
+    try:
+        # Get all notes tagged with 'todo'
+        todo_notes = notes_manager.get_notes_by_tag('todo')
+        
+        if not todo_notes:
+            click.echo(ZettlFormatter.warning("No todos found."))
+            return
+        
+        # Apply filters if specified
+        if filter:
+            filters = [f.lower() for f in filter]
+            filtered_notes = []
+            
+            for note in todo_notes:
+                note_id = note['id']
+                tags = [t.lower() for t in notes_manager.get_tags(note_id)]
+                
+                # Check if all filters are in the note's tags
+                if all(f in tags for f in filters):
+                    filtered_notes.append(note)
+                    
+            todo_notes = filtered_notes
+            
+            if not todo_notes:
+                filter_str = "', '".join(filter)
+                click.echo(ZettlFormatter.warning(f"No todos found with all tags: '{filter_str}'."))
+                return
+        
+        # Group notes by their tags (categories)
+        active_todos_by_category = {}
+        done_todos_by_category = {}
+        uncategorized_active = []
+        uncategorized_done = []
+        
+        # Track unique note IDs to count them at the end
+        unique_active_ids = set()
+        unique_done_ids = set()
+        
+        for note in todo_notes:
+            note_id = note['id']
+            # Get all tags for this note
+            tags = notes_manager.get_tags(note_id)
+            tags_lower = [t.lower() for t in tags]
+            
+            # Check if this is a done todo
+            is_done = 'done' in tags_lower
+            
+            # Skip done todos if not explicitly included
+            if is_done and not done:
+                continue
+                
+            # Track unique IDs
+            if is_done:
+                unique_done_ids.add(note_id)
+            else:
+                unique_active_ids.add(note_id)
+            
+            # Find category tags (everything except 'todo', 'done', and the filter tags)
+            excluded_tags = ['todo', 'done']
+            if filter:
+                excluded_tags.extend([f.lower() for f in filter])
+                
+            categories = [tag for tag in tags if tag.lower() not in excluded_tags]
+            
+            if not categories:
+                # This todo has no category tags
+                if is_done:
+                    uncategorized_done.append(note)
+                else:
+                    uncategorized_active.append(note)
+            else:
+                # Add this note to each of its categories
+                for category in categories:
+                    if is_done:
+                        if category not in done_todos_by_category:
+                            done_todos_by_category[category] = []
+                        done_todos_by_category[category].append(note)
+                    else:
+                        if category not in active_todos_by_category:
+                            active_todos_by_category[category] = []
+                        active_todos_by_category[category].append(note)
+        
+        # Build the header message
+        header_parts = ["Todos"]
+        if filter:
+            filter_str = "', '".join(filter)
+            header_parts.append(f"tagged with '{filter_str}'")
+        
+        # Display todos by category
+        if not active_todos_by_category and not uncategorized_active and (not done or (not done_todos_by_category and not uncategorized_done)):
+            click.echo(ZettlFormatter.warning("No todos match your criteria."))
+            return
+            
+        # Display active todos first
+        if active_todos_by_category or uncategorized_active:
+            active_header = ZettlFormatter.header(f"Active {' '.join(header_parts)} ({len(unique_active_ids)} total)")
+            click.echo(active_header)
+            
+            if active_todos_by_category:
+                for category, notes in sorted(active_todos_by_category.items()):
+                    click.echo(f"\n{ZettlFormatter.tag(category)} ({len(notes)})")
+                    
+                    for note in notes:
+                        formatted_id = ZettlFormatter.note_id(note['id'])
+                        content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
+                        click.echo(f"  {formatted_id}: {content_preview}")
+            
+            if uncategorized_active:
+                click.echo("\nUncategorized")
+                for note in uncategorized_active:
+                    formatted_id = ZettlFormatter.note_id(note['id'])
+                    content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
+                    click.echo(f"  {formatted_id}: {content_preview}")
+        
+        # Display done todos if requested
+        if done and (done_todos_by_category or uncategorized_done):
+            done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids)} total)")
+            click.echo(f"\n{done_header}")
+            
+            if done_todos_by_category:
+                for category, notes in sorted(done_todos_by_category.items()):
+                    click.echo(f"\n{ZettlFormatter.tag(category)} ({len(notes)})")
+                    
+                    for note in notes:
+                        formatted_id = ZettlFormatter.note_id(note['id'])
+                        content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
+                        click.echo(f"  {formatted_id}: {content_preview}")
+            
+            if uncategorized_done:
+                click.echo("\nUncategorized")
+                for note in uncategorized_done:
+                    formatted_id = ZettlFormatter.note_id(note['id'])
+                    content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
+                    click.echo(f"  {formatted_id}: {content_preview}")
+                
+    except Exception as e:
+        click.echo(ZettlFormatter.error(str(e)), err=True)
+
+
+@cli.command()
 def workflow():
     """Show an example workflow of using zettl."""
     # Colors for better readability
