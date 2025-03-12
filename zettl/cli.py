@@ -849,15 +849,36 @@ def todos(done, filter):
                     
                     for note in notes:
                         formatted_id = ZettlFormatter.note_id(note['id'])
-                        content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
-                        click.echo(f"  {formatted_id}: {content_preview}")
+                        
+                        # Format the note content with proper indentation
+                        # Split content by lines and indent each line
+                        content_lines = note['content'].split('\n')
+                        formatted_content = content_lines[0]  # First line with the ID
+                        
+                        # If there are multiple lines, format them with indentation
+                        if len(content_lines) > 1:
+                            additional_lines = '\n'.join(['    ' + line for line in content_lines[1:]])
+                            formatted_content = f"{formatted_content}\n{additional_lines}"
+                        
+                        click.echo(f"  {formatted_id}: {content_lines[0]}")
+                        # Add indented content starting from second line
+                        if len(content_lines) > 1:
+                            for line in content_lines[1:]:
+                                click.echo(f"      {line}")
+                        click.echo("")  # Add an empty line between notes
             
             if uncategorized_active:
                 click.echo("\nUncategorized")
                 for note in uncategorized_active:
                     formatted_id = ZettlFormatter.note_id(note['id'])
-                    content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
-                    click.echo(f"  {formatted_id}: {content_preview}")
+                    
+                    # Format with indentation as above
+                    content_lines = note['content'].split('\n')
+                    click.echo(f"  {formatted_id}: {content_lines[0]}")
+                    if len(content_lines) > 1:
+                        for line in content_lines[1:]:
+                            click.echo(f"      {line}")
+                    click.echo("")  # Add an empty line between notes
         
         # Display done todos if requested
         if done and (done_todos_by_category or uncategorized_done):
@@ -870,19 +891,30 @@ def todos(done, filter):
                     
                     for note in notes:
                         formatted_id = ZettlFormatter.note_id(note['id'])
-                        content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
-                        click.echo(f"  {formatted_id}: {content_preview}")
+                        
+                        # Format with indentation as above
+                        content_lines = note['content'].split('\n')
+                        click.echo(f"  {formatted_id}: {content_lines[0]}")
+                        if len(content_lines) > 1:
+                            for line in content_lines[1:]:
+                                click.echo(f"      {line}")
+                        click.echo("")  # Add an empty line between notes
             
             if uncategorized_done:
                 click.echo("\nUncategorized")
                 for note in uncategorized_done:
                     formatted_id = ZettlFormatter.note_id(note['id'])
-                    content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
-                    click.echo(f"  {formatted_id}: {content_preview}")
+                    
+                    # Format with indentation as above
+                    content_lines = note['content'].split('\n')
+                    click.echo(f"  {formatted_id}: {content_lines[0]}")
+                    if len(content_lines) > 1:
+                        for line in content_lines[1:]:
+                            click.echo(f"      {line}")
+                    click.echo("")  # Add an empty line between notes
                 
     except Exception as e:
         click.echo(ZettlFormatter.error(str(e)), err=True)
-
 
 @cli.command()
 def workflow():
