@@ -143,6 +143,9 @@ Provide a summary that captures the essence of this note in 2-3 sentences."""
         try:
             note = self.db.get_note(note_id)
             
+            # Get tags for the source note
+            source_tags = self.db.get_tags(note_id)
+            
             # Get other notes to compare with
             other_notes = self.db.list_notes(30)
             other_notes = [n for n in other_notes if n['id'] != note_id]
@@ -151,44 +154,57 @@ Provide a summary that captures the essence of this note in 2-3 sentences."""
                 return []
                 
             system_message = """You are an expert assistant for a Zettelkasten note-taking system.
-Your specialized skill is finding meaningful conceptual connections between ideas across different notes.
-Focus on identifying substantial relationships based on:
-1. Shared concepts or themes
-2. Complementary or contradictory ideas
-3. Potential cause-effect relationships
-4. Applications of one idea to another domain
+    Your specialized skill is finding meaningful conceptual connections between ideas across different notes.
+    Focus on identifying substantial relationships based on:
+    1. Shared concepts or themes
+    2. Complementary or contradictory ideas
+    3. Potential cause-effect relationships
+    4. Applications of one idea to another domain
+    5. Shared or related tags
 
-For each connection, provide a clear, specific explanation of how the notes relate to each other."""
+    For each connection, provide a clear, specific explanation of how the notes relate to each other.
+    Pay special attention to the tags associated with each note, as they often indicate key concepts or themes."""
             
             # Prepare prompt with the target note
             prompt = f"""I need to find meaningful connections between notes in my Zettelkasten system.
 
-Here is the source note I want to connect to other notes:
+    Here is the source note I want to connect to other notes:
 
-## Note #{note_id}
-{note['content']}
+    ## Note #{note_id}
+    {note['content']}
+    Tags: {', '.join(source_tags) if source_tags else 'None'}
 
-Here are other notes in my system. Please identify the top {limit} notes that have the strongest conceptual connection to Note #{note_id}:
+    Here are other notes in my system. Please identify the top {limit} notes that have the strongest conceptual connection to Note #{note_id}:
 
-"""
+    """
             
             # Add a reasonable number of other notes to the prompt
             # We'll only include first 300 chars of each note to keep the prompt size manageable
             for i, other_note in enumerate(other_notes):
+                # Get tags for this note
+                try:
+                    note_tags = self.db.get_tags(other_note['id'])
+                except Exception:
+                    note_tags = []
+                    
                 note_preview = other_note['content']
                 if len(note_preview) > 300:
                     note_preview = note_preview[:300] + "..."
-                prompt += f"## Note #{other_note['id']}\n{note_preview}\n\n"
+                
+                # Include tags in the prompt
+                prompt += f"## Note #{other_note['id']}\n{note_preview}\n"
+                prompt += f"Tags: {', '.join(note_tags) if note_tags else 'None'}\n\n"
                 
                 # Limit number of notes to avoid exceeding token limits
-                if i >= 15:  # Reduced from all 30 to just 15
+                if i >= 15:  # Limited to 15 notes to avoid token limits
                     break
                     
             prompt += f"""For each of the top {limit} most related notes, provide:
-1. The note ID (in the format: "Note #ID")
-2. A clear explanation of the conceptual connection to the source note
+    1. The note ID (in the format: "Note #ID")
+    2. A clear explanation of the conceptual connection to the source note
+    3. Mention any shared or related tags that contribute to the connection
 
-Format your response as a structured list with one connection per item. Include only notes with meaningful connections."""
+    Format your response as a structured list with one connection per item. Include only notes with meaningful connections."""
 
             response = self._call_llm_api(prompt, system_message, max_tokens=1500)
             
@@ -212,6 +228,7 @@ Format your response as a structured list with one connection per item. Include 
                     r'#([a-zA-Z0-9]+):',      # #abc123:
                     r'#([a-zA-Z0-9]+) -',     # #abc123 -
                     r'^\s*([0-9]+)\.\s+#([a-zA-Z0-9]+)', # 1. #abc123
+                    r'^\s*([0-9]+)\.\s+Note #([a-zA-Z0-9]+)', # 1. Note #abc123
                 ]
                 
                 found_id = False
