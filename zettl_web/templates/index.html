@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Zettl Web</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/2.37.2/css/jquery.terminal.min.css" rel="stylesheet">
     <style>
@@ -88,10 +88,23 @@
         
         /* Mobile optimizations */
         @media (max-width: 768px) {
+            html, body {
+                height: 100%;
+                position: fixed;
+                overflow: hidden;
+                width: 100%;
+            }
+            
             .terminal {
                 --size: 1.4; /* Larger text on mobile */
                 -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
                 padding-bottom: 60px; /* Extra space at bottom to prevent last line from being hidden */
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 45px; /* Make room for fixed bottom bar */
+                overscroll-behavior: none; /* Prevent pull-to-refresh on iOS */
             }
             
             #mobile-buttons {
@@ -175,6 +188,27 @@
                 display: block;
             }
         }
+        
+        /* iOS-specific fixes */
+        body.ios-device {
+            /* Prevent Safari UI from disappearing */
+            height: calc(100% - 50px);
+            /* Special position absolute for iOS */
+            position: fixed;
+            /* Prevent iOS overscroll/bounce */
+            overflow: hidden;
+        }
+        
+        body.ios-device .terminal {
+            /* Position relative to visible area */
+            position: relative;
+            padding-bottom: 100px;
+        }
+        
+        body.ios-device .cmd-line {
+            /* Keep cursor area visible */
+            padding-bottom: 40vh;
+        }
     </style>
 </head>
 <body>
@@ -216,6 +250,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/2.37.2/js/jquery.terminal.min.js"></script>
     <script>
         $(function() {
+            // Detect iOS device
+            const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            
+            // iOS-specific body class
+            if (isiOS) {
+                $('body').addClass('ios-device');
+            }
+            
             // Enable mouse wheel scrolling globally
             $.terminal.defaults.mousewheel = true;
 
@@ -387,6 +429,27 @@ Type 'list' to see your recent notes.
                 term.focus();
             };
             
+            // Add special handler for iOS cursor focus
+            if (isiOS) {
+                // Special iOS input handler to fix cursor jumping
+                term.on('click', function() {
+                    // Delay focus to help with iOS keyboard positioning
+                    setTimeout(function() {
+                        // Position cursor properly
+                        const cmdLine = $('.cmd-line');
+                        if (cmdLine.length) {
+                            // Position cursor in middle of viewport after click
+                            const cmdPos = cmdLine.offset().top;
+                            const windowHeight = $(window).height();
+                            $('html, body').scrollTop(cmdPos - windowHeight/3);
+                        }
+                    }, 100);
+                });
+                
+                // Add space at bottom for iOS keyboard
+                $('#terminal-container').css('padding-bottom', '40vh');
+            }
+            
             // Mobile keyboard optimization
             if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
                 // Focus on terminal when page loads (with slight delay to ensure DOM is ready)
@@ -400,19 +463,61 @@ Type 'list' to see your recent notes.
                 // Prevent zoom on double-tap for iOS
                 $('body').css('touch-action', 'manipulation');
                 
-                // Fix for iOS erratic scrolling and last line disappearing
-                term.on('keypress', function() {
-                    // Force scroll to bottom after small delay when typing
+                // Fix for iOS erratic scrolling and text jumping to top when typing
+                term.on('keypress', function(event) {
+                    // Don't actually prevent default for the keypress or we'll lose input
+                    // We just need to manage scrolling afterward
+                    
+                    // Force proper positioning of the cursor after a short delay
                     setTimeout(function() {
-                        term.scroll_to_bottom();
-                    }, 50);
+                        // Calculate position to keep current line in view
+                        const terminal = $('.terminal');
+                        const prompt = $('.terminal-output').last();
+                        const promptBottom = prompt.position().top + prompt.height();
+                        const visibleBottom = terminal.scrollTop() + terminal.height() - 100; // Extra space for keyboard
+                        
+                        // Only scroll if needed to make cursor visible
+                        if (promptBottom > visibleBottom) {
+                            terminal.scrollTop(promptBottom - terminal.height() + 150);
+                        }
+                        
+                        // iOS-specific fix: ensure the cmd line stays visible in viewport
+                        // This helps prevent the jumping behavior
+                        const cmdLine = $('.cmd-line');
+                        if (cmdLine.length) {
+                            // Get the input position
+                            const cmdPos = cmdLine.offset().top;
+                            const windowHeight = $(window).height();
+                            
+                            // If the input would be hidden by keyboard, adjust scroll
+                            if (cmdPos > windowHeight * 0.6) {
+                                // Scroll to position the input at 1/3 from top
+                                $('html, body').scrollTop(cmdPos - windowHeight/3);
+                            }
+                        }
+                    }, 10);
                 });
                 
-                // Ensure visibility when soft keyboard appears on mobile
+                // Handle viewport changes when keyboard appears/disappears
+                let viewportHeight = window.innerHeight;
                 $(window).on('resize', function() {
-                    setTimeout(function() {
-                        term.scroll_to_bottom();
-                    }, 300);
+                    // Check if it's likely a keyboard-triggered resize
+                    if (window.innerHeight < viewportHeight) {
+                        // Keyboard appeared - adjust scrolling after delay
+                        setTimeout(function() {
+                            const terminal = $('.terminal');
+                            const cursor = $('.cmd-cursor');
+                            if (cursor.length) {
+                                // Position terminal to keep cursor in view
+                                const cursorPos = cursor.position().top;
+                                const visibleArea = terminal.height() - 150;
+                                terminal.scrollTop(terminal.scrollTop() + cursorPos - visibleArea);
+                            }
+                        }, 300);
+                    } else {
+                        // Keyboard disappeared - restore normal scroll
+                        viewportHeight = window.innerHeight;
+                    }
                 });
                 
                 // Disable iOS text selection on double-tap
