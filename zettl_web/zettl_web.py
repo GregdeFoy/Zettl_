@@ -189,6 +189,29 @@ COMMAND_OPTIONS = {
             'compact': {'flag': True}
         }
     },
+    'todos': {
+        'short_opts': {
+            'd': {'name': 'done', 'flag': True},
+            't': {'name': 'donetoday', 'flag': True},
+            'f': {'name': 'filter', 'multiple': True}
+        },
+        'long_opts': {
+            'done': {'flag': True},
+            'donetoday': {'flag': True},
+            'filter': {'multiple': True}
+        }
+    },
+    'search': {
+        'short_opts': {
+            't': {'name': 'tag'},
+            'f': {'name': 'full', 'flag': True}
+        },
+        'long_opts': {
+            'tag': {},
+            'exclude-tag': {},
+            'full': {'flag': True}
+        }
+    },
     # Add similar configs for other commands
 }
 
@@ -296,12 +319,17 @@ def extract_options(args, cmd):
                 if flag in short_opts:
                     opt_name = short_opts[flag].get('name', flag)
                     options[opt_name] = True
+                else:
+                    # Even if not in short_opts config, keep the flag
+                    options[flag] = True
             i += 1
-            
-        # Regular arguments
-        else:
-            remaining_args.append(arg)
-            i += 1
+        elif arg.startswith('+t'):
+            if i + 1 < len(args) and not args[i+1].startswith('-'):
+                options['exclude-tag'] = args[i+1]
+                i += 2
+            else:
+                options['exclude-tag'] = True
+                i += 1
             
     return options, flags, remaining_args
 
@@ -341,6 +369,49 @@ def ansi_to_html(text):
     
     return text
 
+def show_command_help(cmd):
+    """Show detailed help for a specific command."""
+    help_text = ""
+    
+    if cmd == "search":
+        help_text = f"""
+{Colors.GREEN}{Colors.BOLD}search [QUERY]{Colors.RESET} - Search for notes containing text
+
+{Colors.BOLD}Options:{Colors.RESET}
+  {Colors.YELLOW}-t, --tag TAG{Colors.RESET}        Search for notes with this tag
+  {Colors.YELLOW}+t, --exclude-tag TAG{Colors.RESET} Exclude notes with this tag
+  {Colors.YELLOW}-f, --full{Colors.RESET}           Show full content of matching notes
+
+{Colors.BOLD}Examples:{Colors.RESET}
+  {Colors.BLUE}search "keyword"{Colors.RESET}       Search notes containing "keyword"
+  {Colors.BLUE}search -t concept{Colors.RESET}      Show notes tagged with "concept"
+  {Colors.BLUE}search -t work +t done{Colors.RESET} Show notes tagged "work" but not "done"
+"""
+    elif cmd == "todos":
+        help_text = f"""
+{Colors.GREEN}{Colors.BOLD}todos{Colors.RESET} - List all notes tagged with 'todo'
+
+{Colors.BOLD}Options:{Colors.RESET}
+  {Colors.YELLOW}-d, --done{Colors.RESET}           Include completed todos
+  {Colors.YELLOW}-dt, --donetoday{Colors.RESET}     Show todos completed today
+  {Colors.YELLOW}-f, --filter TAG{Colors.RESET}     Filter todos by additional tag
+
+{Colors.BOLD}Examples:{Colors.RESET}
+  {Colors.BLUE}todos{Colors.RESET}                  Show active todos
+  {Colors.BLUE}todos -d{Colors.RESET}               Show active and completed todos 
+  {Colors.BLUE}todos -dt{Colors.RESET}              Show todos completed today
+  {Colors.BLUE}todos -f work{Colors.RESET}          Show todos tagged with "work"
+"""
+    # Add more command help texts as needed...
+    elif cmd == "help":
+        # For "help --help", just show general help
+        return execute_command("help", [], {}, [])
+    else:
+        help_text = f"No detailed help available for '{cmd}'. Try 'help' for a list of all commands."
+        
+    return jsonify({'result': ansi_to_html(help_text)})
+
+
 # Routes
 @app.route('/')
 @auth.login_required
@@ -359,7 +430,13 @@ def execute_command():
         
     # Parse the command with better handling for options and quotes
     cmd, args = parse_command(command)
-    
+
+    # Check for command-specific help
+    if '--help' in args or '-h' in args:
+        return show_command_help(cmd)
+
+
+
     # Extract options, flags and non-option args
     options, flags, remaining_args = extract_options(args, cmd)
     
