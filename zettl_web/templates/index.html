@@ -30,7 +30,8 @@
             flex: 1;
             width: 100%;
             position: relative;
-            overflow: hidden;  /* Let the terminal handle scrolling */
+            overflow: auto;  /* Enable native scrolling for better performance */
+            -webkit-overflow-scrolling: touch; /* Enable momentum scrolling on iOS */
         }
         
         /* Override terminal styles for better mobile experience */
@@ -38,6 +39,8 @@
             --size: 1.2;
             height: 100%;
             overflow: auto;    /* Ensure terminal has scrolling enabled */
+            -webkit-transform: translateZ(0); /* Hardware acceleration for smoother scrolling */
+            will-change: transform; /* Performance optimization */
         }
         
         /* Custom terminal colors to match Zettl CLI */
@@ -90,8 +93,7 @@
         @media (max-width: 768px) {
             html, body {
                 height: 100%;
-                position: fixed;
-                overflow: hidden;
+                overflow: auto;
                 width: 100%;
             }
             
@@ -99,20 +101,17 @@
                 --size: 1.4; /* Larger text on mobile */
                 -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
                 padding-bottom: 60px; /* Extra space at bottom to prevent last line from being hidden */
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 45px; /* Make room for fixed bottom bar */
-                overscroll-behavior: none; /* Prevent pull-to-refresh on iOS */
+                overflow: auto; /* Enable standard scrolling */
+                height: auto; /* Allow terminal to expand */
+                min-height: 80vh; /* Ensure minimum height */
             }
             
             #mobile-buttons {
                 display: flex;
                 justify-content: space-around;
-                background-color: #333;
+                background-color: rgba(51, 51, 51, 0.9);
                 padding: 10px 0;
-                position: fixed;
+                position: sticky;
                 bottom: 0;
                 left: 0;
                 right: 0;
@@ -139,7 +138,7 @@
         
         /* Mobile keyboard styling */
         #mobile-keyboard {
-            position: fixed;
+            position: sticky;
             bottom: 50px;
             left: 0;
             right: 0;
@@ -147,6 +146,7 @@
             padding: 10px 0;
             z-index: 999;
             border-top: 1px solid #444;
+            margin-bottom: -40px; /* Overlap with the bottom buttons */
         }
         
         .keyboard-row {
@@ -165,6 +165,16 @@
             min-width: 40px;
             touch-action: manipulation;
             -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Mobile controls container */
+        #mobile-controls {
+            position: sticky;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background-color: transparent;
         }
         
         /* Keyboard toggle button */
@@ -192,22 +202,22 @@
         /* iOS-specific fixes */
         body.ios-device {
             /* Prevent Safari UI from disappearing */
-            height: calc(100% - 50px);
-            /* Special position absolute for iOS */
-            position: fixed;
-            /* Prevent iOS overscroll/bounce */
-            overflow: hidden;
+            height: auto;
+            /* Allow normal scrolling */
+            overflow: auto;
         }
         
         body.ios-device .terminal {
-            /* Position relative to visible area */
-            position: relative;
-            padding-bottom: 100px;
+            /* Allow content to scroll normally */
+            overflow: auto;
+            /* Add margin for keyboard visibility */
+            margin-bottom: 50px;
         }
         
+        /* Remove the black square */
         body.ios-device .cmd-line {
-            /* Keep cursor area visible */
-            padding-bottom: 40vh;
+            /* No extra padding */
+            padding-bottom: 0;
         }
     </style>
 </head>
@@ -220,29 +230,33 @@
     <!-- Keyboard toggle button for mobile -->
     <button id="keyboard-toggle" onclick="toggleKeyboard()">⌨️</button>
     
+    <!-- Terminal Container -->
     <div id="terminal-container"></div>
     
-    <!-- Mobile quick-access buttons -->
-    <div id="mobile-buttons">
-        <button onclick="insertCommand('list')">list</button>
-        <button onclick="insertCommand('new')">new</button>
-        <button onclick="insertCommand('search')">search</button>
-        <button onclick="insertCommand('help')">help</button>
-        <button onclick="insertSpecialKey('Tab')">Tab</button>
-        <button onclick="insertSpecialKey('ArrowUp')">↑</button>
-        <button onclick="insertSpecialKey('ArrowDown')">↓</button>
-    </div>
-    
-    <!-- Custom mobile keyboard -->
-    <div id="mobile-keyboard" style="display:none;">
-        <div class="keyboard-row">
+    <!-- Absolute positioned mobile controls that float above keyboard -->
+    <div id="keyboard-float-buttons" style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 1001;">
+        <!-- Custom mobile keyboard -->
+        <div id="mobile-keyboard" style="display:none;">
+            <div class="keyboard-row">
+                <button onclick="insertSpecialKey('Tab')">Tab</button>
+                <button onclick="insertSpecialKey('Escape')">Esc</button>
+                <button onclick="insertSpecialKey('ArrowLeft')">←</button>
+                <button onclick="insertSpecialKey('ArrowUp')">↑</button>
+                <button onclick="insertSpecialKey('ArrowDown')">↓</button>
+                <button onclick="insertSpecialKey('ArrowRight')">→</button>
+                <button onclick="toggleKeyboard()">Hide</button>
+            </div>
+        </div>
+        
+        <!-- Mobile quick-access buttons -->
+        <div id="mobile-buttons">
+            <button onclick="insertCommand('list')">list</button>
+            <button onclick="insertCommand('new')">new</button>
+            <button onclick="insertCommand('search')">search</button>
+            <button onclick="insertCommand('help')">help</button>
             <button onclick="insertSpecialKey('Tab')">Tab</button>
-            <button onclick="insertSpecialKey('Escape')">Esc</button>
-            <button onclick="insertSpecialKey('ArrowLeft')">←</button>
             <button onclick="insertSpecialKey('ArrowUp')">↑</button>
             <button onclick="insertSpecialKey('ArrowDown')">↓</button>
-            <button onclick="insertSpecialKey('ArrowRight')">→</button>
-            <button onclick="toggleKeyboard()">Hide</button>
         </div>
     </div>
 
@@ -326,48 +340,18 @@ Type 'list' to see your recent notes.
                 exit: false,
                 wrap: true,
                 historyPersistedState: true,
-                scrollOnEcho: true,
-                mousewheel: true,
+                scrollOnEcho: false, // Disable scroll on echo for smoother performance
+                mousewheel: false, // Disable mousewheel internal handler
                 height: '100%',
                 overflow: 'auto',
                 touchscroll: true,  // Enable touch scrolling
                 mobileDelete: true, // Better backspace handling on mobile
-                mobileIngameLoop: true, // Improve mobile performance
-                scrollBottomOffset: 40 // Keep space at bottom for better visibility
+                smoothScroll: false, // Disable smooth scrolling for better performance
+                scrollBottomOffset: 0 // No extra space at bottom
             });
             
-            // Improved scroll handling for both mouse and touch
-            $('#terminal-container').on('wheel touchmove', function(event) {
-                // For wheel events
-                if (event.type === 'wheel') {
-                    const delta = event.originalEvent.deltaY;
-                    if (delta > 0) {
-                        term.scroll(1);  // Scroll down
-                    } else {
-                        term.scroll(-1);  // Scroll up
-                    }
-                    event.preventDefault();
-                    return false;
-                }
-            });
-            
-            // Touch-specific scroll handling
-            let touchStartY = 0;
-            $('#terminal-container').on('touchstart', function(e) {
-                touchStartY = e.originalEvent.touches[0].clientY;
-            });
-            
-            $('#terminal-container').on('touchmove', function(e) {
-                // Allow normal scrolling but with improved behavior
-                const touchY = e.originalEvent.touches[0].clientY;
-                const delta = touchStartY - touchY;
-                
-                // Determine scroll direction and speed
-                if (Math.abs(delta) > 5) {
-                    term.scroll(delta > 0 ? 1 : -1);
-                    touchStartY = touchY;
-                }
-            });
+            // Let native scrolling work for better performance
+            // No custom scroll handlers
 
             // Cache command history locally in browser
             if (localStorage.getItem('zettl_history')) {
@@ -446,8 +430,7 @@ Type 'list' to see your recent notes.
                     }, 100);
                 });
                 
-                // Add space at bottom for iOS keyboard
-                $('#terminal-container').css('padding-bottom', '40vh');
+                // No extra padding for iOS
             }
             
             // Mobile keyboard optimization
