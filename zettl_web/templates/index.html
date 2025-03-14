@@ -14,8 +14,6 @@
             font-family: 'Courier New', monospace;
             display: flex;
             flex-direction: column;
-            position: relative;
-            overflow: hidden;
         }
         
         #header {
@@ -33,7 +31,6 @@
             width: 100%;
             overflow: auto;
             -webkit-overflow-scrolling: touch;
-            position: relative;
         }
         
         .terminal {
@@ -49,86 +46,42 @@
         .terminal .cyan { color: #00ffff; }
         .terminal .bold { font-weight: bold; }
         
-        .terminal .output-line {
-            line-height: 1.4;
-        }
-        
-        .terminal .note-separator {
-            margin: 10px 0;
-            border-bottom: 1px dashed #444;
-        }
-        
-        .terminal .note-block {
-            margin-bottom: 15px;
-            padding: 5px;
-            border-left: 3px solid #444;
-        }
-        
         /* Mobile styles */
         @media (max-width: 768px) {
             .terminal {
-                --size: 1.4;
+                --size: 1.4; /* Larger text on mobile */
             }
             
-            /* Mobile toolbar */
-            #mobile-toolbar {
+            /* Basic command buttons */
+            #mobile-buttons {
+                display: flex;
+                justify-content: space-around;
+                background-color: #333;
+                padding: 10px 0;
                 position: fixed;
                 bottom: 0;
                 left: 0;
                 right: 0;
-                background-color: rgba(51, 51, 51, 0.95);
                 z-index: 1000;
-                box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.5);
             }
             
-            .toolbar-row {
-                display: flex;
-                justify-content: space-around;
-                flex-wrap: wrap;
-                padding: 5px 0;
-            }
-            
-            #mobile-toolbar button {
+            #mobile-buttons button {
                 background-color: #4a4a4a;
                 color: white;
                 border: none;
                 padding: 8px 12px;
-                margin: 3px;
                 border-radius: 4px;
                 font-family: 'Courier New', monospace;
-                min-width: 40px;
             }
             
-            /* Custom keyboard */
-            #special-keys {
-                background-color: rgba(40, 40, 40, 0.95);
-                border-top: 1px solid #555;
-                padding: 5px 0;
-            }
-            
-            /* Make room for mobile toolbar */
+            /* Space for mobile buttons */
             #terminal-container {
                 padding-bottom: 60px;
-            }
-            
-            /* Keyboard toggle button */
-            #keyboard-toggle {
-                position: fixed;
-                bottom: 70px;
-                right: 10px;
-                z-index: 1001;
-                width: 40px;
-                height: 40px;
-                border-radius: 50%;
-                background-color: rgba(100, 100, 100, 0.7);
-                color: white;
-                border: none;
-                font-size: 16px;
             }
         }
         
         @media (min-width: 769px) {
-            #mobile-toolbar, #keyboard-toggle {
+            #mobile-buttons {
                 display: none;
             }
         }
@@ -142,46 +95,21 @@
     
     <div id="terminal-container"></div>
     
-    <!-- Mobile keyboard toggle -->
-    <button id="keyboard-toggle">⌨️</button>
-    
-    <!-- Mobile toolbar -->
-    <div id="mobile-toolbar">
-        <div class="toolbar-row">
-            <button onclick="insertCommand('list')">list</button>
-            <button onclick="insertCommand('new')">new</button>
-            <button onclick="insertCommand('search')">search</button>
-            <button onclick="insertCommand('help')">help</button>
-        </div>
-        <div id="special-keys" class="toolbar-row">
-            <button onclick="insertSpecialKey('Tab')">Tab</button>
-            <button onclick="insertSpecialKey('ArrowLeft')">←</button>
-            <button onclick="insertSpecialKey('ArrowUp')">↑</button>
-            <button onclick="insertSpecialKey('ArrowDown')">↓</button>
-            <button onclick="insertSpecialKey('ArrowRight')">→</button>
-            <button onclick="insertSpecialKey('Escape')">Esc</button>
-        </div>
+    <!-- Simple mobile buttons -->
+    <div id="mobile-buttons">
+        <button onclick="insertCommand('list')">list</button>
+        <button onclick="insertCommand('new')">new</button>
+        <button onclick="insertCommand('search')">search</button>
+        <button onclick="insertCommand('help')">help</button>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/2.37.2/js/jquery.terminal.min.js"></script>
     <script>
         $(function() {
-            // Initially hide special keys
-            $('#special-keys').hide();
-            
-            // Toggle special keys
-            $('#keyboard-toggle').on('click', function() {
-                $('#special-keys').toggle();
-            });
-            
             // Mobile detection
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-            
-            if (isIOS) {
-                $('body').addClass('ios-device');
-            }
             
             // Terminal initialization
             let term = $('#terminal-container').terminal(function(command) {
@@ -205,8 +133,6 @@
                     data: JSON.stringify({ command: command }),
                     success: function(response) {
                         term.resume();
-                        
-                        // Remove loading indicator
                         $('.loading-indicator').remove();
                         
                         // Output response
@@ -222,7 +148,7 @@
                             }
                         });
                         
-                        // Ensure visibility after response on mobile
+                        // Ensure visibility of terminal output
                         if (isMobile) {
                             setTimeout(function() {
                                 term.scroll_to_bottom();
@@ -257,34 +183,9 @@ Type 'list' to see your recent notes.
                 height: '100%'
             });
             
-            // Handle command insertion from mobile buttons
+            // Handle command insertion from buttons
             window.insertCommand = function(cmd) {
                 term.set_command(cmd + ' ');
-                term.focus();
-                
-                if (isIOS) {
-                    // On iOS, force focus input to show keyboard
-                    setTimeout(function() {
-                        term.focus(true);
-                    }, 100);
-                }
-            };
-            
-            // Handle special key insertion
-            window.insertSpecialKey = function(key) {
-                const e = $.Event('keydown');
-                
-                switch(key) {
-                    case 'Tab':      e.which = 9;   break;
-                    case 'ArrowUp':  e.which = 38;  break;
-                    case 'ArrowDown':e.which = 40;  break;
-                    case 'ArrowLeft':e.which = 37;  break;
-                    case 'ArrowRight':e.which = 39; break;
-                    case 'Escape':   e.which = 27;  break;
-                    default: return;
-                }
-                
-                term.trigger(e);
                 term.focus();
             };
             
@@ -305,83 +206,48 @@ Type 'list' to see your recent notes.
                 localStorage.setItem('zettl_history', JSON.stringify(history));
             });
             
-            // Mobile-specific optimizations
-            if (isMobile) {
-                // Ensure terminal gets focus on mobile
+            // iOS-specific fix to ensure input line stays visible when typing
+            if (isIOS) {
+                // Focus on terminal when page loads
                 setTimeout(function() {
                     term.focus();
                 }, 500);
                 
-                // iOS-specific fixes
-                if (isIOS) {
-                    // Store original height
-                    const originalHeight = window.innerHeight;
+                // Simple keyboard visibility detector
+                const originalHeight = window.innerHeight;
+                $(window).on('resize', function() {
+                    const currentHeight = window.innerHeight;
                     
-                    // Handle keyboard visibility
-                    function adjustKeyboard() {
-                        // Check if keyboard is visible by comparing heights
-                        const currentHeight = window.innerHeight;
-                        const keyboardHeight = originalHeight - currentHeight;
-                        
-                        if (keyboardHeight > 100) { // Keyboard is visible
-                            // Move toolbar above keyboard
-                            $('#mobile-toolbar').css({
-                                'transform': 'translateY(-' + keyboardHeight + 'px)',
-                                'transition': 'transform 0.1s'
-                            });
-                            
-                            // Adjust terminal container
-                            $('#terminal-container').css('padding-bottom', (keyboardHeight + 10) + 'px');
-                            
-                            // Scroll terminal to ensure input is visible
-                            setTimeout(function() {
-                                // Find input line
-                                const cmd = $('.cmd-line').last();
-                                if (cmd.length) {
-                                    // Scroll to make input visible
-                                    cmd[0].scrollIntoView(false);
-                                }
-                            }, 200);
-                            
-                            // Keep focus on terminal
-                            term.focus(true);
-                        } else { // Keyboard is hidden
-                            // Reset toolbar position
-                            $('#mobile-toolbar').css({
-                                'transform': 'translateY(0)',
-                                'transition': 'transform 0.1s'
-                            });
-                            
-                            // Reset terminal container
-                            $('#terminal-container').css('padding-bottom', '60px');
-                        }
-                    }
-                    
-                    // Handle keyboard on input
-                    term.on('keypress', function() {
-                        // Force scroll on keypress
+                    // If keyboard is visible (height is significantly less)
+                    if (currentHeight < originalHeight * 0.75) {
+                        // Wait a moment for keyboard to fully appear
                         setTimeout(function() {
-                            term.scroll_to_bottom();
-                        }, 0);
-                    });
-                    
-                    // Use visualViewport API if available (iOS 13+)
-                    if (window.visualViewport) {
-                        window.visualViewport.addEventListener('resize', function() {
-                            adjustKeyboard();
-                        });
-                    } else {
-                        // Fallback for older iOS
-                        $(window).on('resize', function() {
-                            adjustKeyboard();
-                        });
+                            // Get command line
+                            const cmdLine = $('.cmd-line').last();
+                            if (cmdLine.length) {
+                                // Use native scrollIntoView for best performance
+                                cmdLine[0].scrollIntoView(false);
+                            }
+                        }, 300);
                     }
-                    
-                    // Fix iOS touch scrolling
-                    document.addEventListener('touchmove', function(e) {
-                        // Use passive listener to improve scroll performance
-                    }, { passive: true });
-                }
+                });
+                
+                // When typing, ensure command line is visible
+                term.on('keydown keypress', function() {
+                    setTimeout(function() {
+                        term.scroll_to_bottom();
+                    }, 0);
+                });
+                
+                // When clicking to position cursor, ensure it's visible
+                $(document).on('click', '.cmd-line', function() {
+                    setTimeout(function() {
+                        const cmdLine = $('.cmd-line').last();
+                        if (cmdLine.length) {
+                            cmdLine[0].scrollIntoView(false);
+                        }
+                    }, 0);
+                });
             }
         });
     </script>
