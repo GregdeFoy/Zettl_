@@ -29,11 +29,15 @@
         #terminal-container {
             flex: 1;
             width: 100%;
+            position: relative;
+            overflow: hidden;  /* Let the terminal handle scrolling */
         }
         
         /* Override terminal styles for better mobile experience */
         .terminal {
             --size: 1.2;
+            height: 100%;
+            overflow: auto;    /* Ensure terminal has scrolling enabled */
         }
         
         /* Custom terminal colors to match Zettl CLI */
@@ -132,6 +136,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/2.37.2/js/jquery.terminal.min.js"></script>
     <script>
         $(function() {
+            // Enable mouse wheel scrolling globally
+            $.terminal.defaults.mousewheel = true;
+
             let term = $('#terminal-container').terminal(function(command) {
                 if (command.trim() === '') {
                     return;
@@ -198,9 +205,22 @@ Type 'list' to see your recent notes.
                 wrap: true,
                 historyPersistedState: true,
                 scrollOnEcho: true,
-                height: '100%'
+                mousewheel: true,
+                height: '100%',
+                overflow: 'auto'
             });
             
+            // Add explicit mouse wheel handler as backup
+            $('#terminal-container').on('wheel', function(event) {
+                const delta = event.originalEvent.deltaY;
+                if (delta > 0) {
+                    term.scroll(1);  // Scroll down
+                } else {
+                    term.scroll(-1);  // Scroll up
+                }
+                return false;  // Prevent default scrolling
+            });
+
             // Cache command history locally in browser
             if (localStorage.getItem('zettl_history')) {
                 try {

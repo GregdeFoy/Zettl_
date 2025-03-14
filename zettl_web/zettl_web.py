@@ -659,12 +659,17 @@ def execute_command():
                 
                 notes_manager.delete_link(source_id, target_id)
                 result = ZettlFormatter.success(f"Removed link from note #{source_id} to note #{target_id}")
-        
+                
         elif cmd == "todos":
-            # List all notes tagged with 'todo'
+            # List all notes tagged with 'todo' grouped by category
             done = 'done' in flags or 'd' in flags
             donetoday = 'donetoday' in flags or 'dt' in flags
-            filter_tags = options.get('filter', '').split(',') if 'filter' in options else []
+            filter_tags = []
+            if 'filter' in options:
+                if isinstance(options['filter'], list):  # Multiple filters
+                    filter_tags.extend(options['filter'])
+                else:  # Single filter
+                    filter_tags.append(options['filter'])
             
             # Get all notes tagged with 'todo'
             todo_notes = notes_manager.get_notes_by_tag('todo')
@@ -672,27 +677,207 @@ def execute_command():
             if not todo_notes:
                 result = ZettlFormatter.warning("No todos found.")
             else:
-                result = f"{ZettlFormatter.header('Todos')}\n\n"
+                # Get notes with 'done' tag added today (for donetoday option)
+                done_today_ids = set()
+                if donetoday:
+                    from datetime import datetime
+                    today = datetime.now().date()
+                    
+                    try:
+                        tags_result = notes_manager.db.client.table('tags').select('note_id, created_at').eq('tag', 'done').execute()
+                        
+                        if tags_result.data:
+                            for tag_data in tags_result.data:
+                                note_id = tag_data.get('note_id')
+                                created_at = tag_data.get('created_at', '')
+                                
+                                if note_id and created_at:
+                                    try:
+                                        # Parse the ISO format date
+                                        tag_date = datetime.fromisoformat(created_at.replace('Z', '+00:00')).date()
+                                        
+                                        # Check if tag was created today
+                                        if tag_date == today:
+                                            done_today_ids.add(note_id)
+                                    except Exception:
+                                        pass
+                    except Exception as e:
+                        result += f"{ZettlFormatter.warning(f'Could not determine todos completed today: {str(e)}')}\n\n"
                 
-                # Apply simple filter based on 'done' tag
+                # Apply filters if specified
+                if filter_tags:
+                    filtered_notes = []
+                    
+                    for note in todo_notes:
+                        note_id = note['id']
+                        tags = [t.lower() for t in notes_manager.get_tags(note_id)]
+                        
+                        # Check if all filters are in the note's tags
+                        if all(f.lower() in tags for f in filter_tags):
+                            filtered_notes.append(note)
+                            
+                    todo_notes = filtered_notes
+                    
+                    if not todo_notes:
+                        filter_str = "', '".join(filter_tags)
+                        result = ZettlFormatter.warning(f"No todos found with all tags: '{filter_str}'.")
+                        return jsonify({'result': ansi_to_html(result)})
+                
+                # Group notes by their tags (categories)
+                active_todos_by_category = {}
+                done_todos_by_category = {}
+                donetoday_todos_by_category = {}
+                uncategorized_active = []
+                uncategorized_done = []
+                uncategorized_donetoday = []
+                
+                # Track unique note IDs to count them at the end
+                unique_active_ids = set()
+                unique_done_ids = set()
+                unique_donetoday_ids = set()
+                
                 for note in todo_notes:
                     note_id = note['id']
+                    # Get all tags for this note
                     tags = notes_manager.get_tags(note_id)
                     tags_lower = [t.lower() for t in tags]
                     
                     # Check if this is a done todo
                     is_done = 'done' in tags_lower
                     
-                    # Skip done todos if not explicitly included
-                    if is_done and not done:
+                    # Check if this is done today
+                    is_done_today = note_id in done_today_ids
+                    
+                    # Skip done todos if not explicitly included, unless they're done today and we want those
+                    if is_done and not done and not (is_done_today and donetoday):
                         continue
                         
+                    # Track unique IDs
+                    if is_done_today and donetoday:
+                        unique_donetoday_ids.add(note_id)
+                    elif is_done:
+                        unique_done_ids.add(note_id)
+                    else:
+                        unique_active_ids.add(note_id)
+                    
+                    # Find category tags (everything except 'todo', 'done', and the filter tags)
+                    excluded_tags = ['todo', 'done']
+                    if filter_tags:
+                        excluded_tags.extend([f.lower() for f in filter_tags])
                         
-                    # Display the todo
-                    result += f"{ZettlFormatter.note_id(note_id)}: {note['content']}\n"
-                    if tags:
-                        result += f"  Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}\n"
-                    result += "\n\n"  # Added extra newline
+                    categories = [tag for tag in tags if tag.lower() not in excluded_tags]
+                    
+                    # Assign note to appropriate category group
+                    if not categories:
+                        # This todo has no category tags
+                        if is_done_today and donetoday:
+                            uncategorized_donetoday.append(note)
+                        elif is_done:
+                            uncategorized_done.append(note)
+                        else:
+                            uncategorized_active.append(note)
+                    else:
+                        # Add this note to each of its categories
+                        for category in categories:
+                            if is_done_today and donetoday:
+                                if category not in donetoday_todos_by_category:
+                                    donetoday_todos_by_category[category] = []
+                                donetoday_todos_by_category[category].append(note)
+                            elif is_done:
+                                if category not in done_todos_by_category:
+                                    done_todos_by_category[category] = []
+                                done_todos_by_category[category].append(note)
+                            else:
+                                if category not in active_todos_by_category:
+                                    active_todos_by_category[category] = []
+                                active_todos_by_category[category].append(note)
+                
+                # Build the header message
+                header_parts = ["Todos"]
+                if filter_tags:
+                    filter_str = "', '".join(filter_tags)
+                    header_parts.append(f"tagged with '{filter_str}'")
+                
+                # Prepare the result
+                result = ""
+                
+                # Display todos by category
+                if (not active_todos_by_category and not uncategorized_active and 
+                    (not done or (not done_todos_by_category and not uncategorized_done)) and
+                    (not donetoday or (not donetoday_todos_by_category and not uncategorized_donetoday))):
+                    result = ZettlFormatter.warning("No todos match your criteria.")
+                    return jsonify({'result': ansi_to_html(result)})
+                    
+                # Helper function to display a group of todos
+                def display_todos_group(category_dict, uncategorized_list, header_text):
+                    output = ""
+                    if header_text:
+                        output += f"{header_text}\n\n"
+                    
+                    if category_dict:
+                        for category, notes in sorted(category_dict.items()):
+                            output += f"{ZettlFormatter.tag(category)} ({len(notes)})\n\n"
+                            
+                            for note in notes:
+                                formatted_id = ZettlFormatter.note_id(note['id'])
+                                
+                                # Format with indentation
+                                content_lines = note['content'].split('\n')
+                                output += f"  {formatted_id}: {content_lines[0]}\n"
+                                if len(content_lines) > 1:
+                                    for line in content_lines[1:]:
+                                        output += f"      {line}\n"
+                                output += "\n"  # Add an empty line between notes
+                    
+                    if uncategorized_list:
+                        output += "Uncategorized\n\n"
+                        for note in uncategorized_list:
+                            formatted_id = ZettlFormatter.note_id(note['id'])
+                            
+                            # Format with indentation
+                            content_lines = note['content'].split('\n')
+                            output += f"  {formatted_id}: {content_lines[0]}\n"
+                            if len(content_lines) > 1:
+                                for line in content_lines[1:]:
+                                    output += f"      {line}\n"
+                            output += "\n"  # Add an empty line between notes
+                    
+                    return output
+                
+                # Display active todos first
+                if active_todos_by_category or uncategorized_active:
+                    active_header = ZettlFormatter.header(f"Active {' '.join(header_parts)} ({len(unique_active_ids)} total)")
+                    result += display_todos_group(active_todos_by_category, uncategorized_active, active_header)
+                
+                # Display done today todos if requested
+                if donetoday and (donetoday_todos_by_category or uncategorized_donetoday):
+                    donetoday_header = ZettlFormatter.header(f"Completed Today {' '.join(header_parts)} ({len(unique_donetoday_ids)} total)")
+                    result += "\n" + display_todos_group(donetoday_todos_by_category, uncategorized_donetoday, donetoday_header)
+                
+                # Display all done todos if requested
+                if done and (done_todos_by_category or uncategorized_done):
+                    # Exclude today's completed todos if they're shown in their own section
+                    if donetoday:
+                        # Filter out notes that are done today from the regular done section
+                        for category in list(done_todos_by_category.keys()):
+                            done_todos_by_category[category] = [
+                                note for note in done_todos_by_category[category] 
+                                if note['id'] not in done_today_ids
+                            ]
+                            # Remove empty categories
+                            if not done_todos_by_category[category]:
+                                del done_todos_by_category[category]
+                        
+                        # Filter uncategorized done notes too
+                        uncategorized_done = [
+                            note for note in uncategorized_done 
+                            if note['id'] not in done_today_ids
+                        ]
+                    
+                    # Only show this section if there are notes to display after filtering
+                    if done_todos_by_category or uncategorized_done:
+                        done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids - unique_donetoday_ids)} total)")
+                        result += "\n" + display_todos_group(done_todos_by_category, uncategorized_done, done_header)
                 
         elif cmd == "help" or cmd == "--help":
             # Show well-formatted help similar to CLI
