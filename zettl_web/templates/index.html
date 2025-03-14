@@ -78,6 +78,17 @@
             word-break: break-word;
         }
 
+        /* ASCII art logo handling */
+        #terminal-output .logo-container {
+            overflow-x: auto;
+            white-space: nowrap;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+            font-size: 0.9em; /* Slightly reduce the font size */
+            width: 100%;
+        }
+
+        /* Colors for terminal output */
         #terminal-output .green { color: var(--green); }
         #terminal-output .blue { color: var(--blue); }
         #terminal-output .yellow { color: var(--yellow); }
@@ -87,6 +98,7 @@
 
         #input-container {
             padding: 10px;
+            padding-bottom: 25px; /* Extra padding at the bottom to account for browser UI */
             background-color: var(--bg-color);
             border-top: 1px solid var(--input-border);
             transition: transform 0.3s ease;
@@ -162,6 +174,7 @@
             100% { opacity: 0.5; }
         }
 
+        /* Adjust for different screen sizes */
         @media (min-width: 768px) {
             #terminal-output {
                 font-size: 14px;
@@ -169,6 +182,18 @@
             
             #command-input {
                 font-size: 14px;
+            }
+            
+            /* On desktop, we don't need as much bottom padding */
+            #input-container {
+                padding-bottom: 15px;
+            }
+        }
+        
+        /* Extra padding for iOS Safari which has taller nav controls */
+        @media screen and (max-width: 767px) and (-webkit-min-device-pixel-ratio: 0) {
+            #input-container {
+                padding-bottom: 35px;
             }
         }
     </style>
@@ -213,16 +238,22 @@
             let commandHistory = loadHistory();
             let historyIndex = commandHistory.length;
             
-            // Initial greeting
-            appendOutput(`
-████████ ████████ ████████ ████████ ██
+            // Create a container for the logo to handle overflow better
+            const logoContainer = document.createElement('div');
+            logoContainer.className = 'logo-container';
+            logoContainer.innerHTML = `
+<pre>████████ ████████ ████████ ████████ ██
       ██ ██          ██       ██    ██
    ██    ████████    ██       ██    ██
 ██       ██          ██       ██    ██
-████████ ████████    ██       ██    ████████
-Welcome to Zettl Web Terminal. Type 'help' for commands.
-Type 'list' to see your recent notes.
-`, true);
+████████ ████████    ██       ██    ████████</pre>`;
+            
+            // Add the logo container to the terminal output
+            terminalOutput.appendChild(logoContainer);
+            
+            // Add the welcome text
+            appendOutput("Welcome to Zettl Web Terminal. Type 'help' for commands.");
+            appendOutput("Type 'list' to see your recent notes.");
             
             // Focus the input field
             setTimeout(() => {
@@ -446,3 +477,10 @@ Type 'list' to see your recent notes.
 </body>
 </html>
 
+
+
+████████ ████████ ████████ ████████ ██
+      ██ ██          ██       ██    ██
+   ██    ████████    ██       ██    ██
+██       ██          ██       ██    ██
+████████ ████████    ██       ██    ████████
