@@ -90,6 +90,8 @@
         @media (max-width: 768px) {
             .terminal {
                 --size: 1.4; /* Larger text on mobile */
+                -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+                padding-bottom: 60px; /* Extra space at bottom to prevent last line from being hidden */
             }
             
             #mobile-buttons {
@@ -97,6 +99,11 @@
                 justify-content: space-around;
                 background-color: #333;
                 padding: 10px 0;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                z-index: 1000;
             }
             
             #mobile-buttons button {
@@ -106,12 +113,66 @@
                 padding: 8px 12px;
                 border-radius: 4px;
                 font-family: 'Courier New', monospace;
+                touch-action: manipulation; /* Prevent double-tap zoom */
+                -webkit-tap-highlight-color: transparent; /* Remove tap highlight */
             }
         }
         
         @media (min-width: 769px) {
-            #mobile-buttons {
+            #mobile-buttons, #mobile-keyboard {
                 display: none;
+            }
+        }
+        
+        /* Mobile keyboard styling */
+        #mobile-keyboard {
+            position: fixed;
+            bottom: 50px;
+            left: 0;
+            right: 0;
+            background-color: rgba(30, 30, 30, 0.95);
+            padding: 10px 0;
+            z-index: 999;
+            border-top: 1px solid #444;
+        }
+        
+        .keyboard-row {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+        }
+        
+        #mobile-keyboard button {
+            background-color: #333;
+            color: white;
+            border: 1px solid #555;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 4px;
+            min-width: 40px;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Keyboard toggle button */
+        #keyboard-toggle {
+            position: fixed;
+            bottom: 70px;
+            right: 20px;
+            background-color: rgba(70, 70, 70, 0.7);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            font-size: 20px;
+            z-index: 1000;
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            #keyboard-toggle {
+                display: block;
             }
         }
     </style>
@@ -122,6 +183,9 @@
         <span>Logged in as: {{ username }}</span>
     </div>
     
+    <!-- Keyboard toggle button for mobile -->
+    <button id="keyboard-toggle" onclick="toggleKeyboard()">⌨️</button>
+    
     <div id="terminal-container"></div>
     
     <!-- Mobile quick-access buttons -->
@@ -130,6 +194,22 @@
         <button onclick="insertCommand('new')">new</button>
         <button onclick="insertCommand('search')">search</button>
         <button onclick="insertCommand('help')">help</button>
+        <button onclick="insertSpecialKey('Tab')">Tab</button>
+        <button onclick="insertSpecialKey('ArrowUp')">↑</button>
+        <button onclick="insertSpecialKey('ArrowDown')">↓</button>
+    </div>
+    
+    <!-- Custom mobile keyboard -->
+    <div id="mobile-keyboard" style="display:none;">
+        <div class="keyboard-row">
+            <button onclick="insertSpecialKey('Tab')">Tab</button>
+            <button onclick="insertSpecialKey('Escape')">Esc</button>
+            <button onclick="insertSpecialKey('ArrowLeft')">←</button>
+            <button onclick="insertSpecialKey('ArrowUp')">↑</button>
+            <button onclick="insertSpecialKey('ArrowDown')">↓</button>
+            <button onclick="insertSpecialKey('ArrowRight')">→</button>
+            <button onclick="toggleKeyboard()">Hide</button>
+        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
@@ -207,18 +287,44 @@ Type 'list' to see your recent notes.
                 scrollOnEcho: true,
                 mousewheel: true,
                 height: '100%',
-                overflow: 'auto'
+                overflow: 'auto',
+                touchscroll: true,  // Enable touch scrolling
+                mobileDelete: true, // Better backspace handling on mobile
+                mobileIngameLoop: true, // Improve mobile performance
+                scrollBottomOffset: 40 // Keep space at bottom for better visibility
             });
             
-            // Add explicit mouse wheel handler as backup
-            $('#terminal-container').on('wheel', function(event) {
-                const delta = event.originalEvent.deltaY;
-                if (delta > 0) {
-                    term.scroll(1);  // Scroll down
-                } else {
-                    term.scroll(-1);  // Scroll up
+            // Improved scroll handling for both mouse and touch
+            $('#terminal-container').on('wheel touchmove', function(event) {
+                // For wheel events
+                if (event.type === 'wheel') {
+                    const delta = event.originalEvent.deltaY;
+                    if (delta > 0) {
+                        term.scroll(1);  // Scroll down
+                    } else {
+                        term.scroll(-1);  // Scroll up
+                    }
+                    event.preventDefault();
+                    return false;
                 }
-                return false;  // Prevent default scrolling
+            });
+            
+            // Touch-specific scroll handling
+            let touchStartY = 0;
+            $('#terminal-container').on('touchstart', function(e) {
+                touchStartY = e.originalEvent.touches[0].clientY;
+            });
+            
+            $('#terminal-container').on('touchmove', function(e) {
+                // Allow normal scrolling but with improved behavior
+                const touchY = e.originalEvent.touches[0].clientY;
+                const delta = touchStartY - touchY;
+                
+                // Determine scroll direction and speed
+                if (Math.abs(delta) > 5) {
+                    term.scroll(delta > 0 ? 1 : -1);
+                    touchStartY = touchY;
+                }
             });
 
             // Cache command history locally in browser
@@ -245,19 +351,75 @@ Type 'list' to see your recent notes.
                 term.focus();
             };
             
+            // Helper function to insert special keys
+            window.insertSpecialKey = function(key) {
+                const e = $.Event('keydown');
+                switch(key) {
+                    case 'Tab':
+                        e.which = 9;
+                        break;
+                    case 'ArrowUp':
+                        e.which = 38;
+                        break;
+                    case 'ArrowDown':
+                        e.which = 40;
+                        break;
+                    case 'ArrowLeft':
+                        e.which = 37;
+                        break;
+                    case 'ArrowRight':
+                        e.which = 39;
+                        break;
+                    case 'Escape':
+                        e.which = 27;
+                        break;
+                    default:
+                        return;
+                }
+                term.trigger(e);
+                term.focus();
+            };
+            
+            // Toggle custom keyboard
+            window.toggleKeyboard = function() {
+                const keyboard = $('#mobile-keyboard');
+                keyboard.toggle();
+                term.focus();
+            };
+            
             // Mobile keyboard optimization
             if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                // Focus on terminal when page loads
+                // Focus on terminal when page loads (with slight delay to ensure DOM is ready)
                 setTimeout(function() {
                     term.focus();
-                }, 500);
+                }, 800);
                 
                 // Make command prompt more visible on mobile
                 $('.prompt').css('font-weight', 'bold');
                 
-                // Mobile keyboard enhancements for special keys
-                $(document).on('keydown', function(e) {
-                    // Add quick access keys here if needed
+                // Prevent zoom on double-tap for iOS
+                $('body').css('touch-action', 'manipulation');
+                
+                // Fix for iOS erratic scrolling and last line disappearing
+                term.on('keypress', function() {
+                    // Force scroll to bottom after small delay when typing
+                    setTimeout(function() {
+                        term.scroll_to_bottom();
+                    }, 50);
+                });
+                
+                // Ensure visibility when soft keyboard appears on mobile
+                $(window).on('resize', function() {
+                    setTimeout(function() {
+                        term.scroll_to_bottom();
+                    }, 300);
+                });
+                
+                // Disable iOS text selection on double-tap
+                $('#terminal-container').on('touchstart', function(e) {
+                    e.preventDefault();
+                    term.focus();
+                    return true;
                 });
             }
         });
