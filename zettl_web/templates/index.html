@@ -4,85 +4,171 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Zettl Web</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/2.37.2/css/jquery.terminal.min.css" rel="stylesheet">
     <style>
-        body {
+        :root {
+            --bg-color: #1a1a1a;
+            --header-bg: #333;
+            --terminal-text: #f0f0f0;
+            --primary-color: #90ee90;
+            --button-bg: #4a4a4a;
+            --button-hover: #666;
+            --input-bg: #333;
+            --input-border: #555;
+            --green: #90ee90;
+            --blue: #add8e6;
+            --yellow: #ffff00;
+            --red: #ff6347;
+            --cyan: #00ffff;
+        }
+
+        * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            height: 100vh;
-            background-color: #1a1a1a;
+        }
+
+        body {
             font-family: 'Courier New', monospace;
+            background-color: var(--bg-color);
+            color: var(--terminal-text);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
         }
-        
+
         #header {
-            background-color: #333;
-            color: #90ee90;
+            background-color: var(--header-bg);
+            color: var(--primary-color);
             padding: 10px 15px;
             font-weight: bold;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            z-index: 10;
         }
-        
-        #terminal-container {
-            flex: 1;
+
+        #terminal-output {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 15px;
+            font-size: 16px;
+            line-height: 1.4;
+            scrollbar-width: thin;
+            scrollbar-color: var(--button-bg) var(--bg-color);
+        }
+
+        #terminal-output::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #terminal-output::-webkit-scrollbar-track {
+            background: var(--bg-color);
+        }
+
+        #terminal-output::-webkit-scrollbar-thumb {
+            background-color: var(--button-bg);
+            border-radius: 4px;
+        }
+
+        #terminal-output .output-line {
+            margin-bottom: 8px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        #terminal-output .green { color: var(--green); }
+        #terminal-output .blue { color: var(--blue); }
+        #terminal-output .yellow { color: var(--yellow); }
+        #terminal-output .red { color: var(--red); }
+        #terminal-output .cyan { color: var(--cyan); }
+        #terminal-output .bold { font-weight: bold; }
+
+        #input-container {
+            padding: 10px;
+            background-color: var(--bg-color);
+            border-top: 1px solid var(--input-border);
+            transition: transform 0.3s ease;
+            z-index: 20;
+        }
+
+        #shortcut-buttons {
+            display: flex;
+            overflow-x: auto;
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+            scrollbar-width: none;
+        }
+
+        #shortcut-buttons::-webkit-scrollbar {
+            display: none;
+        }
+
+        #shortcut-buttons button {
+            background-color: var(--button-bg);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-right: 8px;
+            font-family: 'Courier New', monospace;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        #shortcut-buttons button:hover {
+            background-color: var(--button-hover);
+        }
+
+        #input-wrapper {
+            display: flex;
             width: 100%;
-            overflow: auto;
-            -webkit-overflow-scrolling: touch;
         }
-        
-        .terminal {
-            --size: 1.2;
-            height: 100%;
+
+        #command-input {
+            flex-grow: 1;
+            background-color: var(--input-bg);
+            color: var(--terminal-text);
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            outline: none;
         }
-        
-        /* Terminal colors */
-        .terminal .green { color: #90ee90; }
-        .terminal .blue { color: #add8e6; }
-        .terminal .yellow { color: #ffff00; }
-        .terminal .red { color: #ff6347; }
-        .terminal .cyan { color: #00ffff; }
-        .terminal .bold { font-weight: bold; }
-        
-        /* Mobile styles */
-        @media (max-width: 768px) {
-            .terminal {
-                --size: 1.4; /* Larger text on mobile */
+
+        #submit-button {
+            background-color: var(--primary-color);
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin-left: 8px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .loading-indicator {
+            display: inline-block;
+            margin-left: 10px;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+
+        @media (min-width: 768px) {
+            #terminal-output {
+                font-size: 14px;
             }
             
-            /* Basic command buttons */
-            #mobile-buttons {
-                display: flex;
-                justify-content: space-around;
-                background-color: #333;
-                padding: 10px 0;
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                z-index: 1000;
-            }
-            
-            #mobile-buttons button {
-                background-color: #4a4a4a;
-                color: white;
-                border: none;
-                padding: 8px 12px;
-                border-radius: 4px;
-                font-family: 'Courier New', monospace;
-            }
-            
-            /* Space for mobile buttons */
-            #terminal-container {
-                padding-bottom: 60px;
-            }
-        }
-        
-        @media (min-width: 769px) {
-            #mobile-buttons {
-                display: none;
+            #command-input {
+                font-size: 14px;
             }
         }
     </style>
@@ -90,166 +176,273 @@
 <body>
     <div id="header">
         <span>Zettl Web Terminal</span>
-        <span>Logged in as: {{ username }}</span>
+        <span id="username">Logged in as: {{ username }}</span>
     </div>
     
-    <div id="terminal-container"></div>
+    <div id="terminal-output">
+        <!-- Terminal output will be inserted here -->
+    </div>
     
-    <!-- Simple mobile buttons -->
-    <div id="mobile-buttons">
-        <button onclick="insertCommand('list')">list</button>
-        <button onclick="insertCommand('new')">new</button>
-        <button onclick="insertCommand('search')">search</button>
-        <button onclick="insertCommand('help')">help</button>
+    <div id="input-container">
+        <div id="shortcut-buttons">
+            <button data-cmd="list">list</button>
+            <button data-cmd="new">new</button>
+            <button data-cmd="show">show</button>
+            <button data-cmd="search">search</button>
+            <button data-cmd="tags">tags</button>
+            <button data-cmd="link">link</button>
+            <button data-cmd="related">related</button>
+            <button data-cmd="help">help</button>
+        </div>
+        <div id="input-wrapper">
+            <input type="text" id="command-input" placeholder="zettl> " autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <button id="submit-button">↵</button>
+        </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/2.37.2/js/jquery.terminal.min.js"></script>
     <script>
-        $(function() {
-            // Mobile detection
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get DOM elements
+            const terminalOutput = document.getElementById('terminal-output');
+            const commandInput = document.getElementById('command-input');
+            const submitButton = document.getElementById('submit-button');
+            const shortcutButtons = document.getElementById('shortcut-buttons');
+            const inputContainer = document.getElementById('input-container');
             
-            // Terminal initialization
-            let term = $('#terminal-container').terminal(function(command) {
-                if (command.trim() === '') {
-                    return;
-                }
-                
-                // Show loading indicator
-                term.pause();
-                const loadingIndicator = term.echo('Processing command... ⏳', {
-                    finalize: function(div) {
-                        $(div).addClass('loading-indicator');
-                    }
-                });
-                
-                // Send command to server
-                $.ajax({
-                    url: '/api/command',
-                    method: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify({ command: command }),
-                    success: function(response) {
-                        term.resume();
-                        $('.loading-indicator').remove();
-                        
-                        // Output response
-                        term.echo(response.result, {
-                            raw: true,
-                            finalize: function(div) {
-                                div.find('.green').css('color', '#90ee90');
-                                div.find('.blue').css('color', '#add8e6');
-                                div.find('.yellow').css('color', '#ffff00');
-                                div.find('.red').css('color', '#ff6347');
-                                div.find('.cyan').css('color', '#00ffff');
-                                div.find('.bold').css('font-weight', 'bold');
-                            }
-                        });
-                        
-                        // Ensure visibility of terminal output
-                        if (isMobile) {
-                            setTimeout(function() {
-                                term.scroll_to_bottom();
-                            }, 10);
-                        }
-                    },
-                    error: function(xhr) {
-                        term.resume();
-                        $('.loading-indicator').remove();
-                        term.error('Server error: ' + (xhr.responseText || 'Connection failed'));
-                    }
-                });
-            }, {
-                greetings: `
-█████ █████ ████████ ████████ ██
-   █  ██       ██       ██    ██
- ██   █████    ██       ██    ██   
-█     ██       ██       ██    ██
-█████ █████    ██       ██    ███████
-
+            // Command history
+            let commandHistory = loadHistory();
+            let historyIndex = commandHistory.length;
+            
+            // Initial greeting
+            appendOutput(`
+████████ ████████ ████████ ████████ ██
+      ██ ██          ██       ██    ██
+   ██    ████████    ██       ██    ██
+██       ██          ██       ██    ██
+████████ ████████    ██       ██    ████████
 Welcome to Zettl Web Terminal. Type 'help' for commands.
 Type 'list' to see your recent notes.
-`,
-                prompt: 'zettl> ',
-                name: 'zettl-web',
-                historySize: 100,
-                clear: false,
-                exit: false,
-                wrap: true,
-                historyPersistedState: true,
-                scrollOnEcho: true,
-                height: '100%'
+`, true);
+            
+            // Focus the input field
+            setTimeout(() => {
+                commandInput.focus();
+            }, 300);
+            
+            // Handle keyboard events for command input
+            commandInput.addEventListener('keydown', function(e) {
+                // Enter key submits command
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    executeCommand(commandInput.value);
+                }
+                // Up arrow for previous command
+                else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (historyIndex > 0) {
+                        historyIndex--;
+                        commandInput.value = commandHistory[historyIndex];
+                        // Move cursor to end of input
+                        setTimeout(() => {
+                            commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
+                        }, 0);
+                    }
+                }
+                // Down arrow for next command
+                else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (historyIndex < commandHistory.length) {
+                        historyIndex++;
+                        commandInput.value = historyIndex === commandHistory.length ? '' : commandHistory[historyIndex];
+                        // Move cursor to end of input
+                        setTimeout(() => {
+                            commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
+                        }, 0);
+                    }
+                }
+                // Tab for shortcuts (simple implementation)
+                else if (e.key === 'Tab') {
+                    e.preventDefault();
+                    const currentCmd = commandInput.value.trim().split(' ')[0];
+                    const shortcuts = ['list', 'new', 'show', 'search', 'tags', 'link', 'related', 'help'];
+                    
+                    if (currentCmd) {
+                        const matches = shortcuts.filter(cmd => cmd.startsWith(currentCmd));
+                        if (matches.length === 1) {
+                            commandInput.value = matches[0] + ' ';
+                        }
+                    }
+                }
             });
             
-            // Handle command insertion from buttons
-            window.insertCommand = function(cmd) {
-                term.set_command(cmd + ' ');
-                term.focus();
-            };
+            // Handle submit button click
+            submitButton.addEventListener('click', function() {
+                executeCommand(commandInput.value);
+            });
             
-            // Save history to local storage
-            if (localStorage.getItem('zettl_history')) {
-                try {
-                    const history = JSON.parse(localStorage.getItem('zettl_history'));
-                    for (const cmd of history) {
-                        term.history().append(cmd);
-                    }
-                } catch (e) {
-                    console.error('Error loading history:', e);
+            // Handle shortcut buttons
+            shortcutButtons.addEventListener('click', function(e) {
+                if (e.target.tagName === 'BUTTON') {
+                    const cmd = e.target.dataset.cmd;
+                    commandInput.value = cmd + ' ';
+                    commandInput.focus();
+                }
+            });
+            
+            // Keyboard visibility detection for mobile
+            let originalHeight = window.innerHeight;
+            
+            function setupVisualViewport() {
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener('resize', handleViewportResize);
+                    window.visualViewport.addEventListener('scroll', handleViewportResize);
+                } else {
+                    // Fallback for browsers without VisualViewport API
+                    window.addEventListener('resize', handleWindowResize);
                 }
             }
             
-            term.on('history', function(command) {
-                const history = term.history().data();
-                localStorage.setItem('zettl_history', JSON.stringify(history));
+            function handleViewportResize() {
+                const currentHeight = window.visualViewport.height;
+                const keyboardVisible = currentHeight < originalHeight * 0.75;
+                
+                if (keyboardVisible) {
+                    // Keyboard is visible - move input above it
+                    const offsetFromBottom = originalHeight - (window.visualViewport.offsetTop + currentHeight);
+                    inputContainer.style.transform = `translateY(-${offsetFromBottom}px)`;
+                } else {
+                    // Keyboard is hidden - reset position
+                    inputContainer.style.transform = 'translateY(0)';
+                }
+            }
+            
+            function handleWindowResize() {
+                const currentHeight = window.innerHeight;
+                const keyboardVisible = currentHeight < originalHeight * 0.75;
+                
+                if (keyboardVisible) {
+                    // Rough estimate for keyboard height
+                    const keyboardHeight = originalHeight - currentHeight;
+                    inputContainer.style.transform = `translateY(-${keyboardHeight}px)`;
+                } else {
+                    inputContainer.style.transform = 'translateY(0)';
+                    originalHeight = currentHeight; // Update in case of orientation change
+                }
+            }
+            
+            // Initialize viewport handling
+            setupVisualViewport();
+            
+            // Focus handling for iOS
+            commandInput.addEventListener('focus', function() {
+                // Small delay to let the keyboard appear
+                setTimeout(() => {
+                    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+                }, 300);
             });
             
-            // iOS-specific fix to ensure input line stays visible when typing
-            if (isIOS) {
-                // Focus on terminal when page loads
-                setTimeout(function() {
-                    term.focus();
-                }, 500);
+            // Execute the command
+            function executeCommand(command) {
+                const cmd = command.trim();
+                if (!cmd) return;
                 
-                // Simple keyboard visibility detector
-                const originalHeight = window.innerHeight;
-                $(window).on('resize', function() {
-                    const currentHeight = window.innerHeight;
-                    
-                    // If keyboard is visible (height is significantly less)
-                    if (currentHeight < originalHeight * 0.75) {
-                        // Wait a moment for keyboard to fully appear
-                        setTimeout(function() {
-                            // Get command line
-                            const cmdLine = $('.cmd-line').last();
-                            if (cmdLine.length) {
-                                // Use native scrollIntoView for best performance
-                                cmdLine[0].scrollIntoView(false);
-                            }
-                        }, 300);
+                // Echo command with prompt
+                appendOutput(`zettl> ${cmd}`);
+                
+                // Add to history if not duplicate of most recent
+                if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== cmd) {
+                    commandHistory.push(cmd);
+                    saveHistory(commandHistory);
+                }
+                
+                // Reset history index
+                historyIndex = commandHistory.length;
+                
+                // Clear input
+                commandInput.value = '';
+                
+                // Show loading indicator
+                const loadingId = `loading-${Date.now()}`;
+                appendOutput(`<span id="${loadingId}">Processing command... ⏳</span>`);
+                
+                // Send command to server
+                fetch('/api/command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ command: cmd })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Remove loading indicator
+                    const loadingElement = document.getElementById(loadingId);
+                    if (loadingElement) {
+                        loadingElement.remove();
                     }
+                    
+                    // Append result
+                    appendOutput(data.result, true);
+                    
+                    // Scroll to bottom
+                    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+                })
+                .catch(error => {
+                    // Remove loading indicator
+                    const loadingElement = document.getElementById(loadingId);
+                    if (loadingElement) {
+                        loadingElement.remove();
+                    }
+                    
+                    // Show error
+                    appendOutput(`<span class="red">Error: ${error.message || 'Connection failed'}</span>`);
+                    
+                    // Scroll to bottom
+                    terminalOutput.scrollTop = terminalOutput.scrollHeight;
                 });
                 
-                // When typing, ensure command line is visible
-                term.on('keydown keypress', function() {
-                    setTimeout(function() {
-                        term.scroll_to_bottom();
-                    }, 0);
-                });
+                // Focus input again
+                commandInput.focus();
+            }
+            
+            // Append output to terminal
+            function appendOutput(content, isHTML = false) {
+                const outputLine = document.createElement('div');
+                outputLine.className = 'output-line';
                 
-                // When clicking to position cursor, ensure it's visible
-                $(document).on('click', '.cmd-line', function() {
-                    setTimeout(function() {
-                        const cmdLine = $('.cmd-line').last();
-                        if (cmdLine.length) {
-                            cmdLine[0].scrollIntoView(false);
-                        }
-                    }, 0);
-                });
+                if (isHTML) {
+                    outputLine.innerHTML = content;
+                } else {
+                    outputLine.textContent = content;
+                }
+                
+                terminalOutput.appendChild(outputLine);
+                terminalOutput.scrollTop = terminalOutput.scrollHeight;
+            }
+            
+            // Save command history to localStorage
+            function saveHistory(history) {
+                try {
+                    // Keep only the last 100 commands
+                    const limitedHistory = history.slice(-100);
+                    localStorage.setItem('zettl_history', JSON.stringify(limitedHistory));
+                } catch (e) {
+                    console.error('Error saving history', e);
+                }
+            }
+            
+            // Load command history from localStorage
+            function loadHistory() {
+                try {
+                    const history = localStorage.getItem('zettl_history');
+                    return history ? JSON.parse(history) : [];
+                } catch (e) {
+                    console.error('Error loading history', e);
+                    return [];
+                }
             }
         });
     </script>
 </body>
 </html>
+
