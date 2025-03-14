@@ -167,34 +167,135 @@ def parse_command(command_str):
         logger.error(f"Error parsing command: {e}")
         return command_str.split()[0], [] 
 
-def extract_options(args):
+
+COMMAND_OPTIONS = {
+    'new': {
+        'short_opts': {'t': {'name': 'tag', 'multiple': True}},
+        'long_opts': {'tag': {'multiple': True}}
+    },
+    'add': {
+        'short_opts': {'t': {'name': 'tag', 'multiple': True}},
+        'long_opts': {'tag': {'multiple': True}}
+    },
+    'list': {
+        'short_opts': {
+            'l': {'name': 'limit', 'type': int},
+            'f': {'name': 'full', 'flag': True},
+            'c': {'name': 'compact', 'flag': True}
+        },
+        'long_opts': {
+            'limit': {'type': int},
+            'full': {'flag': True},
+            'compact': {'flag': True}
+        }
+    },
+    # Add similar configs for other commands
+}
+
+
+def extract_options(args, cmd):
     """
-    Extract --options and -flags from arguments
+    Extract options and flags from arguments based on command configuration
     Returns options dict, flags list, and remaining args
     """
     options = {}
     flags = []
     remaining_args = []
     
+    # Get command configuration or empty dict if command not found
+    cmd_config = COMMAND_OPTIONS.get(cmd, {'short_opts': {}, 'long_opts': {}})
+    short_opts = cmd_config['short_opts']
+    long_opts = cmd_config['long_opts']
+    
     i = 0
     while i < len(args):
         arg = args[i]
         
-        # Handle long options with values: --option value
+        # Handle long options (--option)
         if arg.startswith('--'):
-            option_name = arg[2:]
-            if i + 1 < len(args) and not args[i+1].startswith('-'):
-                options[option_name] = args[i+1]
+            opt_name = arg[2:]
+            opt_config = long_opts.get(opt_name, {})
+            
+            # If it's a flag option
+            if opt_config.get('flag', False):
+                flags.append(opt_name)
+                options[opt_name] = True
+                i += 1
+            # If it takes a value
+            elif i + 1 < len(args) and not args[i+1].startswith('-'):
+                value = args[i+1]
+                
+                # Convert type if specified
+                if 'type' in opt_config:
+                    try:
+                        value = opt_config['type'](value)
+                    except ValueError:
+                        pass
+                
+                # Handle multiple values
+                if opt_config.get('multiple', False):
+                    if opt_name not in options:
+                        options[opt_name] = []
+                    options[opt_name].append(value)
+                else:
+                    options[opt_name] = value
                 i += 2
             else:
-                # Option without value (boolean flag)
-                flags.append(option_name)
+                # Treat as flag if no value provided
+                flags.append(opt_name)
+                options[opt_name] = True
                 i += 1
                 
-        # Handle short options: -f
-        elif arg.startswith('-'):
-            flag_name = arg[1:]
-            flags.append(flag_name)
+        # Handle short options (-o)
+        elif arg.startswith('-') and len(arg) == 2:
+            opt_char = arg[1]
+            if opt_char in short_opts:
+                opt_config = short_opts[opt_char]
+                opt_name = opt_config.get('name', opt_char)
+                
+                # If it's a flag option
+                if opt_config.get('flag', False):
+                    flags.append(opt_char)
+                    options[opt_name] = True
+                    i += 1
+                # If it takes a value
+                elif i + 1 < len(args) and not args[i+1].startswith('-'):
+                    value = args[i+1]
+                    
+                    # Convert type if specified
+                    if 'type' in opt_config:
+                        try:
+                            value = opt_config['type'](value)
+                        except ValueError:
+                            pass
+                    
+                    # Handle multiple values
+                    if opt_config.get('multiple', False):
+                        if opt_name not in options:
+                            options[opt_name] = []
+                        options[opt_name].append(value)
+                    else:
+                        options[opt_name] = value
+                    i += 2
+                else:
+                    # Treat as flag if no value provided
+                    flags.append(opt_char)
+                    options[opt_name] = True
+                    i += 1
+            else:
+                # Unknown short option, treat as flag
+                flags.append(opt_char)
+                i += 1
+                
+        # Handle combined short options (-abc)
+        elif arg.startswith('-') and len(arg) > 2:
+            combined_flags = arg[1:]
+            for flag in combined_flags:
+                flags.append(flag)
+                # Map to long option name if exists
+                if flag in short_opts:
+                    opt_name = short_opts[flag].get('name', flag)
+                    options[opt_name] = True
             i += 1
             
         # Regular arguments
@@ -260,7 +361,7 @@ def execute_command():
     cmd, args = parse_command(command)
     
     # Extract options, flags and non-option args
-    options, flags, remaining_args = extract_options(args)
+    options, flags, remaining_args = extract_options(args, cmd)
     
     try:
         result = ""
@@ -302,12 +403,18 @@ def execute_command():
         elif cmd == "new" or cmd == "add":
             # Handle content and tags
             content = remaining_args[0] if remaining_args else ""
-            tags = options.get('tag', '').split(',') if 'tag' in options else []
             
-            # Also check for -t option
-            if 't' in options:
-                tags.extend(options['t'].split(','))
-                
+            # Get tags from the 'tag' option which could be from -t or --tag
+            tags = []
+            if 'tag' in options:
+                if isinstance(options['tag'], list):
+                    # Multiple tag option usage
+                    tags.extend(options['tag'])
+                else:
+                    # Single tag option
+                    tags.append(options['tag'])
+            
+            # Create the note
             note_id = notes_manager.create_note(content)
             result = f"Created note #{note_id}\n"
             
