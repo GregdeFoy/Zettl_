@@ -783,12 +783,12 @@ def unlink(source_id, target_id):
 @click.option('--donetoday', '-dt', is_flag=True, help='List todos that were completed today')
 @click.option('--all', '-a', is_flag=True, help='Show all todos (both active and completed)')
 @click.option('--tag', '-t', multiple=True, help='Filter todos by one or more additional tags')
-def todos(done, donetoday, all, tag):
+def todos(donetoday, all, tag):
     """List all notes tagged with 'todo' grouped by category."""
     try:
         # If --all is specified, force done=True to include completed todos
-        if all:
-            done = True
+        
+        done = all
             
         # Get all notes tagged with 'todo'
         todo_notes = notes_manager.get_notes_by_tag('todo')
