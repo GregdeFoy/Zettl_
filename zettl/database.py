@@ -113,7 +113,7 @@ class Database:
         return note_id
     
     def get_note(self, note_id: str) -> Dict[str, Any]:
-        """Get a note by its ID with caching."""
+        "Get a note by its ID with caching."
         cache_key = f"note:{note_id}"
         
         # Check if in cache

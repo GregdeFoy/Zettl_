@@ -17,7 +17,7 @@ graph_manager = NoteGraph()
 llm_helper = LLMHelper()
 
 # Define the function that both commands will use
-def create_new_note(content, tag):
+def create_new_note(content, tag, link=None):
     """Create a new note with the given content and optional tags."""
     try:
         note_id = notes_manager.create_note(content)
@@ -31,6 +31,14 @@ def create_new_note(content, tag):
                     click.echo(f"Added tag '{t}' to note #{note_id}")
                 except Exception as e:
                     click.echo(f"Warning: Could not add tag '{t}': {str(e)}", err=True)
+        
+        # Create link if provided
+        if link:
+            try:
+                notes_manager.create_link(note_id, link)
+                click.echo(f"Created link from #{note_id} to #{link}")
+            except Exception as e:
+                click.echo(f"Warning: Could not create link to note #{link}: {str(e)}", err=True)
     except Exception as e:
         click.echo(f"Error creating note: {str(e)}", err=True)
 
@@ -53,12 +61,14 @@ def commands():
         {
             "name": "new",
             "description": "Create a new note with the given content",
-            "example": "zettl new \"This is a new note about an interesting concept\""
+            "example": "zettl new \"This is a new note about an interesting concept\"\n"
+                    "zettl new \"Note with tag and link\" --tag concept --link 22a4b"
         },
         {
             "name": "list",
             "description": "List recent notes",
-            "example": "zettl list --limit 5"
+            "example": "zettl list --limit 5\n"
+                    "zettl list --full  # Shows full content with tags"
         },
         {
             "name": "show",
@@ -78,7 +88,9 @@ def commands():
         {
             "name": "search",
             "description": "Search for notes containing text",
-            "example": "zettl search \"concept\""
+            "example": "zettl search \"concept\"\n"
+                    "zettl search -t concept --full  # Search by tag with full content\n"
+                    "zettl search \"concept\" +t done  # Exclude notes with 'done' tag"
         },
         {
             "name": "related",
@@ -100,6 +112,14 @@ def commands():
                     "zettl llm 22a4b --action concepts   # Extract key concepts from a note\n"
                     "zettl llm 22a4b --action questions  # Generate questions based on a note\n"
                     "zettl llm 22a4b --action critique   # Get constructive feedback on a note"
+        },
+        {
+            "name": "todos",
+            "description": "List all notes tagged with 'todo' grouped by category",
+            "example": "zettl todos  # Show active todos\n"
+                    "zettl todos --all  # Show all todos (active and completed)\n"
+                    "zettl todos --done  # Show completed todos\n"
+                    "zettl todos --filter work  # Filter todos by tag"
         },
         {
             "name": "delete",
@@ -192,17 +212,19 @@ def commands():
 @cli.command()
 @click.argument('content')
 @click.option('--tag', '-t', multiple=True, help='Tag(s) to add to the new note')
-def new(content, tag):
+@click.option('--link', '-l', help='Note ID to link this note to')
+def new(content, tag, link):
     """Create a new note with the given content and optional tags."""
-    create_new_note(content, tag)
+    create_new_note(content, tag, link)
 
 
 @cli.command()
 @click.argument('content')
 @click.option('--tag', '-t', multiple=True, help='Tag(s) to add to the new note')
-def add(content, tag):
+@click.option('--link', '-l', help='Note ID to link this note to')
+def add(content, tag, link):
     """Create a new note with the given content and optional tags. Alias for 'new'."""
-    create_new_note(content, tag)
+    create_new_note(content, tag, link)
 
 # Update the list command
 @cli.command()
@@ -229,6 +251,15 @@ def list(limit, full, compact):
             elif full:
                 # Full content mode
                 click.echo(ZettlFormatter.format_note_display(note, notes_manager))
+                
+                # Add tags if there are any
+                try:
+                    tags = notes_manager.get_tags(note_id)
+                    if tags:
+                        click.echo(f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}")
+                except Exception:
+                    pass
+                
                 click.echo()  # Extra line between notes
             else:
                 # Default mode - ID, timestamp, and preview
@@ -357,6 +388,15 @@ def search(query, tag, exclude_tag, full):
             if full:
                 # Full content mode
                 click.echo(ZettlFormatter.format_note_display(note, notes_manager))
+                
+                # Add tags if there are any
+                try:
+                    tags = notes_manager.get_tags(note['id'])
+                    if tags:
+                        click.echo(f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}")
+                except Exception:
+                    pass
+                
                 click.echo()  # Extra line between notes
             else:
                 # Preview mode
@@ -742,10 +782,15 @@ def unlink(source_id, target_id):
 @cli.command()
 @click.option('--done', '-d', is_flag=True, help='Include completed todos (tagged with "done")')
 @click.option('--donetoday', '-dt', is_flag=True, help='List todos that were completed today')
+@click.option('--all', '-a', is_flag=True, help='Show all todos (both active and completed)')
 @click.option('--filter', '-f', multiple=True, help='Filter todos by one or more additional tags')
-def todos(done, donetoday, filter):
+def todos(done, donetoday, all, filter):
     """List all notes tagged with 'todo' grouped by category."""
     try:
+        # If --all is specified, force done=True to include completed todos
+        if all:
+            done = True
+            
         # Get all notes tagged with 'todo'
         todo_notes = notes_manager.get_notes_by_tag('todo')
         
@@ -782,6 +827,8 @@ def todos(done, donetoday, filter):
                                 pass
             except Exception as e:
                 click.echo(ZettlFormatter.warning(f"Could not determine todos completed today: {str(e)}"))
+        
+        # The rest of the function remains unchanged
         
         # Apply filters if specified
         if filter:
@@ -983,6 +1030,11 @@ def workflow():
             "explanation": "This creates another note (let's call it 18c3d)."
         },
         {
+            "title": "Create a note with a direct link",
+            "command": "zettl new \"Using spaced repetition with the Feynman Technique enhances recall.\" --tag learning --link 22a4b",
+            "explanation": "This creates a new note with a tag and links it directly to the Feynman Technique note."
+        },
+        {
             "title": "Link these two notes",
             "command": "zettl link 22a4b 18c3d",
             "explanation": "This creates a connection between the Feynman Technique note and the Spaced Repetition note."
@@ -998,9 +1050,9 @@ def workflow():
             "explanation": "This displays the full content of the note, along with any tags."
         },
         {
-            "title": "List all recent notes",
-            "command": "zettl list",
-            "explanation": "This shows all your recent notes."
+            "title": "List all recent notes with full content",
+            "command": "zettl list --full",
+            "explanation": "This shows all your recent notes with their full content and tags."
         },
         {
             "title": "Find related notes",
@@ -1018,9 +1070,14 @@ def workflow():
             "explanation": "This exports a graph of your notes and their connections, which you can visualize with various tools."
         },
         {
-            "title": "Search your notes",
-            "command": "zettl search \"technique\"",
-            "explanation": "This finds all notes containing the word 'technique'."
+            "title": "Search your notes with tags",
+            "command": "zettl search \"technique\" --full",
+            "explanation": "This finds all notes containing the word 'technique' and shows full content including tags."
+        },
+        {
+            "title": "Manage todos with filtering",
+            "command": "zettl todos --all --filter learning",
+            "explanation": "This shows all todos (active and completed) that have the 'learning' tag."
         }
     ]
     
