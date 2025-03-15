@@ -119,7 +119,7 @@ def commands():
             "example": "zettl todos  # Show active todos\n"
                     "zettl todos --all  # Show all todos (active and completed)\n"
                     "zettl todos --done  # Show completed todos\n"
-                    "zettl todos --filter work  # Filter todos by tag"
+                    "zettl todos --tag work  # Filter todos by tag"
         },
         {
             "name": "delete",
@@ -783,8 +783,8 @@ def unlink(source_id, target_id):
 @click.option('--done', '-d', is_flag=True, help='Include completed todos (tagged with "done")')
 @click.option('--donetoday', '-dt', is_flag=True, help='List todos that were completed today')
 @click.option('--all', '-a', is_flag=True, help='Show all todos (both active and completed)')
-@click.option('--filter', '-f', multiple=True, help='Filter todos by one or more additional tags')
-def todos(done, donetoday, all, filter):
+@click.option('--tag', '-t', multiple=True, help='Filter todos by one or more additional tags')
+def todos(done, donetoday, all, tag):
     """List all notes tagged with 'todo' grouped by category."""
     try:
         # If --all is specified, force done=True to include completed todos
@@ -831,22 +831,28 @@ def todos(done, donetoday, all, filter):
         # The rest of the function remains unchanged
         
         # Apply filters if specified
-        if filter:
-            filters = [f.lower() for f in filter]
+        if tag:
+            filters = [f.lower() for f in tag]
             filtered_notes = []
             
             for note in todo_notes:
                 note_id = note['id']
-                tags = [t.lower() for t in notes_manager.get_tags(note_id)]
+                note_tags = [t.lower() for t in notes_manager.get_tags(note_id)]
                 
                 # Check if all filters are in the note's tags
-                if all(f in tags for f in filters):
+                has_all_filters = True
+                for f in filters:
+                    if f not in note_tags:
+                        has_all_filters = False
+                        break
+                
+                if has_all_filters:
                     filtered_notes.append(note)
                     
             todo_notes = filtered_notes
             
             if not todo_notes:
-                filter_str = "', '".join(filter)
+                filter_str = "', '".join(tag)
                 click.echo(ZettlFormatter.warning(f"No todos found with all tags: '{filter_str}'."))
                 return
         
@@ -866,8 +872,8 @@ def todos(done, donetoday, all, filter):
         for note in todo_notes:
             note_id = note['id']
             # Get all tags for this note
-            tags = notes_manager.get_tags(note_id)
-            tags_lower = [t.lower() for t in tags]
+            note_tags = notes_manager.get_tags(note_id)
+            tags_lower = [t.lower() for t in note_tags]
             
             # Check if this is a done todo
             is_done = 'done' in tags_lower
@@ -889,10 +895,10 @@ def todos(done, donetoday, all, filter):
             
             # Find category tags (everything except 'todo', 'done', and the filter tags)
             excluded_tags = ['todo', 'done']
-            if filter:
-                excluded_tags.extend([f.lower() for f in filter])
+            if tag:
+                excluded_tags.extend([f.lower() for f in tag])
                 
-            categories = [tag for tag in tags if tag.lower() not in excluded_tags]
+            categories = [t for t in note_tags if t.lower() not in excluded_tags]
             
             if not categories:
                 # This todo has no category tags
@@ -920,8 +926,8 @@ def todos(done, donetoday, all, filter):
         
         # Build the header message
         header_parts = ["Todos"]
-        if filter:
-            filter_str = "', '".join(filter)
+        if tag:
+            filter_str = "', '".join(tag)
             header_parts.append(f"tagged with '{filter_str}'")
         
         # Display todos by category
@@ -1076,7 +1082,7 @@ def workflow():
         },
         {
             "title": "Manage todos with filtering",
-            "command": "zettl todos --all --filter learning",
+            "command": "zettl todos --all --tag learning",
             "explanation": "This shows all todos (active and completed) that have the 'learning' tag."
         }
     ]
