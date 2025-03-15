@@ -118,7 +118,7 @@ def commands():
             "description": "List all notes tagged with 'todo' grouped by category",
             "example": "zettl todos  # Show active todos\n"
                     "zettl todos --all  # Show all todos (active and completed)\n"
-                    "zettl todos --done  # Show completed todos\n"
+                    "zettl todos --donetoday  # Show todos completed today\n"
                     "zettl todos --tag work  # Filter todos by tag"
         },
         {
@@ -780,7 +780,6 @@ def unlink(source_id, target_id):
         click.echo(ZettlFormatter.error(f"Error removing link: {str(e)}"), err=True)
 
 @cli.command()
-@click.option('--done', '-d', is_flag=True, help='Include completed todos (tagged with "done")')
 @click.option('--donetoday', '-dt', is_flag=True, help='List todos that were completed today')
 @click.option('--all', '-a', is_flag=True, help='Show all todos (both active and completed)')
 @click.option('--tag', '-t', multiple=True, help='Filter todos by one or more additional tags')
@@ -976,10 +975,13 @@ def todos(done, donetoday, all, tag):
             display_todos_group(active_todos_by_category, uncategorized_active, active_header)
         
         # Display done today todos if requested
-        if donetoday and (donetoday_todos_by_category or uncategorized_donetoday):
-            donetoday_header = ZettlFormatter.header(f"Completed Today {' '.join(header_parts)} ({len(unique_donetoday_ids)} total)")
-            click.echo(f"\n{donetoday_header}")
-            display_todos_group(donetoday_todos_by_category, uncategorized_donetoday, "")
+        if donetoday:
+            if donetoday_todos_by_category or uncategorized_donetoday:
+                donetoday_header = ZettlFormatter.header(f"Completed Today {' '.join(header_parts)} ({len(unique_donetoday_ids)} total)")
+                click.echo(f"\n{donetoday_header}")
+                display_todos_group(donetoday_todos_by_category, uncategorized_donetoday, "")
+            else:
+                click.echo(f"\n{ZettlFormatter.warning('No todos were completed today.')}")
         
         # Display all done todos if requested
         if done and (done_todos_by_category or uncategorized_done):

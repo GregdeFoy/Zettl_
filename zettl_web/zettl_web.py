@@ -203,17 +203,17 @@ COMMAND_OPTIONS = {
     },
     'todos': {
         'short_opts': {
-        'd': {'name': 'done', 'flag': True},
-        't': {'name': 'donetoday', 'flag': True},
-        'a': {'name': 'all', 'flag': True},
-        'f': {'name': 'filter', 'multiple': True}
-    },
-    'long_opts': {
-        'done': {'flag': True},
-        'donetoday': {'flag': True},
-        'all': {'flag': True},
-        'filter': {'multiple': True}
-    }
+            
+            'dt': {'name': 'donetoday', 'flag': True},
+            'a': {'name': 'all', 'flag': True},
+            'f': {'name': 'filter', 'multiple': True}
+        },
+        'long_opts': {
+            
+            'donetoday': {'flag': True},
+            'all': {'flag': True},
+            'filter': {'multiple': True}
+        }
     },
     'search': {
         'short_opts': {
@@ -248,8 +248,12 @@ def extract_options(args, cmd):
     while i < len(args):
         arg = args[i]
         
+        if arg == '-dt':
+            flags.append('dt')
+            options['donetoday'] = True
+            i += 1
         # Handle long options (--option)
-        if arg.startswith('--'):
+        elif arg.startswith('--'):
             opt_name = arg[2:]
             opt_config = long_opts.get(opt_name, {})
             
@@ -410,13 +414,13 @@ def show_command_help(cmd):
 {Colors.GREEN}{Colors.BOLD}todos{Colors.RESET} - List all notes tagged with 'todo'
 
 {Colors.BOLD}Options:{Colors.RESET}
-  {Colors.YELLOW}-d, --done{Colors.RESET}           Include completed todos
+  {Colors.YELLOW}-a, --all{Colors.RESET}            Show all todos (active and completed)
   {Colors.YELLOW}-dt, --donetoday{Colors.RESET}     Show todos completed today
   {Colors.YELLOW}-f, --filter TAG{Colors.RESET}     Filter todos by additional tag
 
 {Colors.BOLD}Examples:{Colors.RESET}
   {Colors.BLUE}todos{Colors.RESET}                  Show active todos
-  {Colors.BLUE}todos -d{Colors.RESET}               Show active and completed todos 
+  {Colors.BLUE}todos -a{Colors.RESET}               Show all todos (active and completed)
   {Colors.BLUE}todos -dt{Colors.RESET}              Show todos completed today
   {Colors.BLUE}todos -f work{Colors.RESET}          Show todos tagged with "work"
 """
@@ -832,9 +836,9 @@ def execute_command():
                 
         elif cmd == "todos":
             # List all notes tagged with 'todo' grouped by category
-            done = 'done' in flags or 'd' in flags
             donetoday = 'donetoday' in flags or 'dt' in flags
             all_todos = 'all' in flags or 'a' in flags  # NEW: Add all_todos flag
+            done = all_todos
             filter_tags = []
             if all_todos:
                 done = True
@@ -853,29 +857,54 @@ def execute_command():
                 # Get notes with 'done' tag added today (for donetoday option)
                 done_today_ids = set()
                 if donetoday:
-                    from datetime import datetime
-                    today = datetime.now().date()
+                    from datetime import datetime, timezone
+                    import logging
+                    
+                    # Get today's date in UTC for consistent comparison
+                    today = datetime.now(timezone.utc).date()
+                    logger.debug(f"Today's date (UTC): {today}")
                     
                     try:
                         tags_result = notes_manager.db.client.table('tags').select('note_id, created_at').eq('tag', 'done').execute()
                         
                         if tags_result.data:
+                            logger.debug(f"Found {len(tags_result.data)} 'done' tags")
                             for tag_data in tags_result.data:
                                 note_id = tag_data.get('note_id')
                                 created_at = tag_data.get('created_at', '')
                                 
                                 if note_id and created_at:
                                     try:
-                                        # Parse the ISO format date
-                                        tag_date = datetime.fromisoformat(created_at.replace('Z', '+00:00')).date()
+                                        # Better handling of date format
+                                        logger.debug(f"Processing date: {created_at} for note_id: {note_id}")
+                                        
+                                        # Handle different ISO formats
+                                        if 'Z' in created_at:
+                                            created_at = created_at.replace('Z', '+00:00')
+                                        elif 'T' in created_at and not ('+' in created_at or '-' in created_at[10:]):
+                                            # No timezone info - assume UTC
+                                            created_at = created_at + '+00:00'
+                                            
+                                        # Parse with timezone awareness
+                                        parsed_datetime = datetime.fromisoformat(created_at)
+                                        # Convert to UTC for comparison
+                                        utc_datetime = parsed_datetime.astimezone(timezone.utc)
+                                        tag_date = utc_datetime.date()
+                                        
+                                        logger.debug(f"Parsed date: {tag_date}")
                                         
                                         # Check if tag was created today
                                         if tag_date == today:
+                                            logger.debug(f"Match found for note_id: {note_id}")
                                             done_today_ids.add(note_id)
-                                    except Exception:
-                                        pass
+                                    except Exception as e:
+                                        logger.debug(f"Error parsing date '{created_at}': {str(e)}")
+                            
+                            logger.debug(f"Total todos done today: {len(done_today_ids)}")
                     except Exception as e:
-                        result += f"{ZettlFormatter.warning(f'Could not determine todos completed today: {str(e)}')}\n\n"
+                        error_msg = f"Could not determine todos completed today: {str(e)}"
+                        logger.error(error_msg)
+                        result += f"{ZettlFormatter.warning(error_msg)}\n\n"
                 
                 # Apply filters if specified
                 if filter_tags:
@@ -1023,9 +1052,12 @@ def execute_command():
                     result += display_todos_group(active_todos_by_category, uncategorized_active, active_header)
                 
                 # Display done today todos if requested
-                if donetoday and (donetoday_todos_by_category or uncategorized_donetoday):
-                    donetoday_header = ZettlFormatter.header(f"Completed Today {' '.join(header_parts)} ({len(unique_donetoday_ids)} total)")
-                    result += "\n" + display_todos_group(donetoday_todos_by_category, uncategorized_donetoday, donetoday_header)
+                if donetoday:
+                    if donetoday_todos_by_category or uncategorized_donetoday:
+                        donetoday_header = ZettlFormatter.header(f"Completed Today {' '.join(header_parts)} ({len(unique_donetoday_ids)} total)")
+                        result += "\n" + display_todos_group(donetoday_todos_by_category, uncategorized_donetoday, donetoday_header)
+                    else:
+                        result += "\n" + ZettlFormatter.warning("No todos were completed today.")
                 
                 # Display all done todos if requested
                 if done and (done_todos_by_category or uncategorized_done):
