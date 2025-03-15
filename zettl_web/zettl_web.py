@@ -170,12 +170,24 @@ def parse_command(command_str):
 
 COMMAND_OPTIONS = {
     'new': {
-        'short_opts': {'t': {'name': 'tag', 'multiple': True}},
-        'long_opts': {'tag': {'multiple': True}}
+            'short_opts': {
+        't': {'name': 'tag', 'multiple': True},
+        'l': {'name': 'link'}
+    },
+    'long_opts': {
+        'tag': {'multiple': True},
+        'link': {}
+    }
     },
     'add': {
-        'short_opts': {'t': {'name': 'tag', 'multiple': True}},
-        'long_opts': {'tag': {'multiple': True}}
+            'short_opts': {
+        't': {'name': 'tag', 'multiple': True},
+        'l': {'name': 'link'}
+    },
+    'long_opts': {
+        'tag': {'multiple': True},
+        'link': {}
+    }
     },
     'list': {
         'short_opts': {
@@ -191,15 +203,17 @@ COMMAND_OPTIONS = {
     },
     'todos': {
         'short_opts': {
-            'd': {'name': 'done', 'flag': True},
-            't': {'name': 'donetoday', 'flag': True},
-            'f': {'name': 'filter', 'multiple': True}
-        },
-        'long_opts': {
-            'done': {'flag': True},
-            'donetoday': {'flag': True},
-            'filter': {'multiple': True}
-        }
+        'd': {'name': 'done', 'flag': True},
+        't': {'name': 'donetoday', 'flag': True},
+        'a': {'name': 'all', 'flag': True},
+        'f': {'name': 'filter', 'multiple': True}
+    },
+    'long_opts': {
+        'done': {'flag': True},
+        'donetoday': {'flag': True},
+        'all': {'flag': True},
+        'filter': {'multiple': True}
+    }
     },
     'search': {
         'short_opts': {
@@ -468,7 +482,17 @@ def execute_command():
                     # Full content mode
                     result += f"{ZettlFormatter.note_id(note_id)} [{ZettlFormatter.timestamp(created_at)}]\n"
                     result += "-" * 40 + "\n"
-                    result += f"{note['content']}\n\n"
+                    result += f"{note['content']}\n"
+                    
+                    # Add tags display
+                    try:
+                        tags = notes_manager.get_tags(note_id)
+                        if tags:
+                            result += f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}\n"
+                    except Exception:
+                        pass
+                    
+                    result += "\n"  # Extra line between notes
                 else:
                     # Default mode - ID, timestamp, and preview
                     formatted_id = ZettlFormatter.note_id(note_id)
@@ -495,6 +519,7 @@ def execute_command():
             note_id = notes_manager.create_note(content)
             result = f"Created note #{note_id}\n"
             
+            
             # Add tags if provided
             for tag in tags:
                 if tag:
@@ -503,27 +528,81 @@ def execute_command():
                         result += f"Added tag '{tag}' to note #{note_id}\n"
                     except Exception as e:
                         result += f"{ZettlFormatter.warning(f'Could not add tag {tag}: {str(e)}')}\n"
-            
-        elif cmd == "show":
-            # Display a note
-            note_id = remaining_args[0] if remaining_args else ""
-            
-            try:
-                note = notes_manager.get_note(note_id)
-                created_at = notes_manager.format_timestamp(note['created_at'])
-                result = f"{ZettlFormatter.note_id(note_id)} [{ZettlFormatter.timestamp(created_at)}]\n"
-                result += "-" * 40 + "\n"
-                result += f"{note['content']}\n\n"
-                
-                # Show tags if any
+
+
+            link = options.get('link', options.get('l', ''))
+            # Create link if provided
+            if link:
                 try:
-                    tags = notes_manager.get_tags(note_id)
-                    if tags:
-                        result += f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}"
+                    notes_manager.create_link(note_id, link)
+                    result += f"Created link from #{note_id} to #{link}\n"
                 except Exception as e:
-                    logger.error(f"Error getting tags: {e}")
-            except Exception as e:
-                result = ZettlFormatter.error(str(e))
+                    result += f"{ZettlFormatter.warning(f'Could not create link to note #{link}: {str(e)}')}\n"
+
+                    
+        elif cmd == "show":
+            # Debugging for the show command
+            logger.debug(f"Executing show command with args: {remaining_args}")
+            
+            if not remaining_args:
+                result = ZettlFormatter.error("Please provide a note ID")
+            else:
+                note_id = remaining_args[0]
+                logger.debug(f"Attempting to retrieve note with ID: {note_id}")
+                
+                try:
+                    # Try to directly access the database to check if the note exists
+                    db_client = notes_manager.db.client
+                    logger.debug(f"Database client initialized: {db_client is not None}")
+                    
+                    # Check if the note exists directly with a database query
+                    query_result = db_client.table('notes').select('*').eq('id', note_id).execute()
+                    logger.debug(f"Direct DB query result: {query_result}")
+                    
+                    if not query_result.data:
+                        logger.debug(f"Note {note_id} not found in direct DB query")
+                        result = ZettlFormatter.error(f"Note {note_id} not found")
+                        return jsonify({'result': ansi_to_html(result)})
+                        
+                    # If we get here, the note exists in the database
+                    logger.debug(f"Note {note_id} found in database, attempting to load")
+                    
+                    # Now try to load it using the notes_manager
+                    note = notes_manager.get_note(note_id)
+                    logger.debug(f"Note loaded successfully: {note is not None}")
+                    
+                    created_at = notes_manager.format_timestamp(note['created_at'])
+                    
+                    result = f"{ZettlFormatter.note_id(note_id)} [{ZettlFormatter.timestamp(created_at)}]\n"
+                    result += "-" * 40 + "\n"
+                    result += f"{note['content']}\n\n"
+                    
+                    # Show tags if any
+                    try:
+                        tags = notes_manager.get_tags(note_id)
+                        if tags:
+                            result += f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}"
+                    except Exception as e:
+                        logger.exception(f"Error getting tags for note {note_id}: {e}")
+                except Exception as e:
+                    logger.exception(f"Error in show command for note {note_id}: {e}")
+                    
+                    # Provide a more helpful error message based on the exception
+                    if "connection" in str(e).lower():
+                        result = ZettlFormatter.error(f"Database connection error: {str(e)}")
+                    elif "not found" in str(e).lower():
+                        result = ZettlFormatter.error(f"Note {note_id} not found")
+                    elif "authentication" in str(e).lower():
+                        result = ZettlFormatter.error(f"Authentication error: {str(e)}")
+                    else:
+                        # Detailed error message with exception type
+                        error_type = type(e).__name__
+                        result = ZettlFormatter.error(f"Error ({error_type}): {str(e)}")
+                        
+                    # Log the full stack trace for server debugging
+                    import traceback
+                    logger.error(f"Full stack trace for show command error:\n{traceback.format_exc()}")
+
                 
         elif cmd == "search":
             # Parse options
@@ -574,7 +653,17 @@ def execute_command():
                         # Full content mode
                         result += f"{ZettlFormatter.note_id(note['id'])}\n"
                         result += "-" * 40 + "\n"
-                        result += f"{note['content']}\n\n"
+                        result += f"{note['content']}\n"
+                        
+                        # Add tags display
+                        try:
+                            tags = notes_manager.get_tags(note['id'])
+                            if tags:
+                                result += f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}\n"
+                        except Exception:
+                            pass
+                        
+                        result += "\n"  # Extra line between notes
                     else:
                         # Preview mode
                         content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
@@ -741,7 +830,10 @@ def execute_command():
             # List all notes tagged with 'todo' grouped by category
             done = 'done' in flags or 'd' in flags
             donetoday = 'donetoday' in flags or 'dt' in flags
+            all_todos = 'all' in flags or 'a' in flags  # NEW: Add all_todos flag
             filter_tags = []
+            if all_todos:
+                done = True
             if 'filter' in options:
                 if isinstance(options['filter'], list):  # Multiple filters
                     filter_tags.extend(options['filter'])
@@ -964,15 +1056,19 @@ def execute_command():
 {Colors.BOLD}Core Commands:{Colors.RESET}
   {Colors.YELLOW}{Colors.BOLD}new{Colors.RESET} - Create a new note with the given content
     {Colors.BLUE}→{Colors.RESET} zettl new "This is a new note about an interesting concept"
+    {Colors.BLUE}→{Colors.RESET} zettl new "Note with tag and link" --tag concept --link 22a4b
 
   {Colors.YELLOW}{Colors.BOLD}list{Colors.RESET} - List recent notes
     {Colors.BLUE}→{Colors.RESET} zettl list --limit 5
+    {Colors.BLUE}→{Colors.RESET} zettl list --full  # Shows full content with tags
 
   {Colors.YELLOW}{Colors.BOLD}show{Colors.RESET} - Display note content
     {Colors.BLUE}→{Colors.RESET} zettl show 22a4b
 
   {Colors.YELLOW}{Colors.BOLD}search{Colors.RESET} - Search for notes containing text
     {Colors.BLUE}→{Colors.RESET} zettl search "concept"
+    {Colors.BLUE}→{Colors.RESET} zettl search -t concept --full  # Show full content with tags
+    {Colors.BLUE}→{Colors.RESET} zettl search "concept" +t done  # Exclude notes with 'done' tag
 
 {Colors.BOLD}Connection Commands:{Colors.RESET}
   {Colors.YELLOW}{Colors.BOLD}link{Colors.RESET} - Create link between notes
@@ -991,7 +1087,9 @@ def execute_command():
 
   {Colors.YELLOW}{Colors.BOLD}todos{Colors.RESET} - List notes tagged with 'todo'
     {Colors.BLUE}→{Colors.RESET} zettl todos
-    {Colors.BLUE}→{Colors.RESET} zettl todos --done
+    {Colors.BLUE}→{Colors.RESET} zettl todos --all  # Show all todos (active and completed)
+    {Colors.BLUE}→{Colors.RESET} zettl todos --done # Show only completed todos
+    {Colors.BLUE}→{Colors.RESET} zettl todos --filter work  # Filter todos by tag
 
 {Colors.BOLD}Management Commands:{Colors.RESET}
   {Colors.YELLOW}{Colors.BOLD}delete{Colors.RESET} - Delete a note and its associated data
