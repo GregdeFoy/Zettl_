@@ -344,6 +344,10 @@ def extract_options(args, cmd):
             else:
                 options['exclude-tag'] = True
                 i += 1
+        else:
+            # Add this else clause to capture non-option arguments
+            remaining_args.append(arg)
+            i += 1
             
     return options, flags, remaining_args
 
