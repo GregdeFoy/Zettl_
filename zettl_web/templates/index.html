@@ -52,6 +52,24 @@
             border-bottom: 1px solid #444;
         }
 
+        #header .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        #header .actions button {
+            background-color: var(--button-bg);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #header .actions button:hover {
+            background-color: var(--button-hover);
+        }
+
         #app-container {
             display: flex;
             flex-direction: column;
@@ -97,6 +115,17 @@
             margin-bottom: 15px;
             padding-bottom: 5px;
             font-size: 0.9em;
+        }
+
+        /* Processing messages - new styling */
+        #terminal-output .processing-message {
+            padding: 8px 12px;
+            background-color: rgba(74, 74, 74, 0.3);
+            border-left: 3px solid var(--primary-color);
+            margin-bottom: 10px;
+            font-style: italic;
+            font-size: 0.9em;
+            opacity: 0.8;
         }
 
         /* Colors for terminal output */
@@ -154,8 +183,7 @@
         #prompt-label {
             position: absolute;
             left: 10px;
-            top: 50%;
-            transform: translateY(-50%);
+            top: 9px; /* Fixed position aligned with first line */
             color: var(--primary-color);
             pointer-events: none;
             user-select: none;
@@ -173,6 +201,12 @@
             font-size: 16px;
             outline: none;
             position: relative;
+            resize: none; /* Disable manual resizing */
+            overflow-y: hidden; /* Hide scrollbar */
+            min-height: 38px; /* Minimum height for one line + padding */
+            max-height: 120px; /* Max height (approximately 4 lines) */
+            line-height: 1.4;
+            width: 100%;
         }
 
         #submit-button {
@@ -185,6 +219,31 @@
             font-family: 'Courier New', monospace;
             font-weight: bold;
             cursor: pointer;
+        }
+
+        /* Clear input button - new */
+        #clear-input-button {
+            position: absolute;
+            right: 45px; /* Moved to the left of the submit button */
+            top: 9px; /* Aligned with first line */
+            background-color: var(--button-bg);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0.7;
+            z-index: 10;
+        }
+
+        #clear-input-button:hover {
+            opacity: 1;
+            background-color: var(--button-hover);
         }
 
         .loading-indicator {
@@ -228,7 +287,10 @@
 <body>
     <div id="header">
         <span>Zettl Web Terminal</span>
-        <span id="username">Logged in as: {{ username }}</span>
+        <div class="actions">
+            <button id="clear-terminal">Clear</button>
+            <span id="username">{{ username }}</span>
+        </div>
     </div>
 
     <div id="app-container">
@@ -238,19 +300,12 @@
         
         <div id="input-area">
             <div id="shortcut-buttons">
-                <button data-cmd="list --full">list --full</button>
-                <button data-cmd="new">new</button>
-                <button data-cmd="show">show</button>
-                <button data-cmd="search">search</button>
-                <button data-cmd="todos --all">todos --all</button>
-                <button data-cmd="tags">tags</button>
-                <button data-cmd="link">link</button>
-                <button data-cmd="related">related</button>
-                <button data-cmd="help">help</button>
+                <!-- Dynamic buttons will be inserted here -->
             </div>
             <div id="input-wrapper">
                 <span id="prompt-label">zettl&gt;</span>
-                <input type="text" id="command-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                <textarea id="command-input" rows="1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+                <button id="clear-input-button">×</button>
                 <button id="submit-button">↵</button>
             </div>
         </div>
@@ -263,10 +318,37 @@
             const commandInput = document.getElementById('command-input');
             const submitButton = document.getElementById('submit-button');
             const shortcutButtons = document.getElementById('shortcut-buttons');
+            const clearTerminalButton = document.getElementById('clear-terminal');
+            const clearInputButton = document.getElementById('clear-input-button');
             
             // Command history
             let commandHistory = loadHistory();
             let historyIndex = commandHistory.length;
+
+            // Command to options mapping - for dynamic buttons
+            const commandOptions = {
+                'list': ['-l', '--limit', '-f', '--full', '-c', '--compact', '-h', '--help'],
+                'new': ['-t', '--tag', '-l', '--link', '-h', '--help'],
+                'add': ['-t', '--tag', '-l', '--link', '-h', '--help'],
+                'show': ['-h', '--help'],
+                'search': ['-t', '--tag', '+t', '--exclude-tag', '-f', '--full', '-h', '--help'],
+                'tags': ['-h', '--help'],
+                'link': ['-c', '--context', '-h', '--help'],
+                'related': ['-f', '--full', '-h', '--help'],
+                'graph': ['-o', '--output', '-d', '--depth', '-h', '--help'],
+                'llm': ['-a', '--action', '-c', '--count', '-s', '--show-source', '-h', '--help'],
+                'todos': ['-a', '--all', '-dt', '--donetoday', '-t', '--tag', '-h', '--help'],
+                'delete': ['--keep-links', '--keep-tags', '-f', '--force', '-h', '--help'],
+                'untag': ['-h', '--help'],
+                'unlink': ['-h', '--help'],
+                'help': ['-h', '--help']
+            };
+
+            // Top-level commands for initial buttons
+            const topLevelCommands = ['new', 'list', 'show', 'search', 'todos', 'tags', 'link', 'related', 'help'];
+            
+            // For commands that need auto-quotes
+            const autoQuoteCommands = ['new', 'add', 'search'];
             
             // Create a container for the logo to handle overflow better
             const logoContainer = document.createElement('div');
@@ -286,20 +368,107 @@
             appendOutput("Welcome to Zettl Web Terminal. Type 'help' for commands.");
             appendOutput("Type 'list' to see your recent notes.");
             
+            // Initialize buttons
+            updateShortcutButtons();
+            
+            // Function to resize textarea based on content
+            function autoResizeTextarea() {
+                const textarea = commandInput;
+                
+                // Reset height to auto to get the correct scrollHeight
+                textarea.style.height = 'auto';
+                
+                // Set height to scrollHeight (content height)
+                const newHeight = Math.min(textarea.scrollHeight, 120); // Max 120px (about 4 lines)
+                textarea.style.height = newHeight + 'px';
+            }
+            
+            // Auto-resize the textarea whenever input changes
+            commandInput.addEventListener('input', autoResizeTextarea);
+            
             // Focus the input field
             setTimeout(() => {
                 commandInput.focus();
+                autoResizeTextarea();
             }, 300);
             
-            // Handle keyboard events for command input
+            // Function to update shortcut buttons based on current input
+            function updateShortcutButtons() {
+                // Clear existing buttons
+                shortcutButtons.innerHTML = '';
+                
+                const currentText = commandInput.value.trim();
+                const cmdParts = currentText.split(/\s+/);
+                const currentCmd = cmdParts[0];
+                
+                // If a command is typed, show its options
+                if (currentCmd && commandOptions[currentCmd]) {
+                    // Show options for the current command
+                    commandOptions[currentCmd].forEach(option => {
+                        const button = document.createElement('button');
+                        button.textContent = option;
+                        button.dataset.option = option;
+                        button.addEventListener('click', function() {
+                            // Add the option with spaces
+                            const currentValue = commandInput.value;
+                            
+                            // Only add a space before if there isn't one already
+                            let newValue;
+                            if (currentValue.endsWith(' ')) {
+                                newValue = currentValue + option + ' ';
+                            } else {
+                                newValue = currentValue + ' ' + option + ' ';
+                            }
+                            
+                            commandInput.value = newValue;
+                            commandInput.focus();
+                            
+                            // Put cursor at the end
+                            commandInput.selectionStart = commandInput.selectionEnd = newValue.length;
+                        });
+                        shortcutButtons.appendChild(button);
+                    });
+                } else {
+                    // Show top-level commands
+                    topLevelCommands.forEach(cmd => {
+                        const button = document.createElement('button');
+                        button.textContent = cmd;
+                        button.dataset.cmd = cmd;
+                        button.addEventListener('click', function() {
+                            const commandText = cmd;
+                            commandInput.value = commandText;
+                            commandInput.focus();
+                            autoResizeTextarea();
+                            
+                            // Update buttons immediately to reflect new command
+                            updateShortcutButtons();
+                            
+                            // If this is a command needing quotes, add them and position cursor
+                            if (autoQuoteCommands.includes(cmd)) {
+                // Auto-add quotes and position cursor between them
+                                commandInput.value = cmd + ' ""';
+                                autoResizeTextarea();
+                                // Set cursor position between the quotes
+                                const cursorPos = commandInput.value.length - 1;
+                                setTimeout(() => {
+                                    commandInput.selectionStart = commandInput.selectionEnd = cursorPos;
+                                }, 0);
+                            }
+                        });
+                        shortcutButtons.appendChild(button);
+                    });
+                }
+            }
+            
+            // Handle keyboard events for command input - updated for textarea
             commandInput.addEventListener('keydown', function(e) {
-                // Enter key submits command
-                if (e.key === 'Enter') {
+                // Enter key submits command (without Shift)
+                if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     executeCommand(commandInput.value);
                 }
-                // Up arrow for previous command
-                else if (e.key === 'ArrowUp') {
+                // Up arrow for previous command - only when textarea is on first line
+                else if (e.key === 'ArrowUp' && commandInput.selectionStart === 0) {
                     e.preventDefault();
                     if (historyIndex > 0) {
                         historyIndex--;
@@ -307,11 +476,13 @@
                         // Move cursor to end of input
                         setTimeout(() => {
                             commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
+                            updateShortcutButtons();
+                            autoResizeTextarea();
                         }, 0);
                     }
                 }
-                // Down arrow for next command
-                else if (e.key === 'ArrowDown') {
+                // Down arrow for next command - only when textarea is on last line
+                else if (e.key === 'ArrowDown' && commandInput.selectionStart === commandInput.value.length) {
                     e.preventDefault();
                     if (historyIndex < commandHistory.length) {
                         historyIndex++;
@@ -319,36 +490,54 @@
                         // Move cursor to end of input
                         setTimeout(() => {
                             commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
+                            updateShortcutButtons();
+                            autoResizeTextarea();
                         }, 0);
                     }
                 }
-                // Tab for shortcuts (simple implementation)
+                // Tab for shortcuts 
                 else if (e.key === 'Tab') {
                     e.preventDefault();
                     const currentCmd = commandInput.value.trim().split(' ')[0];
-                    const shortcuts = ['list', 'new', 'show', 'search', 'tags', 'link', 'related', 'help'];
+                    const shortcuts = Object.keys(commandOptions);
                     
                     if (currentCmd) {
                         const matches = shortcuts.filter(cmd => cmd.startsWith(currentCmd));
                         if (matches.length === 1) {
                             commandInput.value = matches[0] + ' ';
+                            updateShortcutButtons();
+                            autoResizeTextarea();
                         }
                     }
                 }
             });
             
+            // Update shortcut buttons when input changes
+            commandInput.addEventListener('input', updateShortcutButtons);
+            
             // Handle submit button click
             submitButton.addEventListener('click', function() {
                 executeCommand(commandInput.value);
             });
-            
-            // Handle shortcut buttons
-            shortcutButtons.addEventListener('click', function(e) {
-                if (e.target.tagName === 'BUTTON') {
-                    const cmd = e.target.dataset.cmd;
-                    commandInput.value = cmd + ' ';
-                    commandInput.focus();
-                }
+
+            // Handle the clear terminal button
+            clearTerminalButton.addEventListener('click', function() {
+                // Clear terminal output but keep logo
+                terminalOutput.innerHTML = '';
+                
+                // Add the logo back
+                terminalOutput.appendChild(logoContainer);
+                
+                // Add the welcome text again
+                appendOutput("Terminal cleared. Type 'help' for commands.");
+            });
+
+            // Handle the clear input button
+            clearInputButton.addEventListener('click', function() {
+                commandInput.value = '';
+                commandInput.focus();
+                autoResizeTextarea();
+                updateShortcutButtons();
             });
 
             // Handle iOS focus issues
@@ -377,12 +566,21 @@
                 // Reset history index
                 historyIndex = commandHistory.length;
                 
-                // Clear input
+                // Clear input and resize
                 commandInput.value = '';
+                autoResizeTextarea();
+                updateShortcutButtons();
                 
-                // Show loading indicator
+                // Show loading indicator with a unique ID
                 const loadingId = `loading-${Date.now()}`;
-                appendOutput(`<span id="${loadingId}">Processing command... ⏳</span>`);
+                const processingElement = document.createElement('div');
+                processingElement.className = 'processing-message';
+                processingElement.id = loadingId;
+                processingElement.innerHTML = 'Processing command... <span class="loading-indicator">⏳</span>';
+                terminalOutput.appendChild(processingElement);
+                
+                // Scroll to the processing message
+                terminalOutput.scrollTop = terminalOutput.scrollHeight;
                 
                 // Send command to server
                 fetch('/api/command', {

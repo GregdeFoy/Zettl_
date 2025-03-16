@@ -203,16 +203,14 @@ COMMAND_OPTIONS = {
     },
     'todos': {
         'short_opts': {
-            
             'dt': {'name': 'donetoday', 'flag': True},
             'a': {'name': 'all', 'flag': True},
-            'f': {'name': 'filter', 'multiple': True}
+            't': {'name': 'tag', 'multiple': True}  # Changed from 'f': {'name': 'filter', ...}
         },
         'long_opts': {
-            
             'donetoday': {'flag': True},
             'all': {'flag': True},
-            'filter': {'multiple': True}
+            'tag': {'multiple': True}  # Changed from 'filter': ...
         }
     },
     'search': {
@@ -416,13 +414,13 @@ def show_command_help(cmd):
 {Colors.BOLD}Options:{Colors.RESET}
   {Colors.YELLOW}-a, --all{Colors.RESET}            Show all todos (active and completed)
   {Colors.YELLOW}-dt, --donetoday{Colors.RESET}     Show todos completed today
-  {Colors.YELLOW}-f, --filter TAG{Colors.RESET}     Filter todos by additional tag
+  {Colors.YELLOW}-t, --tag TAG{Colors.RESET}        Filter todos by additional tag
 
 {Colors.BOLD}Examples:{Colors.RESET}
   {Colors.BLUE}todos{Colors.RESET}                  Show active todos
   {Colors.BLUE}todos -a{Colors.RESET}               Show all todos (active and completed)
   {Colors.BLUE}todos -dt{Colors.RESET}              Show todos completed today
-  {Colors.BLUE}todos -f work{Colors.RESET}          Show todos tagged with "work"
+  {Colors.BLUE}todos -t work{Colors.RESET}          Show todos tagged with "work"
 """
     # Add more command help texts as needed...
     elif cmd == "help":
@@ -836,17 +834,18 @@ def execute_command():
                 
         elif cmd == "todos":
             # List all notes tagged with 'todo' grouped by category
+            # List all notes tagged with 'todo' grouped by category
             donetoday = 'donetoday' in flags or 'dt' in flags
-            all_todos = 'all' in flags or 'a' in flags  # NEW: Add all_todos flag
+            all_todos = 'all' in flags or 'a' in flags
             done = all_todos
             filter_tags = []
             if all_todos:
                 done = True
-            if 'filter' in options:
-                if isinstance(options['filter'], list):  # Multiple filters
-                    filter_tags.extend(options['filter'])
-                else:  # Single filter
-                    filter_tags.append(options['filter'])
+            if 'tag' in options:  # Changed from 'filter' to 'tag'
+                if isinstance(options['tag'], list):  # Multiple tags
+                    filter_tags.extend(options['tag'])
+                else:  # Single tag
+                    filter_tags.append(options['tag'])
             
             # Get all notes tagged with 'todo'
             todo_notes = notes_manager.get_notes_by_tag('todo')
@@ -1121,11 +1120,11 @@ def execute_command():
     {Colors.BLUE}→{Colors.RESET} zettl tags 22a4b
     {Colors.BLUE}→{Colors.RESET} zettl tags 22a4b "concept"
 
-  {Colors.YELLOW}{Colors.BOLD}todos{Colors.RESET} - List notes tagged with 'todo'
+    {Colors.YELLOW}{Colors.BOLD}todos{Colors.RESET} - List notes tagged with 'todo'
     {Colors.BLUE}→{Colors.RESET} zettl todos
     {Colors.BLUE}→{Colors.RESET} zettl todos --all  # Show all todos (active and completed)
-    {Colors.BLUE}→{Colors.RESET} zettl todos --done # Show only completed todos
-    {Colors.BLUE}→{Colors.RESET} zettl todos --filter work  # Filter todos by tag
+    {Colors.BLUE}→{Colors.RESET} zettl todos --donetoday  # Show todos completed today
+    {Colors.BLUE}→{Colors.RESET} zettl todos --tag work  # Filter todos by tag
 
 {Colors.BOLD}Management Commands:{Colors.RESET}
   {Colors.YELLOW}{Colors.BOLD}delete{Colors.RESET} - Delete a note and its associated data
