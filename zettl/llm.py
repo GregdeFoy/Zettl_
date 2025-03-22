@@ -101,28 +101,26 @@ class LLMHelper:
         
     def summarize_note(self, note_id: str) -> str:
         """
-        Summarize a single note using Claude.
+        Summarize a single note's content focusing on its key ideas.
         
         Args:
             note_id: ID of the note to summarize
             
         Returns:
-            A concise summary of the note
+            A concise summary of the note's ideas
         """
         try:
             note = self.db.get_note(note_id)
             
-            system_message = """You are an expert assistant for a Zettelkasten note-taking system. 
-Your task is to provide clear, concise summaries of notes while preserving the key ideas.
-Focus on extracting the core concepts, and present them in well-structured format.
-Your summary should be significantly shorter than the original note but capture its essence."""
+            system_message = """You are skilled at distilling complex ideas.
+    Your task is to provide a clear, concise summary that captures the essence of the text.
+    Focus on identifying the key points while preserving the core meaning."""
             
-            prompt = f"""Please summarize the following note concisely, preserving the main ideas and their relationships:
+            prompt = f"""Please summarize the following text concisely:
 
-## Note #{note_id}
-{note['content']}
+    {note['content']}
 
-Provide a summary that captures the essence of this note in 2-3 sentences."""
+    Provide a summary that captures the essence of these ideas in 2-3 sentences."""
             
             return self._call_llm_api(prompt, system_message, max_tokens=300)
             
@@ -131,14 +129,14 @@ Provide a summary that captures the essence of this note in 2-3 sentences."""
         
     def generate_connections(self, note_id: str, limit: int = 5) -> List[Dict[str, Any]]:
         """
-        Find potential connections between this note and others.
+        Find potential connections between this note's ideas and others in the system.
         
         Args:
             note_id: ID of the note to find connections for
             limit: Maximum number of connections to return
             
         Returns:
-            List of dictionaries containing note_id and explanation of the connection
+            List of dictionaries containing note_id and explanation of the conceptual connection
         """
         try:
             note = self.db.get_note(note_id)
@@ -153,28 +151,21 @@ Provide a summary that captures the essence of this note in 2-3 sentences."""
             if not other_notes:
                 return []
                 
-            system_message = """You are an expert assistant for a Zettelkasten note-taking system.
-    Your specialized skill is finding meaningful conceptual connections between ideas across different notes.
-    Focus on identifying substantial relationships based on:
-    1. Shared concepts or themes
-    2. Complementary or contradictory ideas
-    3. Potential cause-effect relationships
-    4. Applications of one idea to another domain
-    5. Shared or related tags
-
-    For each connection, provide a clear, specific explanation of how the notes relate to each other.
-    Pay special attention to the tags associated with each note, as they often indicate key concepts or themes."""
+            system_message = """You are an expert at finding meaningful conceptual connections between ideas.
+    Your task is to identify substantive relationships between the main ideas in different texts.
+    Focus on identifying connections based on conceptual relationships, complementary ideas, 
+    contradictions, applications, or shared themes."""
             
             # Prepare prompt with the target note
-            prompt = f"""I need to find meaningful connections between notes in my Zettelkasten system.
+            prompt = f"""I need to find meaningful connections between the ideas in these texts.
 
-    Here is the source note I want to connect to other notes:
+    Here is the source text:
 
-    ## Note #{note_id}
+    ## Source Text
     {note['content']}
     Tags: {', '.join(source_tags) if source_tags else 'None'}
 
-    Here are other notes in my system. Please identify the top {limit} notes that have the strongest conceptual connection to Note #{note_id}:
+    Here are other texts to compare with. Please identify the top {limit} texts that have the strongest conceptual connection to the source text:
 
     """
             
@@ -192,19 +183,19 @@ Provide a summary that captures the essence of this note in 2-3 sentences."""
                     note_preview = note_preview[:300] + "..."
                 
                 # Include tags in the prompt
-                prompt += f"## Note #{other_note['id']}\n{note_preview}\n"
+                prompt += f"## Text #{other_note['id']}\n{note_preview}\n"
                 prompt += f"Tags: {', '.join(note_tags) if note_tags else 'None'}\n\n"
                 
                 # Limit number of notes to avoid exceeding token limits
                 if i >= 15:  # Limited to 15 notes to avoid token limits
                     break
                     
-            prompt += f"""For each of the top {limit} most related notes, provide:
-    1. The note ID (in the format: "Note #ID")
-    2. A clear explanation of the conceptual connection to the source note
-    3. Mention any shared or related tags that contribute to the connection
+            prompt += f"""For each of the top {limit} most related texts, provide:
+    1. The text ID (in the format: "Text #ID")
+    2. A clear explanation of the conceptual connection to the source text
+    3. Describe specifically how the ideas relate to each other
 
-    Format your response as a structured list with one connection per item. Include only notes with meaningful connections."""
+    Format your response as a structured list with one connection per item. Include only texts with meaningful idea connections."""
 
             response = self._call_llm_api(prompt, system_message, max_tokens=1500)
             
@@ -224,11 +215,11 @@ Provide a summary that captures the essence of this note in 2-3 sentences."""
                     
                 # Look for note IDs in various formats
                 id_patterns = [
-                    r'Note #([a-zA-Z0-9]+)',  # Note #abc123
-                    r'#([a-zA-Z0-9]+):',      # #abc123:
-                    r'#([a-zA-Z0-9]+) -',     # #abc123 -
+                    r'Text #([a-zA-Z0-9]+)',    # Text #abc123
+                    r'#([a-zA-Z0-9]+):',        # #abc123:
+                    r'#([a-zA-Z0-9]+) -',       # #abc123 -
                     r'^\s*([0-9]+)\.\s+#([a-zA-Z0-9]+)', # 1. #abc123
-                    r'^\s*([0-9]+)\.\s+Note #([a-zA-Z0-9]+)', # 1. Note #abc123
+                    r'^\s*([0-9]+)\.\s+Text #([a-zA-Z0-9]+)', # 1. Text #abc123
                 ]
                 
                 found_id = False
@@ -275,10 +266,10 @@ Provide a summary that captures the essence of this note in 2-3 sentences."""
         except Exception as e:
             print(f"Error generating connections: {str(e)}")
             return []
-        
+            
     def suggest_tags(self, note_id: str, count: int = 3) -> List[str]:
         """
-        Suggest tags for a note using Claude.
+        Suggest tags based on the key themes and concepts in a note.
         
         Args:
             note_id: ID of the note to suggest tags for
@@ -290,32 +281,30 @@ Provide a summary that captures the essence of this note in 2-3 sentences."""
         try:
             note = self.db.get_note(note_id)
             
-            system_message = """You are an expert assistant for a Zettelkasten note-taking system.
-Your task is to suggest relevant, precise tags for notes.
-Tags should be specific enough to be useful for categorization but general enough to connect multiple notes.
-Prefer lowercase, single-word tags or short hyphenated phrases that capture key concepts."""
+            system_message = """You are skilled at identifying key themes and concepts.
+    Your task is to suggest relevant, precise tags that capture the main topics and concepts in this text.
+    Focus on identifying substantive themes rather than metadata or format characteristics."""
             
-            prompt = f"""Please suggest exactly {count} appropriate tags for the following note:
+            prompt = f"""Please suggest exactly {count} appropriate tags for the following text based on its content:
 
-## Note #{note_id}
-{note['content']}
+    {note['content']}
 
-Consider:
-1. Key concepts in the note
-2. Academic fields or domains relevant to the content
-3. Methodologies or approaches mentioned
-4. Potential use cases or applications
+    Consider:
+    1. Key concepts, themes, or topics in the text
+    2. Fields or domains relevant to the content
+    3. Important methodologies, frameworks, or approaches mentioned
+    4. Significant ideas that could connect this content to other topics
 
-Format your response as a simple list with exactly {count} tags, each on a new line.
-Start each line with "Tag: " followed by the tag.
-Each tag should be a single lowercase word or hyphenated phrase without the # symbol.
+    Format your response as a simple list with exactly {count} tags, each on a new line.
+    Start each line with "Tag: " followed by the tag.
+    Each tag should be a single word or short hyphenated phrase without the # symbol.
 
-For example:
-Tag: productivity
-Tag: memory-techniques
-Tag: learning
+    For example:
+    Tag: artificial-intelligence
+    Tag: ethics
+    Tag: consciousness
 
-Please provide exactly {count} tags in this format."""
+    Please provide exactly {count} tags in this format."""
             
             response = self._call_llm_api(prompt, system_message, max_tokens=200)
             
@@ -335,7 +324,7 @@ Please provide exactly {count} tags in this format."""
                     tag = line[4:].strip()  # Remove "Tag: " prefix
                     if tag:
                         tags.append(tag)
-                    
+                        
             # If we didn't find any tags with that format, try other formats
             if not tags:
                 for line in response.strip().split('\n'):
@@ -383,7 +372,7 @@ Please provide exactly {count} tags in this format."""
         except Exception as e:
             print(f"Error suggesting tags: {str(e)}")
             return []
-    
+        
     def extract_key_concepts(self, note_id: str, count: int = 5) -> List[Dict[str, str]]:
         """
         Extract key concepts from a note with explanations.
@@ -398,28 +387,27 @@ Please provide exactly {count} tags in this format."""
         try:
             note = self.db.get_note(note_id)
             
-            system_message = """You are an expert assistant for a Zettelkasten note-taking system.
-Your task is to identify the most important concepts in a note and provide a brief explanation for each.
-Focus on extracting core ideas that could form the basis of new notes in a Zettelkasten system."""
+            system_message = """You are skilled at identifying and explaining key concepts.
+    Your task is to identify the most important concepts in this text and provide a clear explanation for each.
+    Focus on extracting the core ideas that are most central to understanding the text."""
             
-            prompt = f"""Please identify the {count} most important concepts in this note:
+            prompt = f"""Please identify the {count} most important concepts in this text:
 
-## Note #{note_id}
-{note['content']}
+    {note['content']}
 
-For each concept:
-1. Start with "Concept: " followed by a short, clear name for the concept (3-5 words maximum)
-2. On the next line, start with "Explanation: " followed by a 1-2 sentence explanation
+    For each concept:
+    1. Start with "Concept: " followed by a short, clear name for the concept (3-5 words maximum)
+    2. On the next line, start with "Explanation: " followed by a 1-2 sentence explanation that captures its significance
 
-Format your response precisely as follows:
+    Format your response precisely as follows:
 
-Concept: [First concept name]
-Explanation: [Your explanation of the first concept]
+    Concept: [First concept name]
+    Explanation: [Your explanation of the first concept]
 
-Concept: [Second concept name]
-Explanation: [Your explanation of the second concept]
+    Concept: [Second concept name]
+    Explanation: [Your explanation of the second concept]
 
-Follow this exact format for all {count} concepts, with each concept-explanation pair separated by a blank line."""
+    Follow this exact format for all {count} concepts, with each concept-explanation pair separated by a blank line."""
             
             response = self._call_llm_api(prompt, system_message, max_tokens=800)
             
@@ -490,7 +478,7 @@ Follow this exact format for all {count} concepts, with each concept-explanation
                         
                         # If no explanation found, use a placeholder
                         if not explanation:
-                            explanation = "This is a key concept from the note."
+                            explanation = "This is a key concept from the text."
                         
                         concepts.append({
                             "concept": concept_text.strip(),
@@ -537,10 +525,10 @@ Follow this exact format for all {count} concepts, with each concept-explanation
         except Exception as e:
             print(f"Error extracting concepts: {str(e)}")
             return []
-    
+        
     def generate_question_note(self, note_id: str, count: int = 3) -> List[Dict[str, str]]:
         """
-        Generate thought-provoking questions based on a note.
+        Generate thought-provoking questions based on a note's content.
         
         Args:
             note_id: ID of the note to generate questions from
@@ -552,32 +540,32 @@ Follow this exact format for all {count} concepts, with each concept-explanation
         try:
             note = self.db.get_note(note_id)
             
-            system_message = """You are an expert assistant for a Zettelkasten note-taking system.
-Your task is to generate thought-provoking questions that extend the ideas in a note.
-Each question should explore implications, applications, or connections that aren't explicitly covered in the original note."""
+            system_message = """You are skilled at generating insightful questions.
+    Your task is to generate thought-provoking questions that explore and extend the ideas in the text.
+    Focus on questions that encourage critical thinking, deeper analysis, or novel applications."""
             
-            prompt = f"""Based on the following note, generate exactly {count} thought-provoking questions that extend its ideas:
+            prompt = f"""Based on the following text, generate exactly {count} thought-provoking questions:
 
-## Note #{note_id}
-{note['content']}
+    {note['content']}
 
-For each question:
-1. Start with 'Question: ' followed by your clear, focused question
-2. Then on a new line, start with 'Explanation: ' followed by why this question is interesting or important
-3. Use this exact format for each of the {count} questions, with a blank line between each question-explanation pair
+    For each question:
+    1. Start with 'Question: ' followed by your clear, focused question
+    2. Then on a new line, start with 'Explanation: ' followed by why this question is interesting or important
+    3. Make sure each question explores different aspects of the ideas in the text
+    4. Use this exact format for each of the {count} questions, with a blank line between each question-explanation pair
 
-Format your response precisely as follows:
+    Format your response precisely as follows:
 
-Question: [Your first question here]
-Explanation: [Your explanation here]
+    Question: [Your first question here]
+    Explanation: [Your explanation here]
 
-Question: [Your second question here]
-Explanation: [Your explanation here]
+    Question: [Your second question here]
+    Explanation: [Your explanation here]
 
-Question: [Your third question here]
-Explanation: [Your explanation here]
+    Question: [Your third question here]
+    Explanation: [Your explanation here]
 
-Follow this format exactly, with the labels 'Question:' and 'Explanation:' at the start of their respective lines."""
+    Follow this format exactly, with the labels 'Question:' and 'Explanation:' at the start of their respective lines."""
             
             response = self._call_llm_api(prompt, system_message, max_tokens=800)
             
@@ -644,7 +632,7 @@ Follow this format exactly, with the labels 'Question:' and 'Explanation:' at th
                         # Add to questions
                         questions.append({
                             "question": question_line.strip(),
-                            "explanation": explanation if explanation else "This question explores an important aspect of the note."
+                            "explanation": explanation if explanation else "This question explores an important aspect of the ideas presented."
                         })
                 
                 # If still no questions, try to split the response into equal parts
@@ -670,7 +658,7 @@ Follow this format exactly, with the labels 'Question:' and 'Explanation:' at th
                         # Use the rest as explanation or a default
                         explanation = chunk.replace(question, "").strip()
                         if not explanation:
-                            explanation = "This question relates to concepts in the note."
+                            explanation = "This question encourages deeper thinking about the ideas in the text."
                         
                         questions.append({
                             "question": question,
@@ -690,33 +678,30 @@ Follow this format exactly, with the labels 'Question:' and 'Explanation:' at th
             
     def expand_note(self, note_id: str) -> str:
         """
-        Expand a note with additional details and insights.
+        Expand the ideas in a note with additional details and insights.
         
         Args:
             note_id: ID of the note to expand
             
         Returns:
-            Expanded version of the note
+            Expanded version of the ideas in the note
         """
         try:
             note = self.db.get_note(note_id)
             
-            system_message = """You are an expert assistant for a Zettelkasten note-taking system.
-Your task is to thoughtfully expand a note with additional context, examples, and insights.
-Preserve the original meaning while adding depth and connections to other potential ideas.
-You should aim to roughly double the length of the original note."""
+            system_message = """You are an expert at developing and enriching ideas.
+    Your task is to thoughtfully expand on the concepts presented with additional context, examples, and insights.
+    Focus on deepening understanding and exploring implications of these ideas."""
             
-            prompt = f"""Please expand the following note with additional context, examples, and insights:
+            prompt = f"""Please expand thoughtfully on the following text:
 
-## Note #{note_id}
-{note['content']}
+    {note['content']}
 
-Please:
-1. Preserve the original meaning and intent of the note
-2. Add relevant examples or applications
-3. Explore potential implications or extensions of the ideas
-4. Suggest connections to related concepts
-5. Maintain a clear, concise writing style appropriate for a Zettelkasten system"""
+    Please:
+    1. Elaborate on the core ideas with additional context and nuance
+    2. Provide relevant examples, applications, or case studies
+    3. Explore implications, extensions, or consequences of these ideas
+    4. Add depth and richness while maintaining clarity and coherence"""
             
             return self._call_llm_api(prompt, system_message, max_tokens=1500)
             
@@ -725,7 +710,7 @@ Please:
         
     def critique_note(self, note_id: str) -> Dict[str, Any]:
         """
-        Provide constructive critique for a note.
+        Provide constructive critique on the ideas in a note.
         
         Args:
             note_id: ID of the note to critique
@@ -736,27 +721,27 @@ Please:
         try:
             note = self.db.get_note(note_id)
             
-            system_message = """You are an expert assistant for a Zettelkasten note-taking system.
-Your task is to provide a constructive critique of a note to help improve its quality.
-Focus on clarity, atomicity (one idea per note), and potential for connections."""
+            system_message = """You are a thoughtful critic.
+    Your task is to provide constructive critique of the ideas presented in this text.
+    Focus on the quality of thinking, clarity of expression, and strength of arguments or insights."""
             
-            prompt = f"""Please provide a constructive critique of the following note:
+            prompt = f"""Please provide a constructive critique of the following text:
 
-## Note #{note_id}
-{note['content']}
+    {note['content']}
 
-Analyze the note for:
-1. Clarity and precision of expression
-2. Atomicity (does it focus on a single idea?)
-3. Potential for connections to other ideas
-4. Completeness of the thought
+    Analyze for:
+    1. Clarity and precision of expression
+    2. Logical coherence and strength of reasoning
+    3. Depth and originality of the ideas
+    4. Evidence and support for claims
+    5. Potential counterarguments or limitations
 
-Format your response with these clearly labeled sections:
-- Strengths: [List the note's strengths]
-- Areas for Improvement: [List areas that could be improved]
-- Suggestions: [Provide specific actionable suggestions]
+    Format your response with these clearly labeled sections:
+    - Strengths: [List the strongest aspects of the ideas]
+    - Areas for Improvement: [List areas that could be improved]
+    - Suggestions: [Provide specific actionable suggestions]
 
-Use this exact format with these three section headings."""
+    Use this exact format with these three section headings."""
             
             response = self._call_llm_api(prompt, system_message, max_tokens=800)
             
