@@ -354,592 +354,580 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Get DOM elements
-            const terminalOutput = document.getElementById('terminal-output');
-            const commandInput = document.getElementById('command-input');
-            const submitButton = document.getElementById('submit-button');
-            const shortcutButtons = document.getElementById('shortcut-buttons');
-            const clearTerminalButton = document.getElementById('clear-terminal');
-            const clearInputButton = document.getElementById('clear-input-button');
-            
-            // Command history
-            let commandHistory = loadHistory();
-            let historyIndex = commandHistory.length;
+document.addEventListener('DOMContentLoaded', function() {
+    // Get DOM elements
+    const terminalOutput = document.getElementById('terminal-output');
+    const commandInput = document.getElementById('command-input');
+    const submitButton = document.getElementById('submit-button');
+    const shortcutButtons = document.getElementById('shortcut-buttons');
+    const clearTerminalButton = document.getElementById('clear-terminal');
+    const clearInputButton = document.getElementById('clear-input-button');
+    
+    // Command history
+    let commandHistory = loadHistory();
+    let historyIndex = commandHistory.length;
 
-            // Command to options mapping - for dynamic buttons
-            const commandOptions = {
-                'list': ['-l', '--limit', '-f', '--full', '-c', '--compact', '-h', '--help'],
-                'new': ['-t', '--tag', '-l', '--link', '-h', '--help'],
-                'add': ['-t', '--tag', '-l', '--link', '-h', '--help'],
-                'show': ['-h', '--help'],
-                'search': ['-t', '--tag', '+t', '--exclude-tag', '-f', '--full', '-h', '--help'],
-                'tags': ['-h', '--help'],
-                'link': ['-c', '--context', '-h', '--help'],
-                'related': ['-f', '--full', '-h', '--help'],
-                'graph': ['-o', '--output', '-d', '--depth', '-h', '--help'],
-                'llm': ['-a', '--action', '-c', '--count', '-s', '--show-source', '-d', '--debug', '-h', '--help'],
-                'todos': ['-a', '--all', '-dt', '--donetoday', '-c', '--cancel', '-t', '--tag', '-h', '--help'],
-                'delete': ['--keep-links', '--keep-tags', '-f', '--force', '-h', '--help'],
-                'untag': ['-h', '--help'],
-                'unlink': ['-h', '--help'],
-                'help': ['-h', '--help']
-            };
+    // Initialize LLM actions array if not already defined
+    if (typeof llmActions === 'undefined') {
+        const llmActions = ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'];
+    }
 
-            // Top-level commands for initial buttons
-            const topLevelCommands = ['new', 'list', 'show', 'search', 'todos', 'tags', 'link', 'related', 'help'];
-            
-            const llmActions = ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'];
+    // Command to options mapping - for dynamic buttons
+    const commandOptions = {
+        'list': ['-l', '--limit', '-f', '--full', '-c', '--compact', '-h', '--help'],
+        'new': ['-t', '--tag', '-l', '--link', '-h', '--help'],
+        'add': ['-t', '--tag', '-l', '--link', '-h', '--help'],
+        'show': ['-h', '--help'],
+        'search': ['-t', '--tag', '+t', '--exclude-tag', '-f', '--full', '-h', '--help'],
+        'tags': ['-h', '--help'],
+        'link': ['-c', '--context', '-h', '--help'],
+        'related': ['-f', '--full', '-h', '--help'],
+        'graph': ['-o', '--output', '-d', '--depth', '-h', '--help'],
+        'llm': ['-a', '--action', '-c', '--count', '-s', '--show-source', '-d', '--debug', '-h', '--help'],
+        'todos': ['-a', '--all', '-dt', '--donetoday', '-c', '--cancel', '-t', '--tag', '-h', '--help'],
+        'delete': ['--keep-links', '--keep-tags', '-f', '--force', '-h', '--help'],
+        'untag': ['-h', '--help'],
+        'unlink': ['-h', '--help'],
+        'help': ['-h', '--help']
+    };
 
-            // For commands that need auto-quotes
-            const autoQuoteCommands = ['new', 'add', 'search'];
+    // For commands that need auto-quotes
+    const autoQuoteCommands = ['new', 'add', 'search'];
 
-            const subOptions = {
-                'llm': {
-                    '-a': ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'],
-                    '--action': ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'],
-                    '-c': ['3', '5', '10'],
-                    '--count': ['3', '5', '10']
-                }
-            };
+    // Sub-options for commands like llm
+    const subOptions = {
+        'llm': {
+            '-a': ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'],
+            '--action': ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'],
+            '-c': ['3', '5', '10'],
+            '--count': ['3', '5', '10']
+        }
+    };
 
-
-            
-            // Create a container for the logo to handle overflow better
-            const logoContainer = document.createElement('div');
-            logoContainer.className = 'logo-container';
-            logoContainer.innerHTML = `
+    // Top-level commands for initial buttons
+    const topLevelCommands = ['new', 'list', 'show', 'search', 'todos', 'tags', 'link', 'related', 'help'];
+    
+    // Define function for appending output to the terminal
+    window.appendOutput = function(content, isHTML = false) {
+        const line = document.createElement('div');
+        line.className = 'output-line';
+        
+        if (isHTML) {
+            line.innerHTML = content;
+        } else {
+            line.textContent = content;
+        }
+        
+        terminalOutput.appendChild(line);
+        terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        
+        // Check if this is a note display (contains a note ID formatting)
+        if (isHTML && content.includes('class="cyan">#')) {
+            // Extract the note ID from the content
+            const noteIdMatch = content.match(/class="cyan">#([a-zA-Z0-9]+)/);
+            if (noteIdMatch && noteIdMatch[1]) {
+                const noteId = noteIdMatch[1];
+                
+                // Add LLM action buttons
+                setTimeout(() => {
+                    addLlmActionsToNoteDisplay(noteId, line);
+                }, 100);
+            }
+        }
+    };
+    
+    // Create a container for the logo to handle overflow better
+    const logoContainer = document.createElement('div');
+    logoContainer.className = 'logo-container';
+    logoContainer.innerHTML = `
 <pre>
 ████████ ████████ ████████ ████████ ██
       ██ ██          ██       ██    ██
    ██    ████████    ██       ██    ██
 ██       ██          ██       ██    ██
 ████████ ████████    ██       ██    ████████</pre>`;
-            
-            // Add the logo container to the terminal output
-            terminalOutput.appendChild(logoContainer);
-            
-            // Add the welcome text
-            appendOutput("Welcome to Zettl Web Terminal. Type 'help' for commands.");
-            appendOutput("Type 'list' to see your recent notes.");
-            
-            // Initialize buttons
-            updateShortcutButtons();
-            
-            // Function to resize textarea based on content
-            function autoResizeTextarea() {
-                const textarea = commandInput;
-                
-                // Reset height to auto to get the correct scrollHeight
-                textarea.style.height = 'auto';
-                
-                // Set height to scrollHeight (content height)
-                const newHeight = Math.min(textarea.scrollHeight, 120); // Max 120px (about 4 lines)
-                textarea.style.height = newHeight + 'px';
-            }
-            
-            // Auto-resize the textarea whenever input changes
-            commandInput.addEventListener('input', autoResizeTextarea);
-            
-            // Focus the input field
-            setTimeout(() => {
-                commandInput.focus();
-                autoResizeTextarea();
-            }, 300);
-            
-            // Function to update shortcut buttons based on current input
-            function updateShortcutButtons() {
-                // Clear existing buttons
-                shortcutButtons.innerHTML = '';
-                
-                const currentText = commandInput.value.trim();
-                const cmdParts = currentText.split(/\s+/);
-                const currentCmd = cmdParts[0];
-                
-                // Track the last option mentioned to show relevant sub-options
-                let lastOption = null;
-                if (cmdParts.length > 1) {
-                    const possibleOption = cmdParts[cmdParts.length - 1];
-                    if (possibleOption.startsWith('-')) {
-                        lastOption = possibleOption;
-                    }
-                }
-                
-                // If a command is typed, show its options
-                if (currentCmd && commandOptions[currentCmd]) {
-                    // Special handling for when an option that has sub-options was just typed
-                    if (lastOption && subOptions[currentCmd] && subOptions[currentCmd][lastOption]) {
-                        // Show sub-options for this option
-                        const subOpts = subOptions[currentCmd][lastOption];
-                        subOpts.forEach(subOpt => {
-                            const button = document.createElement('button');
-                            button.textContent = subOpt;
-                            button.dataset.subopt = subOpt;
-                            button.addEventListener('click', function() {
-                                // Add the sub-option with spaces
-                                const currentValue = commandInput.value;
-                                
-                                // Only add a space before if there isn't one already
-                                const newValue = currentValue.endsWith(' ') ? 
-                                            currentValue + subOpt + ' ' : 
-                                            currentValue + ' ' + subOpt + ' ';
-                                
-                                commandInput.value = newValue;
-                                commandInput.focus();
-                                autoResizeTextarea();
-                                
-                                // Put cursor at the end
-                                commandInput.selectionStart = commandInput.selectionEnd = newValue.length;
-                            });
-                            shortcutButtons.appendChild(button);
-                        });
-                        
-                        // Add an extra "custom" button for free-form input
-                        const customButton = document.createElement('button');
-                        customButton.textContent = "custom...";
-                        customButton.style.fontStyle = "italic";
-                        shortcutButtons.appendChild(customButton);
-                        
-                        return; // Early return as we've handled the sub-options
-                    }
-                    
-                    // Show options for the current command
-                    commandOptions[currentCmd].forEach(option => {
-                        const button = document.createElement('button');
-                        button.textContent = option;
-                        button.dataset.option = option;
-                        button.addEventListener('click', function() {
-                            // Add the option with spaces
-                            const currentValue = commandInput.value;
-                            
-                            // Only add a space before if there isn't one already
-                            let newValue;
-                            if (currentValue.endsWith(' ')) {
-                                newValue = currentValue + option + ' ';
-                            } else {
-                                newValue = currentValue + ' ' + option + ' ';
-                            }
-                            
-                            commandInput.value = newValue;
-                            commandInput.focus();
-                            autoResizeTextarea();
-                            
-                            // Update buttons immediately to show sub-options if applicable
-                            updateShortcutButtons();
-                            
-                            // Put cursor at the end
-                            commandInput.selectionStart = commandInput.selectionEnd = newValue.length;
-                        });
-                        shortcutButtons.appendChild(button);
-                    });
-                    
-                    // Add a special button for direct LLM actions if current command is 'llm'
-                    if (currentCmd === 'llm' && cmdParts.length === 2 && !lastOption) {
-                        // This means they've typed "llm noteId" but no options yet
-                        // Add direct action buttons
-                        
-                        // First add a separator
-                        const separator = document.createElement('div');
-                        separator.style.borderLeft = '1px solid #555';
-                        separator.style.height = '24px';
-                        separator.style.margin = '0 8px';
-                        shortcutButtons.appendChild(separator);
-                        
-                        // Add shortcut buttons for common LLM actions
-                        const actions = ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'];
-                        actions.forEach(action => {
-                            const button = document.createElement('button');
-                            button.textContent = action;
-                            button.style.backgroundColor = '#3a7a50'; // Different color for action buttons
-                            button.addEventListener('click', function() {
-                                // Add the complete action option
-                                const noteId = cmdParts[1]; // Get the note ID
-                                commandInput.value = `llm ${noteId} -a ${action}`;
-                                commandInput.focus();
-                                autoResizeTextarea();
-                                
-                                // Put cursor at the end
-                                commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
-                            });
-                            shortcutButtons.appendChild(button);
-                        });
-                    }
-                } else {
-                    // Show top-level commands
-                    topLevelCommands.forEach(cmd => {
-                        const button = document.createElement('button');
-                        button.textContent = cmd;
-                        button.dataset.cmd = cmd;
-                        button.addEventListener('click', function() {
-                            const commandText = cmd;
-                            commandInput.value = commandText;
-                            commandInput.focus();
-                            autoResizeTextarea();
-                            
-                            // Update buttons immediately to reflect new command
-                            updateShortcutButtons();
-                            
-                            // If this is a command needing quotes, add them and position cursor
-                            if (autoQuoteCommands.includes(cmd)) {
-                                // Auto-add quotes and position cursor between them
-                                commandInput.value = cmd + ' ""';
-                                autoResizeTextarea();
-                                // Set cursor position between the quotes
-                                const cursorPos = commandInput.value.length - 1;
-                                setTimeout(() => {
-                                    commandInput.selectionStart = commandInput.selectionEnd = cursorPos;
-                                }, 0);
-                            }
-                        });
-                        shortcutButtons.appendChild(button);
-                    });
-                }
-            }
-            
-            // Handle keyboard events for command input - updated for textarea
-            commandInput.addEventListener('keydown', function(e) {
-                // Enter key submits command (without Shift)
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    executeCommand(commandInput.value);
-                }
-                // Up arrow for previous command - only when textarea is on first line
-                else if (e.key === 'ArrowUp' && commandInput.selectionStart === 0) {
-                    e.preventDefault();
-                    if (historyIndex > 0) {
-                        historyIndex--;
-                        commandInput.value = commandHistory[historyIndex];
-                        // Move cursor to end of input
-                        setTimeout(() => {
-                            commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
-                            updateShortcutButtons();
-                            autoResizeTextarea();
-                        }, 0);
-                    }
-                }
-                // Down arrow for next command - only when textarea is on last line
-                else if (e.key === 'ArrowDown' && commandInput.selectionStart === commandInput.value.length) {
-                    e.preventDefault();
-                    if (historyIndex < commandHistory.length) {
-                        historyIndex++;
-                        commandInput.value = historyIndex === commandHistory.length ? '' : commandHistory[historyIndex];
-                        // Move cursor to end of input
-                        setTimeout(() => {
-                            commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
-                            updateShortcutButtons();
-                            autoResizeTextarea();
-                        }, 0);
-                    }
-                }
-                // Tab for shortcuts 
-                else if (e.key === 'Tab') {
-                    e.preventDefault();
-                    const currentCmd = commandInput.value.trim().split(' ')[0];
-                    const shortcuts = Object.keys(commandOptions);
-                    
-                    if (currentCmd) {
-                        const matches = shortcuts.filter(cmd => cmd.startsWith(currentCmd));
-                        if (matches.length === 1) {
-                            commandInput.value = matches[0] + ' ';
-                            updateShortcutButtons();
-                            autoResizeTextarea();
-                        }
-                    }
-                }
-            });
-            
-            // Update shortcut buttons when input changes
-            commandInput.addEventListener('input', updateShortcutButtons);
-            
-            // Handle submit button click
-            submitButton.addEventListener('click', function() {
-                executeCommand(commandInput.value);
-            });
-
-            // Handle the clear terminal button
-            clearTerminalButton.addEventListener('click', function() {
-                // Clear terminal output but keep logo
-                terminalOutput.innerHTML = '';
-                
-                // Add the logo back
-                terminalOutput.appendChild(logoContainer);
-                
-                // Add the welcome text again
-                appendOutput("Terminal cleared. Type 'help' for commands.");
-            });
-
-            // Handle the clear input button
-            clearInputButton.addEventListener('click', function() {
-                commandInput.value = '';
-                commandInput.focus();
-                autoResizeTextarea();
-                updateShortcutButtons();
-            });
-
-            // Handle iOS focus issues
-            commandInput.addEventListener('focus', function() {
-                // Ensure keyboard doesn't push content around
+    
+    // Add the logo container to the terminal output
+    terminalOutput.appendChild(logoContainer);
+    
+    // Add the welcome text
+    appendOutput("Welcome to Zettl Web Terminal. Type 'help' for commands.");
+    appendOutput("Type 'list' to see your recent notes.");
+    
+    // Function to resize textarea based on content
+    function autoResizeTextarea() {
+        const textarea = commandInput;
+        
+        // Reset height to auto to get the correct scrollHeight
+        textarea.style.height = 'auto';
+        
+        // Set height to scrollHeight (content height)
+        const newHeight = Math.min(textarea.scrollHeight, 120); // Max 120px (about 4 lines)
+        textarea.style.height = newHeight + 'px';
+    }
+    
+    // Auto-resize the textarea whenever input changes
+    commandInput.addEventListener('input', autoResizeTextarea);
+    
+    // Initialize buttons
+    updateShortcutButtons();
+    
+    // Focus the input field
+    setTimeout(() => {
+        commandInput.focus();
+        autoResizeTextarea();
+    }, 300);
+    
+    // Handle keyboard events for command input - updated for textarea
+    commandInput.addEventListener('keydown', function(e) {
+        // Enter key submits command (without Shift)
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            executeCommand(commandInput.value);
+        }
+        // Up arrow for previous command - only when textarea is on first line
+        else if (e.key === 'ArrowUp' && commandInput.selectionStart === 0) {
+            e.preventDefault();
+            if (historyIndex > 0) {
+                historyIndex--;
+                commandInput.value = commandHistory[historyIndex];
+                // Move cursor to end of input
                 setTimeout(() => {
-                    window.scrollTo(0, 0);
-                    document.body.scrollTop = 0;
-                }, 50);
-            });
-
-            // Execute the command
-            function executeCommand(command) {
-                const cmd = command.trim();
-                if (!cmd) return;
-                
-                // Echo command with prompt
-                appendOutput(`zettl> ${cmd}`);
-                
-                // Add to history if not duplicate of most recent
-                if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== cmd) {
-                    commandHistory.push(cmd);
-                    saveHistory(commandHistory);
+                    commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
+                    updateShortcutButtons();
+                    autoResizeTextarea();
+                }, 0);
+            }
+        }
+        // Down arrow for next command - only when textarea is on last line
+        else if (e.key === 'ArrowDown' && commandInput.selectionStart === commandInput.value.length) {
+            e.preventDefault();
+            if (historyIndex < commandHistory.length) {
+                historyIndex++;
+                commandInput.value = historyIndex === commandHistory.length ? '' : commandHistory[historyIndex];
+                // Move cursor to end of input
+                setTimeout(() => {
+                    commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
+                    updateShortcutButtons();
+                    autoResizeTextarea();
+                }, 0);
+            }
+        }
+        // Tab for shortcuts 
+        else if (e.key === 'Tab') {
+            e.preventDefault();
+            const currentCmd = commandInput.value.trim().split(' ')[0];
+            const shortcuts = Object.keys(commandOptions);
+            
+            if (currentCmd) {
+                const matches = shortcuts.filter(cmd => cmd.startsWith(currentCmd));
+                if (matches.length === 1) {
+                    commandInput.value = matches[0] + ' ';
+                    updateShortcutButtons();
+                    autoResizeTextarea();
                 }
-                
-                // Reset history index
-                historyIndex = commandHistory.length;
-                
-                // Clear input and resize
-                commandInput.value = '';
-                autoResizeTextarea();
-                updateShortcutButtons();
-                
-                // Show loading indicator with a unique ID
-                const loadingId = `loading-${Date.now()}`;
-                const processingElement = document.createElement('div');
-                processingElement.className = 'processing-message';
-                processingElement.id = loadingId;
-                processingElement.innerHTML = 'Processing command... <span class="loading-indicator">⏳</span>';
-                terminalOutput.appendChild(processingElement);
-                
-                // Scroll to the processing message
-                terminalOutput.scrollTop = terminalOutput.scrollHeight;
-                
-                // Send command to server
-                fetch('/api/command', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ command: cmd })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    // Remove loading indicator
-                    const loadingElement = document.getElementById(loadingId);
-                    if (loadingElement) {
-                        loadingElement.remove();
-                    }
-                    
-                    // Append result
-                    appendOutput(data.result, true);
-                    
-                    // Scroll to bottom
-                    terminalOutput.scrollTop = terminalOutput.scrollHeight;
-                })
-                .catch(error => {
-                    // Remove loading indicator
-                    const loadingElement = document.getElementById(loadingId);
-                    if (loadingElement) {
-                        loadingElement.remove();
-                    }
-                    
-                    // Show error
-                    appendOutput(`<span class="red">Error: ${error.message || 'Connection failed'}</span>`);
-                    
-                    // Scroll to bottom
-                    terminalOutput.scrollTop = terminalOutput.scrollHeight;
-                });
-                
-                // Focus input again
-                commandInput.focus();
+            }
+        }
+    });
+    
+    // Update shortcut buttons when input changes
+    commandInput.addEventListener('input', updateShortcutButtons);
+    
+    // Handle submit button click
+    submitButton.addEventListener('click', function() {
+        executeCommand(commandInput.value);
+    });
+
+    // Handle the clear terminal button
+    clearTerminalButton.addEventListener('click', function() {
+        // Clear terminal output but keep logo
+        terminalOutput.innerHTML = '';
+        
+        // Add the logo back
+        terminalOutput.appendChild(logoContainer);
+        
+        // Add the welcome text again
+        appendOutput("Terminal cleared. Type 'help' for commands.");
+    });
+
+    // Handle the clear input button
+    clearInputButton.addEventListener('click', function() {
+        commandInput.value = '';
+        commandInput.focus();
+        autoResizeTextarea();
+        updateShortcutButtons();
+    });
+
+    // Handle iOS focus issues
+    commandInput.addEventListener('focus', function() {
+        // Ensure keyboard doesn't push content around
+        setTimeout(() => {
+            window.scrollTo(0, 0);
+            document.body.scrollTop = 0;
+        }, 50);
+    });
+
+    // Execute the command
+    function executeCommand(command) {
+        const cmd = command.trim();
+        if (!cmd) return;
+        
+        // Echo command with prompt
+        appendOutput(`zettl> ${cmd}`);
+        
+        // Add to history if not duplicate of most recent
+        if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== cmd) {
+            commandHistory.push(cmd);
+            saveHistory(commandHistory);
+        }
+        
+        // Reset history index
+        historyIndex = commandHistory.length;
+        
+        // Clear input and resize
+        commandInput.value = '';
+        autoResizeTextarea();
+        updateShortcutButtons();
+        
+        // Show loading indicator with a unique ID
+        const loadingId = `loading-${Date.now()}`;
+        const processingElement = document.createElement('div');
+        processingElement.className = 'processing-message';
+        processingElement.id = loadingId;
+        processingElement.innerHTML = 'Processing command... <span class="loading-indicator">⏳</span>';
+        terminalOutput.appendChild(processingElement);
+        
+        // Scroll to the processing message
+        terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        
+        // Send command to server
+        fetch('/api/command', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ command: cmd })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Remove loading indicator
+            const loadingElement = document.getElementById(loadingId);
+            if (loadingElement) {
+                loadingElement.remove();
             }
             
-
-            // Add this custom function to process LLM commands for better UX
-            function processLlmCommand(note_id, action) {
-                const command = `llm ${note_id} -a ${action}`;
-                
-                // Add to command history
-                if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== command) {
-                    commandHistory.push(command);
-                    saveHistory(commandHistory);
-                }
-                
-                // Reset history index
-                historyIndex = commandHistory.length;
-                
-                // Show loading indicator with a unique ID
-                const loadingId = `loading-${Date.now()}`;
-                const processingElement = document.createElement('div');
-                processingElement.className = 'processing-message';
-                processingElement.id = loadingId;
-                processingElement.innerHTML = `Processing ${action} command for note #${note_id}... <span class="loading-indicator">⏳</span>`;
-                terminalOutput.appendChild(processingElement);
-                
-                // Scroll to the processing message
-                terminalOutput.scrollTop = terminalOutput.scrollHeight;
-                
-                // Send command to server
-                fetch('/api/command', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ command: command })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    // Remove loading indicator
-                    const loadingElement = document.getElementById(loadingId);
-                    if (loadingElement) {
-                        loadingElement.remove();
-                    }
-                    
-                    // Append result
-                    appendOutput(`zettl> ${command}`);
-                    appendOutput(data.result, true);
-                    
-                    // Scroll to bottom
-                    terminalOutput.scrollTop = terminalOutput.scrollHeight;
-                })
-                .catch(error => {
-                    // Remove loading indicator
-                    const loadingElement = document.getElementById(loadingId);
-                    if (loadingElement) {
-                        loadingElement.remove();
-                    }
-                    
-                    // Show error
-                    appendOutput(`zettl> ${command}`);
-                    appendOutput(`<span class="red">Error: ${error.message || 'Connection failed'}</span>`);
-                    
-                    // Scroll to bottom
-                    terminalOutput.scrollTop = terminalOutput.scrollHeight;
-                });
+            // Append result
+            appendOutput(data.result, true);
+            
+            // Scroll to bottom
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        })
+        .catch(error => {
+            // Remove loading indicator
+            const loadingElement = document.getElementById(loadingId);
+            if (loadingElement) {
+                loadingElement.remove();
             }
-
-            // Add this function to show LLM action buttons when a note ID is shown
-            function addLlmActionsToNoteDisplay(noteId, element) {
-                // Check if actions are already added
-                if (element.querySelector('.llm-actions')) {
-                    return;
-                }
+            
+            // Show error
+            appendOutput(`<span class="red">Error: ${error.message || 'Connection failed'}</span>`);
+            
+            // Scroll to bottom
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        });
+        
+        // Focus input again
+        commandInput.focus();
+    }
+    
+    // Add this function to show LLM action buttons when a note ID is shown
+    function addLlmActionsToNoteDisplay(noteId, element) {
+        // Check if actions are already added
+        if (element.querySelector('.llm-actions')) {
+            return;
+        }
+        
+        // Create a container for the LLM action buttons
+        const actionsContainer = document.createElement('div');
+        actionsContainer.className = 'llm-actions';
+        
+        // Add a label
+        const label = document.createElement('div');
+        label.textContent = 'LLM Actions:';
+        label.style.marginRight = '10px';
+        label.style.alignSelf = 'center';
+        label.style.color = '#90ee90';
+        actionsContainer.appendChild(label);
+        
+        // Add buttons for each LLM action
+        ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'].forEach(action => {
+            const button = document.createElement('button');
+            button.textContent = action;
+            button.className = 'llm-action-button';
+            
+            button.addEventListener('click', function() {
+                processLlmCommand(noteId, action);
+            });
+            
+            actionsContainer.appendChild(button);
+        });
+        
+        // Add the actions container after the note content
+        element.appendChild(actionsContainer);
+    }
+    
+    // Custom function to process LLM commands for better UX
+    function processLlmCommand(note_id, action) {
+        const command = `llm ${note_id} -a ${action}`;
+        
+        // Add to command history
+        if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== command) {
+            commandHistory.push(command);
+            saveHistory(commandHistory);
+        }
+        
+        // Reset history index
+        historyIndex = commandHistory.length;
+        
+        // Show loading indicator with a unique ID
+        const loadingId = `loading-${Date.now()}`;
+        const processingElement = document.createElement('div');
+        processingElement.className = 'processing-message';
+        processingElement.id = loadingId;
+        processingElement.innerHTML = `Processing ${action} command for note #${note_id}... <span class="loading-indicator">⏳</span>`;
+        terminalOutput.appendChild(processingElement);
+        
+        // Scroll to the processing message
+        terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        
+        // Send command to server
+        fetch('/api/command', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ command: command })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Remove loading indicator
+            const loadingElement = document.getElementById(loadingId);
+            if (loadingElement) {
+                loadingElement.remove();
+            }
+            
+            // Append result
+            appendOutput(`zettl> ${command}`);
+            appendOutput(data.result, true);
+            
+            // Scroll to bottom
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        })
+        .catch(error => {
+            // Remove loading indicator
+            const loadingElement = document.getElementById(loadingId);
+            if (loadingElement) {
+                loadingElement.remove();
+            }
+            
+            // Show error
+            appendOutput(`zettl> ${command}`);
+            appendOutput(`<span class="red">Error: ${error.message || 'Connection failed'}</span>`);
+            
+            // Scroll to bottom
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        });
+    }
+    
+    // Function to update shortcut buttons
+    function updateShortcutButtons() {
+        // Clear existing buttons
+        shortcutButtons.innerHTML = '';
+        
+        const currentText = commandInput.value.trim();
+        const cmdParts = currentText.split(/\s+/);
+        const currentCmd = cmdParts[0];
+        
+        // Track the last option mentioned to show relevant sub-options
+        let lastOption = null;
+        if (cmdParts.length > 1) {
+            const possibleOption = cmdParts[cmdParts.length - 1];
+            if (possibleOption.startsWith('-')) {
+                lastOption = possibleOption;
+            }
+        }
+        
+        // If a command is typed, show its options
+        if (currentCmd && commandOptions[currentCmd]) {
+            // Special handling for when an option that has sub-options was just typed
+            if (lastOption && subOptions[currentCmd] && subOptions[currentCmd][lastOption]) {
+                // Show sub-options for this option
+                const subOpts = subOptions[currentCmd][lastOption];
+                subOpts.forEach(subOpt => {
+                    const button = document.createElement('button');
+                    button.textContent = subOpt;
+                    button.dataset.subopt = subOpt;
+                    button.addEventListener('click', function() {
+                        // Add the sub-option with spaces
+                        const currentValue = commandInput.value;
+                        
+                        // Only add a space before if there isn't one already
+                        const newValue = currentValue.endsWith(' ') ? 
+                                    currentValue + subOpt + ' ' : 
+                                    currentValue + ' ' + subOpt + ' ';
+                        
+                        commandInput.value = newValue;
+                        commandInput.focus();
+                        autoResizeTextarea();
+                        
+                        // Put cursor at the end
+                        commandInput.selectionStart = commandInput.selectionEnd = newValue.length;
+                    });
+                    shortcutButtons.appendChild(button);
+                });
                 
-                // Create a container for the LLM action buttons
-                const actionsContainer = document.createElement('div');
-                actionsContainer.className = 'llm-actions';
-                actionsContainer.style.display = 'flex';
-                actionsContainer.style.flexWrap = 'wrap';
-                actionsContainer.style.gap = '5px';
-                actionsContainer.style.marginTop = '10px';
-                actionsContainer.style.padding = '8px';
-                actionsContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
-                actionsContainer.style.borderRadius = '4px';
+                // Add an extra "custom" button for free-form input
+                const customButton = document.createElement('button');
+                customButton.textContent = "custom...";
+                customButton.style.fontStyle = "italic";
+                shortcutButtons.appendChild(customButton);
                 
-                // Add a label
-                const label = document.createElement('div');
-                label.textContent = 'LLM Actions:';
-                label.style.marginRight = '10px';
-                label.style.alignSelf = 'center';
-                label.style.color = '#90ee90';
-                actionsContainer.appendChild(label);
+                return; // Early return as we've handled the sub-options
+            }
+            
+            // Show options for the current command
+            commandOptions[currentCmd].forEach(option => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.dataset.option = option;
+                button.addEventListener('click', function() {
+                    // Add the option with spaces
+                    const currentValue = commandInput.value;
+                    
+                    // Only add a space before if there isn't one already
+                    let newValue;
+                    if (currentValue.endsWith(' ')) {
+                        newValue = currentValue + option + ' ';
+                    } else {
+                        newValue = currentValue + ' ' + option + ' ';
+                    }
+                    
+                    commandInput.value = newValue;
+                    commandInput.focus();
+                    autoResizeTextarea();
+                    
+                    // Update buttons immediately to show sub-options if applicable
+                    updateShortcutButtons();
+                    
+                    // Put cursor at the end
+                    commandInput.selectionStart = commandInput.selectionEnd = newValue.length;
+                });
+                shortcutButtons.appendChild(button);
+            });
+            
+            // Add a special button for direct LLM actions if current command is 'llm'
+            if (currentCmd === 'llm' && cmdParts.length === 2 && !lastOption) {
+                // This means they've typed "llm noteId" but no options yet
+                // Add direct action buttons
                 
-                // Add buttons for each LLM action
-                llmActions.forEach(action => {
+                // First add a separator
+                const separator = document.createElement('div');
+                separator.className = 'button-separator';
+                shortcutButtons.appendChild(separator);
+                
+                // Add shortcut buttons for common LLM actions
+                ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'].forEach(action => {
                     const button = document.createElement('button');
                     button.textContent = action;
-                    button.style.fontSize = '12px';
-                    button.style.padding = '4px 8px';
-                    button.style.backgroundColor = '#3a7a50';
-                    button.style.color = 'white';
-                    button.style.border = 'none';
-                    button.style.borderRadius = '3px';
-                    button.style.cursor = 'pointer';
-                    
+                    button.style.backgroundColor = '#3a7a50'; // Different color for action buttons
                     button.addEventListener('click', function() {
-                        processLlmCommand(noteId, action);
-                    });
-                    
-                    actionsContainer.appendChild(button);
-                });
-                
-                // Add the actions container after the note content
-                element.appendChild(actionsContainer);
-            }
-
-
-
-            // Modify the appendOutput function to add LLM action buttons to note displays
-            const originalAppendOutput = appendOutput;
-            appendOutput = function(content, isHTML = false) {
-                // Call the original function
-                originalAppendOutput(content, isHTML);
-                
-                // Find the newly added element
-                const newElement = terminalOutput.lastElementChild;
-                
-                // Check if this is a note display (contains a note ID formatting)
-                if (isHTML && content.includes('class="cyan">#')) {
-                    // Extract the note ID from the content
-                    const noteIdMatch = content.match(/class="cyan">#([a-zA-Z0-9]+)/);
-                    if (noteIdMatch && noteIdMatch[1]) {
-                        const noteId = noteIdMatch[1];
+                        // Add the complete action option
+                        const noteId = cmdParts[1]; // Get the note ID
+                        commandInput.value = `llm ${noteId} -a ${action}`;
+                        commandInput.focus();
+                        autoResizeTextarea();
                         
-                        // Add LLM action buttons
-                        setTimeout(() => {
-                            addLlmActionsToNoteDisplay(noteId, newElement);
-                        }, 100);
-                    }
-                }
-            };
-            
-            // Save command history to localStorage
-            function saveHistory(history) {
-                try {
-                    // Keep only the last 100 commands
-                    const limitedHistory = history.slice(-100);
-                    localStorage.setItem('zettl_history', JSON.stringify(limitedHistory));
-                } catch (e) {
-                    console.error('Error saving history', e);
-                }
-            }
-            
-            // Load command history from localStorage
-            function loadHistory() {
-                try {
-                    const history = localStorage.getItem('zettl_history');
-                    return history ? JSON.parse(history) : [];
-                } catch (e) {
-                    console.error('Error loading history', e);
-                    return [];
-                }
-            }
-
-            // Adjust terminal height on orientation change
-            window.addEventListener('resize', function() {
-                // Small delay to allow browser UI to settle
-                setTimeout(() => {
-                    // Ensure we see the latest content
-                    terminalOutput.scrollTop = terminalOutput.scrollHeight;
-                }, 100);
-            });
-
-            // Handle iOS viewport issues
-            if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                // Visual viewport awareness
-                if (window.visualViewport) {
-                    window.visualViewport.addEventListener('resize', () => {
-                        // Prevent scrolling when keyboard appears
-                        document.body.style.height = window.visualViewport.height + 'px';
-                        window.scrollTo(0, 0);
+                        // Put cursor at the end
+                        commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
                     });
-                }
+                    shortcutButtons.appendChild(button);
+                });
             }
-        });
+        } else {
+            // Show top-level commands
+            topLevelCommands.forEach(cmd => {
+                const button = document.createElement('button');
+                button.textContent = cmd;
+                button.dataset.cmd = cmd;
+                button.addEventListener('click', function() {
+                    const commandText = cmd;
+                    commandInput.value = commandText;
+                    commandInput.focus();
+                    autoResizeTextarea();
+                    
+                    // Update buttons immediately to reflect new command
+                    updateShortcutButtons();
+                    
+                    // If this is a command needing quotes, add them and position cursor
+                    if (autoQuoteCommands.includes(cmd)) {
+                        // Auto-add quotes and position cursor between them
+                        commandInput.value = cmd + ' ""';
+                        autoResizeTextarea();
+                        // Set cursor position between the quotes
+                        const cursorPos = commandInput.value.length - 1;
+                        setTimeout(() => {
+                            commandInput.selectionStart = commandInput.selectionEnd = cursorPos;
+                        }, 0);
+                    }
+                });
+                shortcutButtons.appendChild(button);
+            });
+        }
+    }
+    
+    // Save command history to localStorage
+    function saveHistory(history) {
+        try {
+            // Keep only the last 100 commands
+            const limitedHistory = history.slice(-100);
+            localStorage.setItem('zettl_history', JSON.stringify(limitedHistory));
+        } catch (e) {
+            console.error('Error saving history', e);
+        }
+    }
+    
+    // Load command history from localStorage
+    function loadHistory() {
+        try {
+            const history = localStorage.getItem('zettl_history');
+            return history ? JSON.parse(history) : [];
+        } catch (e) {
+            console.error('Error loading history', e);
+            return [];
+        }
+    }
+
+    // Adjust terminal height on orientation change
+    window.addEventListener('resize', function() {
+        // Small delay to allow browser UI to settle
+        setTimeout(() => {
+            // Ensure we see the latest content
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }, 100);
+    });
+
+    // Handle iOS viewport issues
+    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        // Visual viewport awareness
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                // Prevent scrolling when keyboard appears
+                document.body.style.height = window.visualViewport.height + 'px';
+                window.scrollTo(0, 0);
+            });
+        }
+    }
+});
     </script>
 </body>
 </html>
