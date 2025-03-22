@@ -4,6 +4,11 @@ import re
 from typing import List, Dict, Any, Optional, Union
 from zettl.database import Database
 from zettl.config import CLAUDE_API_KEY
+import urllib3
+urllib3.disable_warnings()
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
 
 class LLMHelper:
     def __init__(self):
@@ -59,6 +64,9 @@ class LLMHelper:
         Raises:
             Exception: If the API call fails or returns an invalid response
         """
+        print(f"API key is {'SET' if self.api_key else 'NOT SET'}")
+        print(f"First few chars of API key: {self.api_key[:5]}..." if self.api_key else "No API key")
+
         # Default system message if none provided
         if not system_message:
             system_message = "You are a helpful assistant for a Zettelkasten note-taking system."
@@ -72,7 +80,7 @@ class LLMHelper:
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
-            )
+            ,timeout=60)
             
             # Extract text from response
             text_blocks = []
