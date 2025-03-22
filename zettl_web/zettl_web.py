@@ -205,12 +205,14 @@ COMMAND_OPTIONS = {
         'short_opts': {
             'dt': {'name': 'donetoday', 'flag': True},
             'a': {'name': 'all', 'flag': True},
-            't': {'name': 'tag', 'multiple': True}  # Changed from 'f': {'name': 'filter', ...}
+            'c': {'name': 'cancel', 'flag': True},  # Added cancel option
+            't': {'name': 'tag', 'multiple': True}
         },
         'long_opts': {
             'donetoday': {'flag': True},
             'all': {'flag': True},
-            'tag': {'multiple': True}  # Changed from 'filter': ...
+            'cancel': {'flag': True},  # Added cancel option
+            'tag': {'multiple': True}
         }
     },
     'search': {
@@ -414,15 +416,17 @@ def show_command_help(cmd):
 {Colors.BOLD}Options:{Colors.RESET}
   {Colors.YELLOW}-a, --all{Colors.RESET}            Show all todos (active and completed)
   {Colors.YELLOW}-dt, --donetoday{Colors.RESET}     Show todos completed today
+  {Colors.YELLOW}-c, --cancel{Colors.RESET}         Show canceled todos
   {Colors.YELLOW}-t, --tag TAG{Colors.RESET}        Filter todos by additional tag
 
 {Colors.BOLD}Examples:{Colors.RESET}
   {Colors.BLUE}todos{Colors.RESET}                  Show active todos
   {Colors.BLUE}todos -a{Colors.RESET}               Show all todos (active and completed)
   {Colors.BLUE}todos -dt{Colors.RESET}              Show todos completed today
+  {Colors.BLUE}todos -c{Colors.RESET}               Show canceled todos
   {Colors.BLUE}todos -t work{Colors.RESET}          Show todos tagged with "work"
 """
-    # Add more command help texts as needed...
+
     elif cmd == "help":
         # For "help --help", just show general help
         return execute_command("help", [], {}, [])
@@ -834,14 +838,14 @@ def execute_command():
                 
         elif cmd == "todos":
             # List all notes tagged with 'todo' grouped by category
-            # List all notes tagged with 'todo' grouped by category
             donetoday = 'donetoday' in flags or 'dt' in flags
             all_todos = 'all' in flags or 'a' in flags
+            cancel = 'cancel' in flags or 'c' in flags  # Add the cancel flag
             done = all_todos
             filter_tags = []
             if all_todos:
                 done = True
-            if 'tag' in options:  # Changed from 'filter' to 'tag'
+            if 'tag' in options:
                 if isinstance(options['tag'], list):  # Multiple tags
                     filter_tags.extend(options['tag'])
                 else:  # Single tag
@@ -928,14 +932,17 @@ def execute_command():
                 active_todos_by_category = {}
                 done_todos_by_category = {}
                 donetoday_todos_by_category = {}
+                canceled_todos_by_category = {}  # New dict for canceled todos
                 uncategorized_active = []
                 uncategorized_done = []
                 uncategorized_donetoday = []
+                uncategorized_canceled = []  # New list for uncategorized canceled todos
                 
                 # Track unique note IDs to count them at the end
                 unique_active_ids = set()
                 unique_done_ids = set()
                 unique_donetoday_ids = set()
+                unique_canceled_ids = set()  # New set for canceled todos
                 
                 for note in todo_notes:
                     note_id = note['id']
@@ -946,6 +953,9 @@ def execute_command():
                     # Check if this is a done todo
                     is_done = 'done' in tags_lower
                     
+                    # Check if this is a canceled todo
+                    is_canceled = 'cancel' in tags_lower
+                    
                     # Check if this is done today
                     is_done_today = note_id in done_today_ids
                     
@@ -953,16 +963,22 @@ def execute_command():
                     if is_done and not done and not (is_done_today and donetoday):
                         continue
                         
+                    # Skip canceled todos if not explicitly requested
+                    if is_canceled and not cancel:
+                        continue
+                        
                     # Track unique IDs
-                    if is_done_today and donetoday:
+                    if is_canceled:
+                        unique_canceled_ids.add(note_id)
+                    elif is_done_today and donetoday:
                         unique_donetoday_ids.add(note_id)
                     elif is_done:
                         unique_done_ids.add(note_id)
                     else:
                         unique_active_ids.add(note_id)
                     
-                    # Find category tags (everything except 'todo', 'done', and the filter tags)
-                    excluded_tags = ['todo', 'done']
+                    # Find category tags (everything except 'todo', 'done', 'cancel', and the filter tags)
+                    excluded_tags = ['todo', 'done', 'cancel']  # Added 'cancel' to exclusion list
                     if filter_tags:
                         excluded_tags.extend([f.lower() for f in filter_tags])
                         
@@ -971,7 +987,9 @@ def execute_command():
                     # Assign note to appropriate category group
                     if not categories:
                         # This todo has no category tags
-                        if is_done_today and donetoday:
+                        if is_canceled:
+                            uncategorized_canceled.append(note)
+                        elif is_done_today and donetoday:
                             uncategorized_donetoday.append(note)
                         elif is_done:
                             uncategorized_done.append(note)
@@ -980,7 +998,11 @@ def execute_command():
                     else:
                         # Add this note to each of its categories
                         for category in categories:
-                            if is_done_today and donetoday:
+                            if is_canceled:
+                                if category not in canceled_todos_by_category:
+                                    canceled_todos_by_category[category] = []
+                                canceled_todos_by_category[category].append(note)
+                            elif is_done_today and donetoday:
                                 if category not in donetoday_todos_by_category:
                                     donetoday_todos_by_category[category] = []
                                 donetoday_todos_by_category[category].append(note)
@@ -1005,10 +1027,11 @@ def execute_command():
                 # Display todos by category
                 if (not active_todos_by_category and not uncategorized_active and 
                     (not done or (not done_todos_by_category and not uncategorized_done)) and
-                    (not donetoday or (not donetoday_todos_by_category and not uncategorized_donetoday))):
+                    (not donetoday or (not donetoday_todos_by_category and not uncategorized_donetoday)) and
+                    (not cancel or (not canceled_todos_by_category and not uncategorized_canceled))):
                     result = ZettlFormatter.warning("No todos match your criteria.")
                     return jsonify({'result': ansi_to_html(result)})
-                    
+                            
                 # Helper function to display a group of todos
                 def display_todos_group(category_dict, uncategorized_list, header_text):
                     output = ""
@@ -1082,6 +1105,12 @@ def execute_command():
                     if done_todos_by_category or uncategorized_done:
                         done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids - unique_donetoday_ids)} total)")
                         result += "\n" + display_todos_group(done_todos_by_category, uncategorized_done, done_header)
+
+                    # Display canceled todos if requested
+                    if cancel and (canceled_todos_by_category or uncategorized_canceled):
+                        canceled_header = ZettlFormatter.header(f"Canceled {' '.join(header_parts)} ({len(unique_canceled_ids)} total)")
+                        result += "\n" + display_todos_group(canceled_todos_by_category, uncategorized_canceled, canceled_header)
+
                 
         elif cmd == "help" or cmd == "--help":
             # Show well-formatted help similar to CLI

@@ -119,6 +119,7 @@ def commands():
             "example": "zettl todos  # Show active todos\n"
                     "zettl todos --all  # Show all todos (active and completed)\n"
                     "zettl todos --donetoday  # Show todos completed today\n"
+                    "zettl todos --cancel  # Show canceled todos\n"
                     "zettl todos --tag work  # Filter todos by tag"
         },
         {

@@ -34,6 +34,7 @@ class ZettlCompleter:
             self.just_inserted_quotes = False
             return
             
+            
         # Detect the command part (first or second word)
         match = re.match(r'^(\w+)(?:\s+(\w+))?', line)
         if match:
