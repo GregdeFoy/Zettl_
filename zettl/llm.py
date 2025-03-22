@@ -8,6 +8,8 @@ import urllib3
 urllib3.disable_warnings()
 import logging
 logging.basicConfig(level=logging.DEBUG)
+import platform
+IS_PYTHONANYWHERE = 'pythonanywhere' in platform.node().lower()
 
 
 class LLMHelper:
@@ -17,22 +19,33 @@ class LLMHelper:
         self.model = "claude-3-7-sonnet-20250219"  # Using the latest model
         self._client = None  # Lazy-loaded client
         
+    # Then modify the client property
     @property
     def client(self):
-        """Lazy-load the Anthropic client."""
+        """Lazy-load the Anthropic client with PythonAnywhere-specific settings."""
         if self._client is None:
             try:
                 import anthropic
+                import httpx
+                
+                if IS_PYTHONANYWHERE:
+                    # Special PythonAnywhere settings
+                    transport = httpx.HTTPTransport(retries=5)
+                    http_client = httpx.Client(
+                        transport=transport,
+                        timeout=60.0,  # Much longer timeout
+                        limits=httpx.Limits(max_connections=5, max_keepalive_connections=2)
+                    )
+                    self._client = anthropic.Anthropic(
+                        api_key=self.api_key,
+                        http_client=http_client
+                    )
+                else:
+                    # Regular settings for local development
+                    self._client = anthropic.Anthropic(api_key=self.api_key)
+                    
             except ImportError:
-                raise ImportError(
-                    "The anthropic package is not installed. "
-                    "Install it with: pip install anthropic"
-                )
-                
-            if not self.api_key:
-                raise ValueError("Claude API key not found. Check the configuration.")
-                
-            self._client = anthropic.Anthropic(api_key=self.api_key)
+                raise ImportError("The anthropic package is not installed.")
         return self._client
         
     def _prepare_note_context(self, note_ids: List[str]) -> str:
