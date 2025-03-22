@@ -226,6 +226,20 @@ COMMAND_OPTIONS = {
             'full': {'flag': True}
         }
     },
+    'llm': {
+        'short_opts': {
+            'a': {'name': 'action'},
+            'c': {'name': 'count', 'type': int},
+            's': {'name': 'show-source', 'flag': True},
+            'd': {'name': 'debug', 'flag': True}
+        },
+        'long_opts': {
+            'action': {},
+            'count': {'type': int},
+            'show-source': {'flag': True},
+            'debug': {'flag': True}
+        }
+    },
     # Add similar configs for other commands
 }
 
@@ -426,6 +440,31 @@ def show_command_help(cmd):
   {Colors.BLUE}todos -c{Colors.RESET}               Show canceled todos
   {Colors.BLUE}todos -t work{Colors.RESET}          Show todos tagged with "work"
 """
+    elif cmd == "llm":
+        """Show detailed help specifically for the LLM command."""
+        help_text = f"""
+    {Colors.GREEN}{Colors.BOLD}llm NOTE_ID{Colors.RESET} - Use Claude AI to analyze and enhance notes
+
+    {Colors.BOLD}Actions:{Colors.RESET}
+    {Colors.YELLOW}summarize{Colors.RESET}   Generate a concise summary of the note
+    {Colors.YELLOW}connect{Colors.RESET}     Find potential connections to other notes
+    {Colors.YELLOW}tags{Colors.RESET}        Suggest relevant tags for the note
+    {Colors.YELLOW}expand{Colors.RESET}      Create an expanded version of the note
+    {Colors.YELLOW}concepts{Colors.RESET}    Extract key concepts from the note
+    {Colors.YELLOW}questions{Colors.RESET}   Generate thought-provoking questions
+    {Colors.YELLOW}critique{Colors.RESET}    Provide constructive feedback on the note
+
+    {Colors.BOLD}Options:{Colors.RESET}
+    {Colors.YELLOW}-a, --action ACTION{Colors.RESET}  LLM action to perform (see above)
+    {Colors.YELLOW}-c, --count NUMBER{Colors.RESET}   Number of results to return (default: 3)
+    {Colors.YELLOW}-s, --show-source{Colors.RESET}    Show the source note before analysis
+    {Colors.YELLOW}-d, --debug{Colors.RESET}          Show debug information for troubleshooting
+
+    {Colors.BOLD}Examples:{Colors.RESET}
+    {Colors.BLUE}llm 22a4b{Colors.RESET}                 Summarize note 22a4b (default action)
+    {Colors.BLUE}llm 22a4b -a tags{Colors.RESET}         Suggest tags for note 22a4b
+    {Colors.BLUE}llm 22a4b -a connect -c 5{Colors.RESET} Find 5 related notes to note 22a4b
+    """
 
     elif cmd == "help":
         # For "help --help", just show general help
@@ -777,17 +816,137 @@ def execute_command():
                 note_id = remaining_args[0]
                 action = options.get('action', options.get('a', 'summarize'))
                 count = int(options.get('count', options.get('c', '3')))
+                debug = 'd' in flags or 'debug' in flags
                 
-                if action == "summarize":
-                    summary = llm_helper.summarize_note(note_id)
-                    result = f"{ZettlFormatter.header(f'AI Summary for Note #{note_id}')}\n\n{summary}"
-                elif action == "tags":
-                    tags = llm_helper.suggest_tags(note_id, count)
-                    result = f"{ZettlFormatter.header(f'AI-Suggested Tags for Note #{note_id}')}\n\n"
-                    for tag in tags:
-                        result += f"{ZettlFormatter.tag(tag)}\n"
-                else:
-                    result = f"LLM action '{action}' not fully implemented in web version."
+                # Debug mode - show environment and configuration info
+                if debug:
+                    debug_info = f"{ZettlFormatter.header('LLM Debug Info')}\n\n"
+                    debug_info += f"Note ID: {note_id}\n"
+                    debug_info += f"Action: {action}\n"
+                    debug_info += f"Count: {count}\n"
+                    debug_info += f"LLM Helper Type: {type(llm_helper).__name__}\n"
+                    debug_info += f"Claude API Key Set: {bool(llm_helper.api_key)}\n"
+                    debug_info += f"Model: {getattr(llm_helper, 'model', 'unknown')}\n"
+                    
+                    try:
+                        # Verify note exists
+                        note = notes_manager.get_note(note_id)
+                        debug_info += f"Note exists: Yes\n"
+                        debug_info += f"Note content length: {len(note['content'])}\n"
+                    except Exception as e:
+                        debug_info += f"Note exists: No (Error: {str(e)})\n"
+                        
+                    try:
+                        # Test anthropic import
+                        import anthropic
+                        debug_info += f"Anthropic package: Installed (version: {getattr(anthropic, '__version__', 'unknown')})\n"
+                    except ImportError:
+                        debug_info += "Anthropic package: Not installed\n"
+                        
+                    result = debug_info
+                    return jsonify({'result': ansi_to_html(result)})
+                    
+                try:
+                    # Check if the note exists first
+                    note = notes_manager.get_note(note_id)
+                    
+                    # Add a processing message to warn the user this might take time
+                    processing_message = f"Processing LLM {action} request for note #{note_id}. This may take a moment..."
+                    result = f"{ZettlFormatter.warning(processing_message)}\n\n"
+                    
+                    if action == "summarize":
+                        summary = llm_helper.summarize_note(note_id)
+                        result += f"{ZettlFormatter.header(f'AI Summary for Note #{note_id}')}\n\n{summary}"
+                        
+                    elif action == "tags":
+                        tags = llm_helper.suggest_tags(note_id, count)
+                        result += f"{ZettlFormatter.header(f'AI-Suggested Tags for Note #{note_id}')}\n\n"
+                        for tag in tags:
+                            result += f"{ZettlFormatter.tag(tag)}\n"
+                            
+                    elif action == "connect":
+                        connections = llm_helper.generate_connections(note_id, count)
+                        result += f"{ZettlFormatter.header(f'AI-Suggested Connections for Note #{note_id}')}\n\n"
+                        if not connections:
+                            result += ZettlFormatter.warning("No potential connections found.")
+                        else:
+                            for conn in connections:
+                                conn_id = conn['note_id']
+                                formatted_id = ZettlFormatter.note_id(conn_id)
+                                result += f"{formatted_id}\n"
+                                result += f"  {conn['explanation']}\n\n"
+                                
+                    elif action == "expand":
+                        expanded_content = llm_helper.expand_note(note_id)
+                        result += f"{ZettlFormatter.header(f'AI-Expanded Version of Note #{note_id}')}\n\n{expanded_content}"
+                        
+                    elif action == "concepts":
+                        concepts = llm_helper.extract_key_concepts(note_id, count)
+                        result += f"{ZettlFormatter.header(f'Key Concepts from Note #{note_id}')}\n\n"
+                        if not concepts:
+                            result += ZettlFormatter.warning("No key concepts identified.")
+                        else:
+                            for i, concept in enumerate(concepts, 1):
+                                result += f"{i}. {Colors.BOLD}{concept['concept']}{Colors.RESET}\n"
+                                result += f"   {concept['explanation']}\n\n"
+                                
+                    elif action == "questions":
+                        questions = llm_helper.generate_question_note(note_id, count)
+                        result += f"{ZettlFormatter.header(f'Thought-Provoking Questions from Note #{note_id}')}\n\n"
+                        if not questions:
+                            result += ZettlFormatter.warning("No questions generated.")
+                        else:
+                            for i, question in enumerate(questions, 1):
+                                result += f"{i}. {Colors.BOLD}{question['question']}{Colors.RESET}\n"
+                                result += f"   {question['explanation']}\n\n"
+                                
+                    elif action == "critique":
+                        critique = llm_helper.critique_note(note_id)
+                        result += f"{ZettlFormatter.header(f'AI Critique of Note #{note_id}')}\n\n"
+                        
+                        # Display strengths
+                        if critique['strengths']:
+                            result += f"{Colors.BOLD}{Colors.GREEN}Strengths:{Colors.RESET}\n"
+                            for strength in critique['strengths']:
+                                result += f"  • {strength}\n"
+                        
+                        # Display weaknesses
+                        if critique['weaknesses']:
+                            result += f"\n{Colors.BOLD}{Colors.YELLOW}Areas for Improvement:{Colors.RESET}\n"
+                            for weakness in critique['weaknesses']:
+                                result += f"  • {weakness}\n"
+                        
+                        # Display suggestions
+                        if critique['suggestions']:
+                            result += f"\n{Colors.BOLD}{Colors.CYAN}Suggestions:{Colors.RESET}\n"
+                            for suggestion in critique['suggestions']:
+                                result += f"  • {suggestion}\n"
+                                
+                        # If no structured feedback was generated
+                        if not (critique['strengths'] or critique['weaknesses'] or critique['suggestions']):
+                            result += ZettlFormatter.warning("Could not generate structured feedback for this note.")
+                    else:
+                        result = ZettlFormatter.warning(f"Unknown LLM action: '{action}'. Available actions: summarize, connect, tags, expand, concepts, questions, critique")
+                        
+                except Exception as e:
+                    # Enhanced error handling with specific messages
+                    error_msg = str(e)
+                    logger.exception(f"Error in LLM command: {error_msg}")
+                    
+                    if "authentication" in error_msg.lower() or "auth" in error_msg.lower() or "api key" in error_msg.lower():
+                        result = ZettlFormatter.error(f"Authentication error: {error_msg}. Check your Claude API key in the .env file.")
+                        
+                    elif "note" in error_msg.lower() and "not found" in error_msg.lower():
+                        result = ZettlFormatter.error(f"Note #{note_id} not found.")
+                        
+                    elif "import" in error_msg.lower() and "anthropic" in error_msg.lower():
+                        result = ZettlFormatter.error("The anthropic package is not installed. Install it with: pip install anthropic")
+                        
+                    elif "connection" in error_msg.lower() or "timeout" in error_msg.lower():
+                        result = ZettlFormatter.error(f"Connection error: {error_msg}. Check your network connection.")
+                        
+                    else:
+                        result = ZettlFormatter.error(f"Error processing LLM command: {error_msg}")
                 
         elif cmd == "delete":
             # Delete a note

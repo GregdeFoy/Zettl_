@@ -189,7 +189,49 @@
             user-select: none;
             z-index: 1;
         }
+        /* Style for LLM action buttons */
+        .llm-action-button {
+            background-color: #3a7a50;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin-right: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
 
+        .llm-action-button:hover {
+            background-color: #4a8a60;
+        }
+
+        /* Style for the actions container */
+        .llm-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 10px;
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        /* Style for sub-option buttons */
+        #shortcut-buttons button[data-subopt] {
+            background-color: #3a7a50;
+        }
+
+        #shortcut-buttons button[data-subopt]:hover {
+            background-color: #4a8a60;
+        }
+
+        /* Separators for button groups */
+        .button-separator {
+            border-left: 1px solid #555;
+            height: 24px;
+            margin: 0 8px;
+        }
         #command-input {
             flex-grow: 1;
             background-color: var(--input-bg);
@@ -336,7 +378,7 @@
                 'link': ['-c', '--context', '-h', '--help'],
                 'related': ['-f', '--full', '-h', '--help'],
                 'graph': ['-o', '--output', '-d', '--depth', '-h', '--help'],
-                'llm': ['-a', '--action', '-c', '--count', '-s', '--show-source', '-h', '--help'],
+                'llm': ['-a', '--action', '-c', '--count', '-s', '--show-source', '-d', '--debug', '-h', '--help'],
                 'todos': ['-a', '--all', '-dt', '--donetoday', '-c', '--cancel', '-t', '--tag', '-h', '--help'],
                 'delete': ['--keep-links', '--keep-tags', '-f', '--force', '-h', '--help'],
                 'untag': ['-h', '--help'],
@@ -347,8 +389,21 @@
             // Top-level commands for initial buttons
             const topLevelCommands = ['new', 'list', 'show', 'search', 'todos', 'tags', 'link', 'related', 'help'];
             
+            const llmActions = ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'];
+
             // For commands that need auto-quotes
             const autoQuoteCommands = ['new', 'add', 'search'];
+
+            const subOptions = {
+                'llm': {
+                    '-a': ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'],
+                    '--action': ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'],
+                    '-c': ['3', '5', '10'],
+                    '--count': ['3', '5', '10']
+                }
+            };
+
+
             
             // Create a container for the logo to handle overflow better
             const logoContainer = document.createElement('div');
@@ -401,8 +456,53 @@
                 const cmdParts = currentText.split(/\s+/);
                 const currentCmd = cmdParts[0];
                 
+                // Track the last option mentioned to show relevant sub-options
+                let lastOption = null;
+                if (cmdParts.length > 1) {
+                    const possibleOption = cmdParts[cmdParts.length - 1];
+                    if (possibleOption.startsWith('-')) {
+                        lastOption = possibleOption;
+                    }
+                }
+                
                 // If a command is typed, show its options
                 if (currentCmd && commandOptions[currentCmd]) {
+                    // Special handling for when an option that has sub-options was just typed
+                    if (lastOption && subOptions[currentCmd] && subOptions[currentCmd][lastOption]) {
+                        // Show sub-options for this option
+                        const subOpts = subOptions[currentCmd][lastOption];
+                        subOpts.forEach(subOpt => {
+                            const button = document.createElement('button');
+                            button.textContent = subOpt;
+                            button.dataset.subopt = subOpt;
+                            button.addEventListener('click', function() {
+                                // Add the sub-option with spaces
+                                const currentValue = commandInput.value;
+                                
+                                // Only add a space before if there isn't one already
+                                const newValue = currentValue.endsWith(' ') ? 
+                                            currentValue + subOpt + ' ' : 
+                                            currentValue + ' ' + subOpt + ' ';
+                                
+                                commandInput.value = newValue;
+                                commandInput.focus();
+                                autoResizeTextarea();
+                                
+                                // Put cursor at the end
+                                commandInput.selectionStart = commandInput.selectionEnd = newValue.length;
+                            });
+                            shortcutButtons.appendChild(button);
+                        });
+                        
+                        // Add an extra "custom" button for free-form input
+                        const customButton = document.createElement('button');
+                        customButton.textContent = "custom...";
+                        customButton.style.fontStyle = "italic";
+                        shortcutButtons.appendChild(customButton);
+                        
+                        return; // Early return as we've handled the sub-options
+                    }
+                    
                     // Show options for the current command
                     commandOptions[currentCmd].forEach(option => {
                         const button = document.createElement('button');
@@ -422,12 +522,48 @@
                             
                             commandInput.value = newValue;
                             commandInput.focus();
+                            autoResizeTextarea();
+                            
+                            // Update buttons immediately to show sub-options if applicable
+                            updateShortcutButtons();
                             
                             // Put cursor at the end
                             commandInput.selectionStart = commandInput.selectionEnd = newValue.length;
                         });
                         shortcutButtons.appendChild(button);
                     });
+                    
+                    // Add a special button for direct LLM actions if current command is 'llm'
+                    if (currentCmd === 'llm' && cmdParts.length === 2 && !lastOption) {
+                        // This means they've typed "llm noteId" but no options yet
+                        // Add direct action buttons
+                        
+                        // First add a separator
+                        const separator = document.createElement('div');
+                        separator.style.borderLeft = '1px solid #555';
+                        separator.style.height = '24px';
+                        separator.style.margin = '0 8px';
+                        shortcutButtons.appendChild(separator);
+                        
+                        // Add shortcut buttons for common LLM actions
+                        const actions = ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'];
+                        actions.forEach(action => {
+                            const button = document.createElement('button');
+                            button.textContent = action;
+                            button.style.backgroundColor = '#3a7a50'; // Different color for action buttons
+                            button.addEventListener('click', function() {
+                                // Add the complete action option
+                                const noteId = cmdParts[1]; // Get the note ID
+                                commandInput.value = `llm ${noteId} -a ${action}`;
+                                commandInput.focus();
+                                autoResizeTextarea();
+                                
+                                // Put cursor at the end
+                                commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
+                            });
+                            shortcutButtons.appendChild(button);
+                        });
+                    }
                 } else {
                     // Show top-level commands
                     topLevelCommands.forEach(cmd => {
@@ -445,7 +581,7 @@
                             
                             // If this is a command needing quotes, add them and position cursor
                             if (autoQuoteCommands.includes(cmd)) {
-                // Auto-add quotes and position cursor between them
+                                // Auto-add quotes and position cursor between them
                                 commandInput.value = cmd + ' ""';
                                 autoResizeTextarea();
                                 // Set cursor position between the quotes
@@ -622,20 +758,144 @@
                 commandInput.focus();
             }
             
-            // Append output to terminal
-            function appendOutput(content, isHTML = false) {
-                const outputLine = document.createElement('div');
-                outputLine.className = 'output-line';
+
+            // Add this custom function to process LLM commands for better UX
+            function processLlmCommand(note_id, action) {
+                const command = `llm ${note_id} -a ${action}`;
                 
-                if (isHTML) {
-                    outputLine.innerHTML = content;
-                } else {
-                    outputLine.textContent = content;
+                // Add to command history
+                if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== command) {
+                    commandHistory.push(command);
+                    saveHistory(commandHistory);
                 }
                 
-                terminalOutput.appendChild(outputLine);
+                // Reset history index
+                historyIndex = commandHistory.length;
+                
+                // Show loading indicator with a unique ID
+                const loadingId = `loading-${Date.now()}`;
+                const processingElement = document.createElement('div');
+                processingElement.className = 'processing-message';
+                processingElement.id = loadingId;
+                processingElement.innerHTML = `Processing ${action} command for note #${note_id}... <span class="loading-indicator">⏳</span>`;
+                terminalOutput.appendChild(processingElement);
+                
+                // Scroll to the processing message
                 terminalOutput.scrollTop = terminalOutput.scrollHeight;
+                
+                // Send command to server
+                fetch('/api/command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ command: command })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Remove loading indicator
+                    const loadingElement = document.getElementById(loadingId);
+                    if (loadingElement) {
+                        loadingElement.remove();
+                    }
+                    
+                    // Append result
+                    appendOutput(`zettl> ${command}`);
+                    appendOutput(data.result, true);
+                    
+                    // Scroll to bottom
+                    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+                })
+                .catch(error => {
+                    // Remove loading indicator
+                    const loadingElement = document.getElementById(loadingId);
+                    if (loadingElement) {
+                        loadingElement.remove();
+                    }
+                    
+                    // Show error
+                    appendOutput(`zettl> ${command}`);
+                    appendOutput(`<span class="red">Error: ${error.message || 'Connection failed'}</span>`);
+                    
+                    // Scroll to bottom
+                    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+                });
             }
+
+            // Add this function to show LLM action buttons when a note ID is shown
+            function addLlmActionsToNoteDisplay(noteId, element) {
+                // Check if actions are already added
+                if (element.querySelector('.llm-actions')) {
+                    return;
+                }
+                
+                // Create a container for the LLM action buttons
+                const actionsContainer = document.createElement('div');
+                actionsContainer.className = 'llm-actions';
+                actionsContainer.style.display = 'flex';
+                actionsContainer.style.flexWrap = 'wrap';
+                actionsContainer.style.gap = '5px';
+                actionsContainer.style.marginTop = '10px';
+                actionsContainer.style.padding = '8px';
+                actionsContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
+                actionsContainer.style.borderRadius = '4px';
+                
+                // Add a label
+                const label = document.createElement('div');
+                label.textContent = 'LLM Actions:';
+                label.style.marginRight = '10px';
+                label.style.alignSelf = 'center';
+                label.style.color = '#90ee90';
+                actionsContainer.appendChild(label);
+                
+                // Add buttons for each LLM action
+                llmActions.forEach(action => {
+                    const button = document.createElement('button');
+                    button.textContent = action;
+                    button.style.fontSize = '12px';
+                    button.style.padding = '4px 8px';
+                    button.style.backgroundColor = '#3a7a50';
+                    button.style.color = 'white';
+                    button.style.border = 'none';
+                    button.style.borderRadius = '3px';
+                    button.style.cursor = 'pointer';
+                    
+                    button.addEventListener('click', function() {
+                        processLlmCommand(noteId, action);
+                    });
+                    
+                    actionsContainer.appendChild(button);
+                });
+                
+                // Add the actions container after the note content
+                element.appendChild(actionsContainer);
+            }
+
+
+
+            // Modify the appendOutput function to add LLM action buttons to note displays
+            const originalAppendOutput = appendOutput;
+            appendOutput = function(content, isHTML = false) {
+                // Call the original function
+                originalAppendOutput(content, isHTML);
+                
+                // Find the newly added element
+                const newElement = terminalOutput.lastElementChild;
+                
+                // Check if this is a note display (contains a note ID formatting)
+                if (isHTML && content.includes('class="cyan">#')) {
+                    // Extract the note ID from the content
+                    const noteIdMatch = content.match(/class="cyan">#([a-zA-Z0-9]+)/);
+                    if (noteIdMatch && noteIdMatch[1]) {
+                        const noteId = noteIdMatch[1];
+                        
+                        // Add LLM action buttons
+                        setTimeout(() => {
+                            addLlmActionsToNoteDisplay(noteId, newElement);
+                        }, 100);
+                    }
+                }
+            };
             
             // Save command history to localStorage
             function saveHistory(history) {
