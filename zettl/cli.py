@@ -782,12 +782,12 @@ def unlink(source_id, target_id):
 @cli.command()
 @click.option('--donetoday', '-dt', is_flag=True, help='List todos that were completed today')
 @click.option('--all', '-a', is_flag=True, help='Show all todos (both active and completed)')
+@click.option('--cancel', '-c', is_flag=True, help='Show canceled todos')
 @click.option('--tag', '-t', multiple=True, help='Filter todos by one or more additional tags')
-def todos(donetoday, all, tag):
+def todos(donetoday, all, cancel, tag):
     """List all notes tagged with 'todo' grouped by category."""
     try:
         # If --all is specified, force done=True to include completed todos
-        
         done = all
             
         # Get all notes tagged with 'todo'
@@ -827,8 +827,6 @@ def todos(donetoday, all, tag):
             except Exception as e:
                 click.echo(ZettlFormatter.warning(f"Could not determine todos completed today: {str(e)}"))
         
-        # The rest of the function remains unchanged
-        
         # Apply filters if specified
         if tag:
             filters = [f.lower() for f in tag]
@@ -859,14 +857,17 @@ def todos(donetoday, all, tag):
         active_todos_by_category = {}
         done_todos_by_category = {}
         donetoday_todos_by_category = {}
+        canceled_todos_by_category = {}  # New dict for canceled todos
         uncategorized_active = []
         uncategorized_done = []
         uncategorized_donetoday = []
+        uncategorized_canceled = []  # New list for uncategorized canceled todos
         
         # Track unique note IDs to count them at the end
         unique_active_ids = set()
         unique_done_ids = set()
         unique_donetoday_ids = set()
+        unique_canceled_ids = set()  # New set for canceled todos
         
         for note in todo_notes:
             note_id = note['id']
@@ -877,6 +878,9 @@ def todos(donetoday, all, tag):
             # Check if this is a done todo
             is_done = 'done' in tags_lower
             
+            # Check if this is a canceled todo
+            is_canceled = 'cancel' in tags_lower
+            
             # Check if this is done today
             is_done_today = note_id in done_today_ids
             
@@ -884,8 +888,14 @@ def todos(donetoday, all, tag):
             if is_done and not done and not (is_done_today and donetoday):
                 continue
                 
+            # Skip canceled todos if not explicitly requested
+            if is_canceled and not cancel:
+                continue
+                
             # Track unique IDs
-            if is_done_today and donetoday:
+            if is_canceled:
+                unique_canceled_ids.add(note_id)
+            elif is_done_today and donetoday:
                 unique_donetoday_ids.add(note_id)
             elif is_done:
                 unique_done_ids.add(note_id)
@@ -893,7 +903,7 @@ def todos(donetoday, all, tag):
                 unique_active_ids.add(note_id)
             
             # Find category tags (everything except 'todo', 'done', and the filter tags)
-            excluded_tags = ['todo', 'done']
+            excluded_tags = ['todo', 'done', 'cancel']  # Added 'cancel' to exclusion list
             if tag:
                 excluded_tags.extend([f.lower() for f in tag])
                 
@@ -901,7 +911,9 @@ def todos(donetoday, all, tag):
             
             if not categories:
                 # This todo has no category tags
-                if is_done_today and donetoday:
+                if is_canceled:
+                    uncategorized_canceled.append(note)
+                elif is_done_today and donetoday:
                     uncategorized_donetoday.append(note)
                 elif is_done:
                     uncategorized_done.append(note)
@@ -910,7 +922,11 @@ def todos(donetoday, all, tag):
             else:
                 # Add this note to each of its categories
                 for category in categories:
-                    if is_done_today and donetoday:
+                    if is_canceled:
+                        if category not in canceled_todos_by_category:
+                            canceled_todos_by_category[category] = []
+                        canceled_todos_by_category[category].append(note)
+                    elif is_done_today and donetoday:
                         if category not in donetoday_todos_by_category:
                             donetoday_todos_by_category[category] = []
                         donetoday_todos_by_category[category].append(note)
@@ -932,7 +948,8 @@ def todos(donetoday, all, tag):
         # Display todos by category
         if (not active_todos_by_category and not uncategorized_active and 
             (not done or (not done_todos_by_category and not uncategorized_done)) and
-            (not donetoday or (not donetoday_todos_by_category and not uncategorized_donetoday))):
+            (not donetoday or (not donetoday_todos_by_category and not uncategorized_donetoday)) and
+            (not cancel or (not canceled_todos_by_category and not uncategorized_canceled))):
             click.echo(ZettlFormatter.warning("No todos match your criteria."))
             return
             
@@ -1008,6 +1025,12 @@ def todos(donetoday, all, tag):
                 done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids - unique_donetoday_ids)} total)")
                 click.echo(f"\n{done_header}")
                 display_todos_group(done_todos_by_category, uncategorized_done, "")
+        
+        # Display canceled todos if requested
+        if cancel and (canceled_todos_by_category or uncategorized_canceled):
+            canceled_header = ZettlFormatter.header(f"Canceled {' '.join(header_parts)} ({len(unique_canceled_ids)} total)")
+            click.echo(f"\n{canceled_header}")
+            display_todos_group(canceled_todos_by_category, uncategorized_canceled, "")
                 
     except Exception as e:
         click.echo(ZettlFormatter.error(str(e)), err=True)
