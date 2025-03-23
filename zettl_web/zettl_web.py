@@ -19,7 +19,6 @@ print(f"File exists: {os.path.exists(dotenv_path)}")
 load_dotenv(dotenv_path)
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Initialize Flask app

@@ -7,7 +7,6 @@ from zettl.config import CLAUDE_API_KEY
 import urllib3
 urllib3.disable_warnings()
 import logging
-logging.basicConfig(level=logging.DEBUG)
 import platform
 IS_PYTHONANYWHERE = 'pythonanywhere' in platform.node().lower()
 
