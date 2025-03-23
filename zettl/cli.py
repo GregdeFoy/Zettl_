@@ -927,24 +927,30 @@ def todos(donetoday, all, cancel, tag):
                 else:
                     uncategorized_active.append(note)
             else:
-                # Add this note to each of its categories
-                for category in categories:
+            # Create a combined category key from all tags
+                if categories:
+                    combined_category = " - ".join(sorted(categories))
+                    
                     if is_canceled:
-                        if category not in canceled_todos_by_category:
-                            canceled_todos_by_category[category] = []
-                        canceled_todos_by_category[category].append(note)
+                        if combined_category not in canceled_todos_by_category:
+                            canceled_todos_by_category[combined_category] = []
+                        if note not in canceled_todos_by_category[combined_category]:  # Avoid duplicates
+                            canceled_todos_by_category[combined_category].append(note)
                     elif is_done_today and donetoday:
-                        if category not in donetoday_todos_by_category:
-                            donetoday_todos_by_category[category] = []
-                        donetoday_todos_by_category[category].append(note)
+                        if combined_category not in donetoday_todos_by_category:
+                            donetoday_todos_by_category[combined_category] = []
+                        if note not in donetoday_todos_by_category[combined_category]:
+                            donetoday_todos_by_category[combined_category].append(note)
                     elif is_done:
-                        if category not in done_todos_by_category:
-                            done_todos_by_category[category] = []
-                        done_todos_by_category[category].append(note)
+                        if combined_category not in done_todos_by_category:
+                            done_todos_by_category[combined_category] = []
+                        if note not in done_todos_by_category[combined_category]:
+                            done_todos_by_category[combined_category].append(note)
                     else:
-                        if category not in active_todos_by_category:
-                            active_todos_by_category[category] = []
-                        active_todos_by_category[category].append(note)
+                        if combined_category not in active_todos_by_category:
+                            active_todos_by_category[combined_category] = []
+                        if note not in active_todos_by_category[combined_category]:
+                            active_todos_by_category[combined_category].append(note)
         
         # Build the header message
         header_parts = ["Todos"]
@@ -967,7 +973,18 @@ def todos(donetoday, all, cancel, tag):
             
             if category_dict:
                 for category, notes in sorted(category_dict.items()):
-                    click.echo(f"\n{ZettlFormatter.tag(category)} ({len(notes)})")
+                    # Check if this is a combined category with multiple tags
+                    if " - " in category:
+                        # For combined categories, format each tag separately
+                        tags = category.split(" - ")
+                        formatted_tags = []
+                        for tag in tags:
+                            formatted_tags.append(ZettlFormatter.tag(tag))
+                        category_display = " - ".join(formatted_tags)
+                        click.echo(f"\n{category_display} ({len(notes)})")
+                    else:
+                        # For single categories, use the original format
+                        click.echo(f"\n{ZettlFormatter.tag(category)} ({len(notes)})")
                     
                     for note in notes:
                         formatted_id = ZettlFormatter.note_id(note['id'])
