@@ -239,6 +239,14 @@ COMMAND_OPTIONS = {
             'debug': {'flag': True}
         }
     },
+    'rules': {
+        'short_opts': {
+            's': {'name': 'source', 'flag': True}
+        },
+        'long_opts': {
+            'source': {'flag': True}
+        }
+    },
     # Add similar configs for other commands
 }
 
@@ -464,7 +472,12 @@ def show_command_help(cmd):
     {Colors.BLUE}llm 22a4b -a tags{Colors.RESET}         Suggest tags for note 22a4b
     {Colors.BLUE}llm 22a4b -a connect -c 5{Colors.RESET} Find 5 related notes to note 22a4b
     """
-
+    elif cmd == "rules":
+        help_text = f"""
+        {Colors.YELLOW}{Colors.BOLD}rules{Colors.RESET} - Display a random rule from notes tagged with 'rules'
+    {Colors.BLUE}→{Colors.RESET} zettl rules
+    {Colors.BLUE}→{Colors.RESET} zettl rules --source  # Show the source note ID
+    """
     elif cmd == "help":
         # For "help --help", just show general help
         return execute_command("help", [], {}, [])
@@ -993,7 +1006,75 @@ def execute_command():
                 
                 notes_manager.delete_link(source_id, target_id)
                 result = ZettlFormatter.success(f"Removed link from note #{source_id} to note #{target_id}")
+                        
+        elif cmd == "rules":
+            # Parse the source flag
+            source = 'source' in flags or 's' in flags
+            
+            # Get all notes tagged with 'rules'
+            rules_notes = notes_manager.get_notes_by_tag('rules')
+            
+            if not rules_notes:
+                result = ZettlFormatter.warning("No notes found with tag 'rules'")
+            else:
+                # Extract rules from all notes
+                all_rules = []
                 
+                for note in rules_notes:
+                    note_id = note['id']
+                    content = note['content']
+                    
+                    # Try to parse numbered rules (like "1. Rule text")
+                    lines = content.split('\n')
+                    rule_starts = []
+                    
+                    # Find line numbers where rules start
+                    for i, line in enumerate(lines):
+                        if re.match(r'^\s*\d+[\.\)]\s+', line):
+                            rule_starts.append(i)
+                    
+                    if rule_starts:
+                        # This note contains numbered rules
+                        for i, start_idx in enumerate(rule_starts):
+                            # Determine where this rule ends (next rule start or end of note)
+                            end_idx = rule_starts[i+1] if i+1 < len(rule_starts) else len(lines)
+                            
+                            # Extract the rule text
+                            rule_lines = lines[start_idx:end_idx]
+                            full_text = '\n'.join(rule_lines).strip()
+                            
+                            rule = {
+                                'note_id': note_id,
+                                'full_text': full_text
+                            }
+                            all_rules.append(rule)
+                    else:
+                        # This note doesn't have numbered items, treat it as a single rule
+                        rule = {
+                            'note_id': note_id,
+                            'full_text': content.strip()
+                        }
+                        all_rules.append(rule)
+                        
+                if not all_rules:
+                    result = ZettlFormatter.warning("Couldn't extract any rules from the notes")
+                else:
+                    # Import random if not already imported
+                    import random
+                    
+                    # Select a random rule
+                    random_rule = random.choice(all_rules)
+                    
+                    # Display the rule
+                    result = f"{ZettlFormatter.header('Random Rule')}\n\n"
+                    
+                    if source:
+                        # Show the source note ID
+                        result += f"Source: {ZettlFormatter.note_id(random_rule['note_id'])}\n\n"
+                    
+                    # Always show the full rule
+                    result += random_rule['full_text']
+
         elif cmd == "todos":
             # List all notes tagged with 'todo' grouped by category
             donetoday = 'donetoday' in flags or 'dt' in flags

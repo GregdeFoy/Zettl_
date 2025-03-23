@@ -372,6 +372,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const llmActions = ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'];
     }
 
+    
     // Command to options mapping - for dynamic buttons
     const commandOptions = {
         'list': ['-l', '--limit', '-f', '--full', '-c', '--compact', '-h', '--help'],
@@ -388,11 +389,12 @@ document.addEventListener('DOMContentLoaded', function() {
         'delete': ['--keep-links', '--keep-tags', '-f', '--force', '-h', '--help'],
         'untag': ['-h', '--help'],
         'unlink': ['-h', '--help'],
-        'help': ['-h', '--help']
+        'help': ['-h', '--help'],
+
     };
 
     // For commands that need auto-quotes
-    const autoQuoteCommands = ['new', 'add', 'search'];
+    const autoQuoteCommands = ['new', 'add'];
 
     // Sub-options for commands like llm
     const subOptions = {
@@ -405,7 +407,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // Top-level commands for initial buttons
-    const topLevelCommands = ['new', 'list', 'show', 'search', 'todos', 'tags', 'link', 'related', 'help'];
+    const topLevelCommands = ['new', 'list', 'show', 'search', 'todos', 'tags', 'link', 'related', 'rules', 'help'];
     
     // Define function for appending output to the terminal
     window.appendOutput = function(content, isHTML = false) {

@@ -10,6 +10,7 @@ from zettl.llm import LLMHelper
 from zettl.config import APP_NAME, APP_VERSION
 from zettl.formatting import ZettlFormatter,Colors
 import re
+import random
 
 # Initialize the notes manager, graph manager and LLM helper
 notes_manager = Notes()
@@ -136,6 +137,11 @@ def commands():
             "name": "unlink",
             "description": "Remove a link between two notes",
             "example": "zettl unlink 22a4b 18c3d"
+        },
+        {
+            "name": "rules",
+            "description": "Display a random rule from notes tagged with 'rules'",
+            "example": "zettl rules\nzettl rules --source  # Show source note ID"
         }
     ]
     
@@ -1035,6 +1041,79 @@ def todos(donetoday, all, cancel, tag):
                 
     except Exception as e:
         click.echo(ZettlFormatter.error(str(e)), err=True)
+
+
+@cli.command()
+@click.option('--source', '-s', is_flag=True, help='Show the source note ID')
+def rules(source):
+    """Display a random rule from notes tagged with 'rules'."""
+    try:
+        # Get all notes tagged with 'rules'
+        rules_notes = notes_manager.get_notes_by_tag('rules')
+        
+        if not rules_notes:
+            click.echo(ZettlFormatter.warning("No notes found with tag 'rules'"))
+            return
+            
+        # Extract rules from all notes
+        all_rules = []
+        
+        for note in rules_notes:
+            note_id = note['id']
+            content = note['content']
+            
+            # Try to parse numbered rules (like "1. Rule text")
+            lines = content.split('\n')
+            rule_starts = []
+            
+            # Find line numbers where rules start
+            for i, line in enumerate(lines):
+                if re.match(r'^\s*\d+[\.\)]\s+', line):
+                    rule_starts.append(i)
+            
+            if rule_starts:
+                # This note contains numbered rules
+                for i, start_idx in enumerate(rule_starts):
+                    # Determine where this rule ends (next rule start or end of note)
+                    end_idx = rule_starts[i+1] if i+1 < len(rule_starts) else len(lines)
+                    
+                    # Extract the rule text
+                    rule_lines = lines[start_idx:end_idx]
+                    full_text = '\n'.join(rule_lines).strip()
+                    
+                    rule = {
+                        'note_id': note_id,
+                        'full_text': full_text
+                    }
+                    all_rules.append(rule)
+            else:
+                # This note doesn't have numbered items, treat it as a single rule
+                rule = {
+                    'note_id': note_id,
+                    'full_text': content.strip()
+                }
+                all_rules.append(rule)
+                
+        if not all_rules:
+            click.echo(ZettlFormatter.warning("Couldn't extract any rules from the notes"))
+            return
+            
+        # Select a random rule
+        random_rule = random.choice(all_rules)
+        
+        # Display the rule
+        click.echo(ZettlFormatter.header("Random Rule"))
+        
+        if source:
+            # Show the source note ID
+            click.echo(f"Source: {ZettlFormatter.note_id(random_rule['note_id'])}\n")
+        
+        # Always show the full rule
+        click.echo(random_rule['full_text'])
+            
+    except Exception as e:
+        click.echo(ZettlFormatter.error(str(e)), err=True)
+
 
 @cli.command()
 def workflow():
