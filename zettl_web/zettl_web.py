@@ -9,6 +9,7 @@ from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 import re
+from zettl.nutrition import NutritionTracker
 
 # Load environment variables from parent directory
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -247,6 +248,21 @@ COMMAND_OPTIONS = {
             'source': {'flag': True}
         }
     },
+    'nutrition': {
+        'short_opts': {
+            'd': {'name': 'days', 'type': int}
+        },
+        'long_opts': {
+            'days': {'type': int}
+        }
+    },
+    'n': {
+        'short_opts': {},
+        'long_opts': {}
+    },
+
+
+
     # Add similar configs for other commands
 }
 
@@ -1426,6 +1442,77 @@ def execute_command():
     {Colors.BLUE}→{Colors.RESET} zettl llm 22a4b --action summarize
     {Colors.BLUE}→{Colors.RESET} zettl llm 22a4b --action tags
 """
+        elif cmd == "nutrition" or cmd == "n":
+            # Handle subcommands or direct "n" command
+            if cmd == "n":
+                # Direct quick-add command
+                if remaining_args:
+                    content = remaining_args[0]
+                    try:
+                        tracker = NutritionTracker()
+                        note_id = tracker.add_entry(content)
+                        result = f"Added nutrition entry #{note_id}\n\n"
+                        
+                        # Show today's totals after adding
+                        today_entries = tracker.get_today_entries()
+                        total_calories = sum(entry['nutrition_data'].get('calories', 0) for entry in today_entries)
+                        total_protein = sum(entry['nutrition_data'].get('protein', 0) for entry in today_entries)
+                        
+                        result += f"Today's totals so far:\n"
+                        result += f"Calories: {total_calories:.1f}\n"
+                        result += f"Protein: {total_protein:.1f}g"
+                    except Exception as e:
+                        result = ZettlFormatter.error(str(e))
+                else:
+                    result = ZettlFormatter.error("Please provide nutrition content")
+            elif remaining_args:
+                subcommand = remaining_args[0]
+                
+                if subcommand == "add" and len(remaining_args) > 1:
+                    # Add a nutrition entry
+                    content = remaining_args[1]
+                    try:
+                        tracker = NutritionTracker()
+                        note_id = tracker.add_entry(content)
+                        result = f"Added nutrition entry #{note_id}\n\n"
+                        
+                        # Show today's totals after adding
+                        today_entries = tracker.get_today_entries()
+                        total_calories = sum(entry['nutrition_data'].get('calories', 0) for entry in today_entries)
+                        total_protein = sum(entry['nutrition_data'].get('protein', 0) for entry in today_entries)
+                        
+                        result += f"Today's totals so far:\n"
+                        result += f"Calories: {total_calories:.1f}\n"
+                        result += f"Protein: {total_protein:.1f}g"
+                    except Exception as e:
+                        result = ZettlFormatter.error(str(e))
+                elif subcommand == "today":
+                    # Show today's nutrition summary
+                    try:
+                        tracker = NutritionTracker()
+                        result = tracker.format_today_summary()
+                    except Exception as e:
+                        result = ZettlFormatter.error(str(e))
+                elif subcommand == "history":
+                    # Show nutrition history
+                    days = 7  # Default
+                    
+                    # Check for days option
+                    if '--days' in options:
+                        days = int(options['--days'])
+                    elif '-d' in options:
+                        days = int(options['-d'])
+                    
+                    try:
+                        tracker = NutritionTracker()
+                        result = tracker.format_history(days=days)
+                    except Exception as e:
+                        result = ZettlFormatter.error(str(e))
+                else:
+                    result = ZettlFormatter.error(f"Unknown nutrition subcommand: {subcommand}")
+            else:
+                result = ZettlFormatter.error("Please specify a nutrition subcommand (add, today, history)")            
+
         else:
             result = f"Unknown command: {cmd}. Try 'help' for available commands."
             

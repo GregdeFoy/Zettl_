@@ -11,6 +11,8 @@ from zettl.config import APP_NAME, APP_VERSION
 from zettl.formatting import ZettlFormatter,Colors
 import re
 import random
+from zettl.nutrition import NutritionTracker
+
 
 # Initialize the notes manager, graph manager and LLM helper
 notes_manager = Notes()
@@ -1221,6 +1223,134 @@ def workflow():
     click.echo("• Focus on creating meaningful connections between notes")
     click.echo("• Use tags sparingly for high-level categorization")
     click.echo("• Regularly review and refine your note network")
-    
+
+@cli.group()
+def nutrition():
+    """Track and analyze nutrition data (calories and protein)."""
+    pass
+
+@nutrition.command('add')
+@click.argument('content')
+def add_nutrition(content):
+    """Add a new nutrition entry."""
+    try:
+        tracker = NutritionTracker()
+        
+        # Parse the nutrition data directly from the content
+        data = tracker.parse_nutrition_data(content)
+        if not data:
+            click.echo(ZettlFormatter.error("Invalid nutrition data format. Use 'cal: XXX prot: YYY'"))
+            return
+            
+        # Get current calories/protein values from the content directly
+        calories = data.get('calories', 0)
+        protein = data.get('protein', 0)
+        
+        # Create the note
+        note_id = tracker.add_entry(content)
+        click.echo(f"Added nutrition entry #{note_id}")
+        
+        # Force database refresh
+        tracker.notes_manager.db.invalidate_cache("tags:")
+        
+        # Try to get today's entries
+        try:
+            today_entries = tracker.get_today_entries()
+            
+            # Calculate totals including the entry we just added
+            prev_calories = sum(entry['nutrition_data'].get('calories', 0) for entry in today_entries)
+            prev_protein = sum(entry['nutrition_data'].get('protein', 0) for entry in today_entries)
+            
+            # In case our new entry isn't in the list yet, add its values
+            new_entry_included = any(entry['id'] == note_id for entry in today_entries)
+            if not new_entry_included:
+                total_calories = prev_calories + calories
+                total_protein = prev_protein + protein
+            else:
+                total_calories = prev_calories
+                total_protein = prev_protein
+            
+            click.echo(f"\nToday's totals so far:")
+            click.echo(f"Calories: {total_calories:.1f}")
+            click.echo(f"Protein: {total_protein:.1f}g")
+        except Exception as e:
+            # Fallback if we can't fetch the existing entries
+            click.echo(f"\nEntry added with:")
+            click.echo(f"Calories: {calories:.1f}")
+            click.echo(f"Protein: {protein:.1f}g")
+            
+    except Exception as e:
+        click.echo(ZettlFormatter.error(str(e)), err=True)
+
+@nutrition.command('today')
+def today_nutrition():
+    """Show today's nutrition summary."""
+    try:
+        tracker = NutritionTracker()
+        summary = tracker.format_today_summary()
+        click.echo(summary)
+    except Exception as e:
+        click.echo(ZettlFormatter.error(str(e)), err=True)
+
+@nutrition.command('history')
+@click.option('--days', '-d', default=7, help='Number of days to show')
+def nutrition_history(days):
+    """Show nutrition history for the past days."""
+    try:
+        tracker = NutritionTracker()
+        history = tracker.format_history(days=days)
+        click.echo(history)
+    except Exception as e:
+        click.echo(ZettlFormatter.error(str(e)), err=True)
+
+# Quick add alias for convenience
+@cli.command('n')
+@click.argument('content')
+def quick_nutrition(content):
+    """Quick add a nutrition entry. Alias for 'nutrition add'."""
+    try:
+        tracker = NutritionTracker()
+        
+        # Parse the nutrition data directly from the content
+        data = tracker.parse_nutrition_data(content)
+        if not data:
+            click.echo(ZettlFormatter.error("Invalid nutrition data format. Use 'cal: XXX prot: YYY'"))
+            return
+            
+        # Get current calories/protein values from the content directly
+        calories = data.get('calories', 0)
+        protein = data.get('protein', 0)
+        
+        # Create the note
+        note_id = tracker.add_entry(content)
+        click.echo(f"Added nutrition entry #{note_id}")
+        
+        # Force database refresh
+        tracker.notes_manager.db.invalidate_cache("tags:")
+        
+        # Try to get today's entries
+        try:
+            today_entries = tracker.get_today_entries()
+            
+            # Calculate totals including the entry we just added
+            prev_calories = sum(entry['nutrition_data'].get('calories', 0) for entry in today_entries)
+            prev_protein = sum(entry['nutrition_data'].get('protein', 0) for entry in today_entries)
+            
+            # Add the current entry's values
+            total_calories = prev_calories + calories
+            total_protein = prev_protein + protein
+            
+            click.echo(f"\nToday's totals so far:")
+            click.echo(f"Calories: {total_calories:.1f}")
+            click.echo(f"Protein: {total_protein:.1f}g")
+        except Exception as e:
+            # Fallback if we can't fetch the existing entries
+            click.echo(f"\nEntry added with:")
+            click.echo(f"Calories: {calories:.1f}")
+            click.echo(f"Protein: {protein:.1f}g")
+            
+    except Exception as e:
+        click.echo(ZettlFormatter.error(str(e)), err=True)
+
 if __name__ == '__main__':
     cli()

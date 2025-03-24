@@ -294,6 +294,69 @@
             animation: pulse 1s infinite;
         }
 
+        .nutrition-bar {
+            display: inline-block;
+            height: 12px;
+            background-color: #90ee90;
+            margin: 0 5px;
+            border-radius: 2px;
+        }
+
+        .protein-bar {
+            background-color: #add8e6;
+        }
+
+        .nutrition-summary {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        .nutrition-date {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .nutrition-total {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+
+        .nutrition-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 2px solid #444;
+            padding-left: 10px;
+        }
+
+        .nutrition-quick-input {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+        }
+
+        .nutrition-quick-input input {
+            background-color: var(--input-bg);
+            color: var(--terminal-text);
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            padding: 8px;
+            margin-right: 8px;
+            width: 80px;
+        }
+
+        .nutrition-quick-input button {
+            background-color: var(--primary-color);
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 8px;
+        }
+
         /* Extra padding for safari to account for toolbar */
         @supports (-webkit-touch-callout: none) {
             #terminal-output {
@@ -390,7 +453,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'untag': ['-h', '--help'],
         'unlink': ['-h', '--help'],
         'help': ['-h', '--help'],
-
+        'nutrition': ['-d','--days'],
     };
 
     // For commands that need auto-quotes
@@ -407,7 +470,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // Top-level commands for initial buttons
-    const topLevelCommands = ['new', 'list', 'show', 'search', 'todos', 'tags', 'link', 'related', 'rules', 'help'];
+    const topLevelCommands = ['new', 'list', 'show', 'search', 'todos', 'tags', 'link', 'related', 'rules', 'help', 'n', 'nutrition'];
     
     // Define function for appending output to the terminal
     window.appendOutput = function(content, isHTML = false) {
@@ -436,6 +499,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 100);
             }
         }
+        enhanceNutritionOutput(line);
+
     };
     
     // Create a container for the logo to handle overflow better
@@ -758,7 +823,56 @@ document.addEventListener('DOMContentLoaded', function() {
                 lastOption = possibleOption;
             }
         }
-        
+
+
+        if (currentCmd === 'nutrition') {
+            // First add a separator
+            const separator = document.createElement('div');
+            separator.className = 'button-separator';
+            shortcutButtons.appendChild(separator);
+            
+            // Add shortcut buttons for nutrition subcommands
+            ['add', 'today', 'history'].forEach(subCmd => {
+                const button = document.createElement('button');
+                button.textContent = subCmd;
+                button.addEventListener('click', function() {
+                    let newValue = `${currentCmd} ${subCmd}`;
+                    if (subCmd === 'add') {
+                        // Special handling for add command to include quotes
+                        newValue += ' ""';
+                    }
+                    commandInput.value = newValue;
+                    commandInput.focus();
+                    autoResizeTextarea();
+                    
+                    // If this is an add command, put cursor between quotes
+                    if (subCmd === 'add') {
+                        const cursorPos = newValue.length - 1;
+                        setTimeout(() => {
+                            commandInput.selectionStart = commandInput.selectionEnd = cursorPos;
+                        }, 0);
+                    }
+                });
+                shortcutButtons.appendChild(button);
+            });
+            
+            if (currentCmd === 'nutrition' && cmdParts.length === 2 && cmdParts[1] === 'history') {
+                // Add options for history command
+                const daysOptions = ['7', '14', '30'];
+                daysOptions.forEach(days => {
+                    const button = document.createElement('button');
+                    button.textContent = `${days} days`;
+                    button.addEventListener('click', function() {
+                        commandInput.value = `nutrition history --days ${days}`;
+                        commandInput.focus();
+                        autoResizeTextarea();
+                    });
+                    shortcutButtons.appendChild(button);
+                });
+            }
+        }
+
+
         // If a command is typed, show its options
         if (currentCmd && commandOptions[currentCmd]) {
             // Special handling for when an option that has sub-options was just typed
@@ -908,6 +1022,98 @@ document.addEventListener('DOMContentLoaded', function() {
             return [];
         }
     }
+
+    function createNutritionBar(value, maxValue, className) {
+        const percentage = Math.min(100, (value / maxValue) * 100);
+        const barEl = document.createElement('div');
+        barEl.className = 'nutrition-bar ' + (className || '');
+        barEl.style.width = percentage + '%';
+        return barEl;
+    }
+
+    // Function to enhance nutrition output with interactive elements
+    function enhanceNutritionOutput(element) {
+        // Check if this is a nutrition-related output
+        if (!element.innerHTML.includes('Nutrition Summary') && 
+            !element.innerHTML.includes('Nutrition History')) {
+            return;
+        }
+        
+        // Add quick entry button for nutrition
+        const quickEntryBtn = document.createElement('button');
+        quickEntryBtn.textContent = 'Quick Add Entry';
+        quickEntryBtn.style.marginTop = '10px';
+        quickEntryBtn.style.backgroundColor = '#3a7a50';
+        
+        quickEntryBtn.addEventListener('click', function() {
+            showQuickNutritionInput();
+        });
+        
+        element.appendChild(quickEntryBtn);
+    }
+
+    // Function to show a quick nutrition input form
+    function showQuickNutritionInput() {
+        // Check if the form already exists
+        let quickInput = document.querySelector('.nutrition-quick-input');
+        
+        if (quickInput) {
+            quickInput.style.display = 'block';
+            return;
+        }
+        
+        // Create the form
+        quickInput = document.createElement('div');
+        quickInput.className = 'nutrition-quick-input';
+        
+        const form = document.createElement('form');
+        form.innerHTML = `
+            <label>Calories: <input type="number" id="quick-cal" min="0" step="1"></label>
+            <label>Protein: <input type="number" id="quick-prot" min="0" step="0.1"></label>
+            <label>Description: <input type="text" id="quick-desc" style="width: 150px;"></label>
+            <button type="submit">Add</button>
+            <button type="button" id="cancel-quick">Cancel</button>
+        `;
+        
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const cal = document.getElementById('quick-cal').value;
+            const prot = document.getElementById('quick-prot').value;
+            const desc = document.getElementById('quick-desc').value;
+            
+            if (!cal && !prot) {
+                return;
+            }
+            
+            // Format the command
+            let cmd = `n "cal: ${cal} prot: ${prot}`;
+            if (desc) {
+                cmd += ` ${desc}`;
+            }
+            cmd += '"';
+            
+            // Execute the command
+            executeCommand(cmd);
+            
+            // Hide the form
+            quickInput.style.display = 'none';
+            
+            // Reset the form
+            document.getElementById('quick-cal').value = '';
+            document.getElementById('quick-prot').value = '';
+            document.getElementById('quick-desc').value = '';
+        });
+        
+        document.getElementById('cancel-quick').addEventListener('click', function() {
+            quickInput.style.display = 'none';
+        });
+        
+        quickInput.appendChild(form);
+        terminalOutput.appendChild(quickInput);
+    }
+
+
 
     // Adjust terminal height on orientation change
     window.addEventListener('resize', function() {

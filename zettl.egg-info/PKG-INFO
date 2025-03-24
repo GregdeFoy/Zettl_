@@ -8,4 +8,6 @@ Requires-Dist: requests
 Requires-Dist: rich
 Requires-Dist: tqdm
 Requires-Dist: anthropic
+Requires-Dist: pyreadline3
+Requires-Dist: colorama
 Dynamic: requires-dist

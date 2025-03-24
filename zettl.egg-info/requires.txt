@@ -5,3 +5,5 @@ requests
 rich
 tqdm
 anthropic
+pyreadline3
+colorama
