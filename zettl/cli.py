@@ -12,6 +12,7 @@ from zettl.formatting import ZettlFormatter,Colors
 import re
 import random
 from zettl.nutrition import NutritionTracker
+from zettl.help import CommandHelp
 
 
 # Initialize the notes manager, graph manager and LLM helper
@@ -55,184 +56,32 @@ def cli():
 @cli.command()
 def commands():
     """Show all available commands with examples."""
-    commands = [
-        {
-            "name": "workflow",
-            "description": "Show an example workflow of using zettl",
-            "example": "zettl workflow"
-        },
-        {
-            "name": "new",
-            "description": "Create a new note with the given content",
-            "example": "zettl new \"This is a new note about an interesting concept\"\n"
-                    "zettl new \"Note with tag and link\" --tag concept --link 22a4b"
-        },
-        {
-            "name": "list",
-            "description": "List recent notes",
-            "example": "zettl list --limit 5\n"
-                    "zettl list --full  # Shows full content with tags"
-        },
-        {
-            "name": "show",
-            "description": "Display note content",
-            "example": "zettl show 22a4b"
-        },
-        {
-            "name": "link",
-            "description": "Create link between notes",
-            "example": "zettl link 22a4b 18c3d"
-        },
-        {
-            "name": "tags",
-            "description": "Show or add tags to a note",
-            "example": "zettl tags 22a4b\nzettl tags 22a4b \"concept\""
-        },
-        {
-            "name": "search",
-            "description": "Search for notes containing text",
-            "example": "zettl search \"concept\"\n"
-                    "zettl search -t concept --full  # Search by tag with full content\n"
-                    "zettl search \"concept\" +t done  # Exclude notes with 'done' tag"
-        },
-        {
-            "name": "related",
-            "description": "Show notes connected to this note",
-            "example": "zettl related 22a4b"
-        },
-        {
-            "name": "graph",
-            "description": "Generate a graph visualization of notes",
-            "example": "zettl graph 22a4b --output graph.json --depth 2"
-        },
-        {
-            "name": "llm",
-            "description": "Use Claude AI to analyze and enhance notes",
-            "example": "zettl llm 22a4b --action summarize  # Summarize a note\n"
-                    "zettl llm 22a4b --action connect    # Find connections to other notes\n"
-                    "zettl llm 22a4b --action tags       # Suggest tags for a note\n"
-                    "zettl llm 22a4b --action expand     # Create expanded version of a note\n"
-                    "zettl llm 22a4b --action concepts   # Extract key concepts from a note\n"
-                    "zettl llm 22a4b --action questions  # Generate questions based on a note\n"
-                    "zettl llm 22a4b --action critique   # Get constructive feedback on a note"
-        },
-        {
-            "name": "todos",
-            "description": "List all notes tagged with 'todo' grouped by category",
-            "example": "zettl todos  # Show active todos\n"
-                    "zettl todos --all  # Show all todos (active and completed)\n"
-                    "zettl todos --donetoday  # Show todos completed today\n"
-                    "zettl todos --cancel  # Show canceled todos\n"
-                    "zettl todos --tag work  # Filter todos by tag"
-        },
-        {
-            "name": "delete",
-            "description": "Delete a note and its associated data",
-            "example": "zettl delete 22a4b\nzettl delete 22a4b --keep-tags"
-        },
-        {
-            "name": "untag",
-            "description": "Remove a tag from a note",
-            "example": "zettl untag 22a4b \"concept\""
-        },
-        {
-            "name": "unlink",
-            "description": "Remove a link between two notes",
-            "example": "zettl unlink 22a4b 18c3d"
-        },
-        {
-            "name": "rules",
-            "description": "Display a random rule from notes tagged with 'rules'",
-            "example": "zettl rules\nzettl rules --source  # Show source note ID"
-        }
-    ]
-    
-    # Terminal colors for better readability
-    GREEN = "\033[92m"
-    BLUE = "\033[94m"
-    YELLOW = "\033[93m"
-    BOLD = "\033[1m"
-    RESET = "\033[0m"
-    
-    header = f"{GREEN}{BOLD}{APP_NAME} v{APP_VERSION}{RESET} - A Zettelkasten-style note-taking CLI tool"
-    
-    # Calculate the width of the terminal
-    try:
-        # Try to get terminal width, fallback to 80 if not available
-        import shutil
-        terminal_width = shutil.get_terminal_size().columns
-    except:
-        terminal_width = 80
-    
-    # Print header with decorative border
-    click.echo("=" * terminal_width)
-    click.echo(header.center(terminal_width))
-    click.echo("=" * terminal_width)
-    click.echo("")
-    
-    # Group commands by type
-    click.echo(f"{BOLD}Getting Started:{RESET}")
-    starter_commands = ["workflow"]
-    
-    click.echo(f"{BOLD}Core Commands:{RESET}")
-    core_commands = ["new", "list", "show", "search"]
-    
-    click.echo(f"{BOLD}Connection Commands:{RESET}")
-    connection_commands = ["link", "related", "graph"]
-    
-    click.echo(f"{BOLD}Organizational Commands:{RESET}")
-    org_commands = ["tags"]
-    
-    click.echo(f"{BOLD}AI-Powered Commands:{RESET}")
-    ai_commands = ["llm"]
-    
-    # Function to display command details
-    def display_command(cmd_name):
-        cmd = next((cmd for cmd in commands if cmd["name"] == cmd_name), None)
-        if cmd:
-            cmd_header = f"{YELLOW}{BOLD}{cmd['name']}{RESET} - {cmd['description']}"
-            click.echo(f"  {cmd_header}")
-            examples = cmd["example"].split("\n")
-            for example in examples:
-                click.echo(f"    {BLUE}→{RESET} {example}")
-            click.echo("")
-    
-    # Display commands by group
-    for cmd_name in starter_commands:
-        display_command(cmd_name)
-
-    for cmd_name in core_commands:
-        display_command(cmd_name)
-        
-    for cmd_name in connection_commands:
-        display_command(cmd_name)
-        
-    for cmd_name in org_commands:
-        display_command(cmd_name)
-        
-    for cmd_name in ai_commands:
-        display_command(cmd_name)
-        
-    # Display footer
-    click.echo("=" * terminal_width)
-    click.echo(f"{BOLD}For more details, run:{RESET} zettl COMMAND --help")
-    click.echo("=" * terminal_width)
+    click.echo(CommandHelp.get_main_help())
 
 @cli.command()
 @click.argument('content')
 @click.option('--tag', '-t', multiple=True, help='Tag(s) to add to the new note')
 @click.option('--link', '-l', help='Note ID to link this note to')
-def new(content, tag, link):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def new(content, tag, link, help):
     """Create a new note with the given content and optional tags."""
+    if help:
+        click.echo(CommandHelp.get_command_help("new"))
+        return
+    
     create_new_note(content, tag, link)
 
-
 @cli.command()
 @click.argument('content')
 @click.option('--tag', '-t', multiple=True, help='Tag(s) to add to the new note')
 @click.option('--link', '-l', help='Note ID to link this note to')
-def add(content, tag, link):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def add(content, tag, link, help):
     """Create a new note with the given content and optional tags. Alias for 'new'."""
+    if help:
+        click.echo(CommandHelp.get_command_help("add"))
+        return
+    
     create_new_note(content, tag, link)
 
 # Update the list command
@@ -240,8 +89,13 @@ def add(content, tag, link):
 @click.option('--limit', '-l', default=10, help='Number of notes to display')
 @click.option('--full', '-f', is_flag=True, help='Show full content of notes')
 @click.option('--compact', '-c', is_flag=True, help='Show very compact list (IDs only)')
-def list(limit, full, compact):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def list(limit, full, compact, help):
     """List recent notes with formatting options."""
+    if help:
+        click.echo(CommandHelp.get_command_help("list"))
+        return
+
     try:
         notes = notes_manager.list_notes(limit)
         if not notes:
@@ -281,7 +135,13 @@ def list(limit, full, compact):
 
 @cli.command()
 @click.argument('note_id')
-def show(note_id):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def show(note_id, help):
+
+    if help:
+        click.echo(CommandHelp.get_command_help("list"))
+        return
+
     """Display note content."""
     try:
         note = notes_manager.get_note(note_id)
@@ -301,7 +161,12 @@ def show(note_id):
 @click.argument('source_id')
 @click.argument('target_id')
 @click.option('--context', '-c', default="", help='Optional context for the link')
-def link(source_id, target_id, context):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def link(source_id, target_id, context, help):
+    if help:
+        click.echo(CommandHelp.get_command_help("link"))
+        return
+
     """Create link between notes."""
     try:
         notes_manager.create_link(source_id, target_id, context)
@@ -312,7 +177,12 @@ def link(source_id, target_id, context):
 @cli.command()
 @click.argument('note_id', required=False)
 @click.argument('tag', required=False)
-def tags(note_id, tag):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def tags(note_id, tag, help):
+
+    if help:
+        click.echo(CommandHelp.get_command_help("tags"))
+        return
     """Show or add tags to a note. If no note_id is provided, list all tags."""
     try:
         # If no note_id is provided, list all tags
@@ -346,7 +216,12 @@ def tags(note_id, tag):
 @click.option('--tag', '-t', help='Search for notes with this tag')
 @click.option('--exclude-tag', '+t', help='Exclude notes with this tag')
 @click.option('--full', '-f', is_flag=True, help='Show full content of matching notes')
-def search(query, tag, exclude_tag, full):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def search(query, tag, exclude_tag, full, help):
+
+    if help:
+        click.echo(CommandHelp.get_command_help("search"))
+        return
     """Search for notes containing text or with specific tag."""
     try:
         results = []
@@ -423,7 +298,11 @@ def search(query, tag, exclude_tag, full):
 @cli.command()
 @click.argument('note_id')
 @click.option('--full', '-f', is_flag=True, help='Show full content of related notes')
-def related(note_id, full):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def related(note_id, full, help):
+    if help:
+        click.echo(CommandHelp.get_command_help("related"))
+        return
     """Show notes connected to this note with improved formatting."""
     try:
         # First, show the source note
@@ -460,7 +339,13 @@ def related(note_id, full):
 @click.argument('note_id', required=False)
 @click.option('--output', '-o', default='zettl_graph.json', help='Output file for graph data')
 @click.option('--depth', '-d', default=2, help='How many levels of connections to include')
-def graph(note_id, output, depth):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def graph(note_id, output, depth, help):
+
+    if help:
+        click.echo(CommandHelp.get_command_help("graph"))
+        return
+
     """Generate a graph visualization of notes and their connections."""
     try:
         file_path = graph_manager.export_graph(output, note_id, depth)
@@ -477,7 +362,12 @@ def graph(note_id, output, depth):
               help='LLM action to perform')
 @click.option('--count', '-c', default=3, help='Number of results to return for tags/connections/concepts/questions')
 @click.option('--show-source', '-s', is_flag=True, help='Show the source note before analysis')
-def llm(note_id, action, count, show_source):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def llm(note_id, action, count, show_source, help):
+
+    if help:
+        click.echo(CommandHelp.get_command_help("llm"))
+        return
     """Use Claude AI to analyze and enhance notes."""
     try:
         # Show the source note if requested
@@ -705,7 +595,13 @@ def llm(note_id, action, count, show_source):
 @click.option('--force', '-f', is_flag=True, help='Skip confirmation prompt')
 @click.option('--keep-links', is_flag=True, help='Keep links to and from this note')
 @click.option('--keep-tags', is_flag=True, help='Keep tags associated with this note')
-def delete(note_id, force, keep_links, keep_tags):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def delete(note_id, force, keep_links, keep_tags,help):
+
+    if help:
+        click.echo(CommandHelp.get_command_help("delete"))
+        return
+
     """Delete a note and its associated data."""
     try:
         # First get the note to show what will be deleted
@@ -769,7 +665,12 @@ def delete(note_id, force, keep_links, keep_tags):
 @cli.command()
 @click.argument('note_id')
 @click.argument('tag')
-def untag(note_id, tag):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def untag(note_id, tag,help):
+
+    if help:
+        click.echo(CommandHelp.get_command_help("untag"))
+        return
     """Remove a tag from a note."""
     try:
         notes_manager.delete_tag(note_id, tag)
@@ -780,7 +681,13 @@ def untag(note_id, tag):
 @cli.command()
 @click.argument('source_id')
 @click.argument('target_id')
-def unlink(source_id, target_id):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def unlink(source_id, target_id,help):
+
+    if help:
+        click.echo(CommandHelp.get_command_help("unlink"))
+        return
+
     """Remove a link between two notes."""
     try:
         notes_manager.delete_link(source_id, target_id)
@@ -793,7 +700,13 @@ def unlink(source_id, target_id):
 @click.option('--all', '-a', is_flag=True, help='Show all todos (both active and completed)')
 @click.option('--cancel', '-c', is_flag=True, help='Show canceled todos')
 @click.option('--tag', '-t', multiple=True, help='Filter todos by one or more additional tags')
-def todos(donetoday, all, cancel, tag):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def todos(donetoday, all, cancel, tag,help):
+
+    if help:
+        click.echo(CommandHelp.get_command_help("todos"))
+        return
+
     """List all notes tagged with 'todo' grouped by category."""
     try:
         # If --all is specified, force done=True to include completed todos
@@ -1064,7 +977,13 @@ def todos(donetoday, all, cancel, tag):
 
 @cli.command()
 @click.option('--source', '-s', is_flag=True, help='Show the source note ID')
-def rules(source):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def rules(source,help):
+
+    if help:
+        click.echo(CommandHelp.get_command_help("rules"))
+        return
+
     """Display a random rule from notes tagged with 'rules'."""
     try:
         # Get all notes tagged with 'rules'
@@ -1229,7 +1148,14 @@ def workflow():
 @click.option('--today', '-t', is_flag=True, help='Show today\'s nutrition summary')
 @click.option('--history', '-i', is_flag=True, help='Show nutrition history')
 @click.option('--days', '-d', default=7, help='Number of days to show in history')
-def nutrition(content, today, history, days):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def nutrition(content, today, history, days,help):
+
+    if help:
+        click.echo(CommandHelp.get_command_help("nutrition"))
+        return
+
+
     """Track and analyze nutrition data (calories and protein).
     
     If called with content in quotes, adds a new entry.
@@ -1299,11 +1225,12 @@ def nutrition(content, today, history, days):
 @click.option('--today', '-t', is_flag=True, help='Show today\'s nutrition summary')
 @click.option('--history', '-i', is_flag=True, help='Show nutrition history')
 @click.option('--days', '-d', default=7, help='Number of days to show in history')
-def nut_cmd(content, today, history, days):
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def nut_cmd(content, today, history, days,help):
     """Alias for nutrition command."""
     # Call the implementation from the nutrition command
     ctx = click.get_current_context()
-    return ctx.invoke(nutrition, content=content, today=today, history=history, days=days)
+    return ctx.invoke(nutrition, content=content, today=today, history=history, days=days,help=help)
 
 if __name__ == '__main__':
     cli()

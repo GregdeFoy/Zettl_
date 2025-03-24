@@ -10,6 +10,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 import re
 from zettl.nutrition import NutritionTracker
+from zettl.help import CommandHelp
 
 # Load environment variables from parent directory
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -430,76 +431,7 @@ def ansi_to_html(text):
 
 def show_command_help(cmd):
     """Show detailed help for a specific command."""
-    help_text = ""
-    
-    if cmd == "search":
-        help_text = f"""
-{Colors.GREEN}{Colors.BOLD}search [QUERY]{Colors.RESET} - Search for notes containing text
-
-{Colors.BOLD}Options:{Colors.RESET}
-  {Colors.YELLOW}-t, --tag TAG{Colors.RESET}        Search for notes with this tag
-  {Colors.YELLOW}+t, --exclude-tag TAG{Colors.RESET} Exclude notes with this tag
-  {Colors.YELLOW}-f, --full{Colors.RESET}           Show full content of matching notes
-
-{Colors.BOLD}Examples:{Colors.RESET}
-  {Colors.BLUE}search "keyword"{Colors.RESET}       Search notes containing "keyword"
-  {Colors.BLUE}search -t concept{Colors.RESET}      Show notes tagged with "concept"
-  {Colors.BLUE}search -t work +t done{Colors.RESET} Show notes tagged "work" but not "done"
-"""
-    elif cmd == "todos":
-        help_text = f"""
-{Colors.GREEN}{Colors.BOLD}todos{Colors.RESET} - List all notes tagged with 'todo'
-
-{Colors.BOLD}Options:{Colors.RESET}
-  {Colors.YELLOW}-a, --all{Colors.RESET}            Show all todos (active and completed)
-  {Colors.YELLOW}-dt, --donetoday{Colors.RESET}     Show todos completed today
-  {Colors.YELLOW}-c, --cancel{Colors.RESET}         Show canceled todos
-  {Colors.YELLOW}-t, --tag TAG{Colors.RESET}        Filter todos by additional tag
-
-{Colors.BOLD}Examples:{Colors.RESET}
-  {Colors.BLUE}todos{Colors.RESET}                  Show active todos
-  {Colors.BLUE}todos -a{Colors.RESET}               Show all todos (active and completed)
-  {Colors.BLUE}todos -dt{Colors.RESET}              Show todos completed today
-  {Colors.BLUE}todos -c{Colors.RESET}               Show canceled todos
-  {Colors.BLUE}todos -t work{Colors.RESET}          Show todos tagged with "work"
-"""
-    elif cmd == "llm":
-        """Show detailed help specifically for the LLM command."""
-        help_text = f"""
-    {Colors.GREEN}{Colors.BOLD}llm NOTE_ID{Colors.RESET} - Use Claude AI to analyze and enhance notes
-
-    {Colors.BOLD}Actions:{Colors.RESET}
-    {Colors.YELLOW}summarize{Colors.RESET}   Generate a concise summary of the note
-    {Colors.YELLOW}connect{Colors.RESET}     Find potential connections to other notes
-    {Colors.YELLOW}tags{Colors.RESET}        Suggest relevant tags for the note
-    {Colors.YELLOW}expand{Colors.RESET}      Create an expanded version of the note
-    {Colors.YELLOW}concepts{Colors.RESET}    Extract key concepts from the note
-    {Colors.YELLOW}questions{Colors.RESET}   Generate thought-provoking questions
-    {Colors.YELLOW}critique{Colors.RESET}    Provide constructive feedback on the note
-
-    {Colors.BOLD}Options:{Colors.RESET}
-    {Colors.YELLOW}-a, --action ACTION{Colors.RESET}  LLM action to perform (see above)
-    {Colors.YELLOW}-c, --count NUMBER{Colors.RESET}   Number of results to return (default: 3)
-    {Colors.YELLOW}-s, --show-source{Colors.RESET}    Show the source note before analysis
-    {Colors.YELLOW}-d, --debug{Colors.RESET}          Show debug information for troubleshooting
-
-    {Colors.BOLD}Examples:{Colors.RESET}
-    {Colors.BLUE}llm 22a4b{Colors.RESET}                 Summarize note 22a4b (default action)
-    {Colors.BLUE}llm 22a4b -a tags{Colors.RESET}         Suggest tags for note 22a4b
-    {Colors.BLUE}llm 22a4b -a connect -c 5{Colors.RESET} Find 5 related notes to note 22a4b
-    """
-    elif cmd == "rules":
-        help_text = f"""
-        {Colors.YELLOW}{Colors.BOLD}rules{Colors.RESET} - Display a random rule from notes tagged with 'rules'
-    {Colors.BLUE}→{Colors.RESET} zettl rules
-    {Colors.BLUE}→{Colors.RESET} zettl rules --source  # Show the source note ID
-    """
-    elif cmd == "help":
-        # For "help --help", just show general help
-        return execute_command("help", [], {}, [])
-    else:
-        help_text = f"No detailed help available for '{cmd}'. Try 'help' for a list of all commands."
-        
+    help_text = CommandHelp.get_command_help(cmd)
     return jsonify({'result': ansi_to_html(help_text)})
 
 
@@ -1384,134 +1316,68 @@ def execute_command():
 
                 
         elif cmd == "help" or cmd == "--help":
-            # Show well-formatted help similar to CLI
-            result = f"""
-{Colors.GREEN}{Colors.BOLD}zettl v0.1.0{Colors.RESET} - A Zettelkasten-style note-taking tool
+            result = CommandHelp.get_main_help()
 
-{Colors.BOLD}Core Commands:{Colors.RESET}
-  {Colors.YELLOW}{Colors.BOLD}new{Colors.RESET} - Create a new note with the given content
-    {Colors.BLUE}→{Colors.RESET} zettl new "This is a new note about an interesting concept"
-    {Colors.BLUE}→{Colors.RESET} zettl new "Note with tag and link" --tag concept --link 22a4b
-
-  {Colors.YELLOW}{Colors.BOLD}list{Colors.RESET} - List recent notes
-    {Colors.BLUE}→{Colors.RESET} zettl list --limit 5
-    {Colors.BLUE}→{Colors.RESET} zettl list --full  # Shows full content with tags
-
-  {Colors.YELLOW}{Colors.BOLD}show{Colors.RESET} - Display note content
-    {Colors.BLUE}→{Colors.RESET} zettl show 22a4b
-
-  {Colors.YELLOW}{Colors.BOLD}search{Colors.RESET} - Search for notes containing text
-    {Colors.BLUE}→{Colors.RESET} zettl search "concept"
-    {Colors.BLUE}→{Colors.RESET} zettl search -t concept --full  # Show full content with tags
-    {Colors.BLUE}→{Colors.RESET} zettl search "concept" +t done  # Exclude notes with 'done' tag
-
-{Colors.BOLD}Connection Commands:{Colors.RESET}
-  {Colors.YELLOW}{Colors.BOLD}link{Colors.RESET} - Create link between notes
-    {Colors.BLUE}→{Colors.RESET} zettl link 22a4b 18c3d
-
-  {Colors.YELLOW}{Colors.BOLD}related{Colors.RESET} - Show notes connected to this note
-    {Colors.BLUE}→{Colors.RESET} zettl related 22a4b
-
-  {Colors.YELLOW}{Colors.BOLD}graph{Colors.RESET} - Generate a graph visualization of notes
-    {Colors.BLUE}→{Colors.RESET} zettl graph 22a4b --output graph.json --depth 2
-
-{Colors.BOLD}Organizational Commands:{Colors.RESET}
-  {Colors.YELLOW}{Colors.BOLD}tags{Colors.RESET} - Show or add tags to a note
-    {Colors.BLUE}→{Colors.RESET} zettl tags 22a4b
-    {Colors.BLUE}→{Colors.RESET} zettl tags 22a4b "concept"
-
-    {Colors.YELLOW}{Colors.BOLD}todos{Colors.RESET} - List notes tagged with 'todo'
-    {Colors.BLUE}→{Colors.RESET} zettl todos
-    {Colors.BLUE}→{Colors.RESET} zettl todos --all  # Show all todos (active and completed)
-    {Colors.BLUE}→{Colors.RESET} zettl todos --donetoday  # Show todos completed today
-    {Colors.BLUE}→{Colors.RESET} zettl todos --tag work  # Filter todos by tag
-
-{Colors.BOLD}Management Commands:{Colors.RESET}
-  {Colors.YELLOW}{Colors.BOLD}delete{Colors.RESET} - Delete a note and its associated data
-    {Colors.BLUE}→{Colors.RESET} zettl delete 22a4b
-    {Colors.BLUE}→{Colors.RESET} zettl delete 22a4b --keep-tags
-
-  {Colors.YELLOW}{Colors.BOLD}untag{Colors.RESET} - Remove a tag from a note
-    {Colors.BLUE}→{Colors.RESET} zettl untag 22a4b "concept"
-
-  {Colors.YELLOW}{Colors.BOLD}unlink{Colors.RESET} - Remove a link between two notes
-    {Colors.BLUE}→{Colors.RESET} zettl unlink 22a4b 18c3d
-
-{Colors.BOLD}AI-Powered Commands:{Colors.RESET}
-  {Colors.YELLOW}{Colors.BOLD}llm{Colors.RESET} - Use Claude AI to analyze and enhance notes
-    {Colors.BLUE}→{Colors.RESET} zettl llm 22a4b --action summarize
-    {Colors.BLUE}→{Colors.RESET} zettl llm 22a4b --action tags
-"""
-        elif cmd == "nutrition" or cmd == "n":
-            # Handle subcommands or direct "n" command
-            if cmd == "n":
-                # Direct quick-add command
-                if remaining_args:
-                    content = remaining_args[0]
-                    try:
-                        tracker = NutritionTracker()
-                        note_id = tracker.add_entry(content)
-                        result = f"Added nutrition entry #{note_id}\n\n"
-                        
-                        # Show today's totals after adding
-                        today_entries = tracker.get_today_entries()
-                        total_calories = sum(entry['nutrition_data'].get('calories', 0) for entry in today_entries)
-                        total_protein = sum(entry['nutrition_data'].get('protein', 0) for entry in today_entries)
-                        
-                        result += f"Today's totals so far:\n"
-                        result += f"Calories: {total_calories:.1f}\n"
-                        result += f"Protein: {total_protein:.1f}g"
-                    except Exception as e:
-                        result = ZettlFormatter.error(str(e))
-                else:
-                    result = ZettlFormatter.error("Please provide nutrition content")
+        elif cmd == "nutrition" or cmd == "nut":
+            # Handle nutrition commands with the new structure
+            tracker = NutritionTracker()
+            
+            # Check for flags/options
+            today = 't' in flags or 'today' in flags
+            history = 'i' in flags or 'history' in flags
+            days = int(options.get('days', options.get('d', 7)))  # Default to 7 days
+            
+            # Determine what action to take based on provided options
+            if today:
+                # Show today's summary
+                try:
+                    result = tracker.format_today_summary()
+                except Exception as e:
+                    result = ZettlFormatter.error(str(e))
+            elif history:
+                # Show history
+                try:
+                    result = tracker.format_history(days=days)
+                except Exception as e:
+                    result = ZettlFormatter.error(str(e))
             elif remaining_args:
-                subcommand = remaining_args[0]
-                
-                if subcommand == "add" and len(remaining_args) > 1:
-                    # Add a nutrition entry
-                    content = remaining_args[1]
-                    try:
-                        tracker = NutritionTracker()
+                # Add new entry (default behavior when content is provided)
+                content = remaining_args[0]
+                try:
+                    data = tracker.parse_nutrition_data(content)
+                    if not data:
+                        result = ZettlFormatter.error("Invalid nutrition data format. Use 'cal: XXX prot: YYY'")
+                    else:
+                        # Get current calories/protein values
+                        calories = data.get('calories', 0)
+                        protein = data.get('protein', 0)
+                        
+                        # Create the note
                         note_id = tracker.add_entry(content)
                         result = f"Added nutrition entry #{note_id}\n\n"
                         
-                        # Show today's totals after adding
-                        today_entries = tracker.get_today_entries()
-                        total_calories = sum(entry['nutrition_data'].get('calories', 0) for entry in today_entries)
-                        total_protein = sum(entry['nutrition_data'].get('protein', 0) for entry in today_entries)
-                        
-                        result += f"Today's totals so far:\n"
-                        result += f"Calories: {total_calories:.1f}\n"
-                        result += f"Protein: {total_protein:.1f}g"
-                    except Exception as e:
-                        result = ZettlFormatter.error(str(e))
-                elif subcommand == "today":
-                    # Show today's nutrition summary
-                    try:
-                        tracker = NutritionTracker()
-                        result = tracker.format_today_summary()
-                    except Exception as e:
-                        result = ZettlFormatter.error(str(e))
-                elif subcommand == "history":
-                    # Show nutrition history
-                    days = 7  # Default
-                    
-                    # Check for days option
-                    if '--days' in options:
-                        days = int(options['--days'])
-                    elif '-d' in options:
-                        days = int(options['-d'])
-                    
-                    try:
-                        tracker = NutritionTracker()
-                        result = tracker.format_history(days=days)
-                    except Exception as e:
-                        result = ZettlFormatter.error(str(e))
-                else:
-                    result = ZettlFormatter.error(f"Unknown nutrition subcommand: {subcommand}")
+                        # Show today's totals
+                        try:
+                            today_entries = tracker.get_today_entries()
+                            
+                            total_calories = sum(entry['nutrition_data'].get('calories', 0) for entry in today_entries)
+                            total_protein = sum(entry['nutrition_data'].get('protein', 0) for entry in today_entries)
+                            
+                            result += f"Today's totals so far:\n"
+                            result += f"Calories: {total_calories:.1f}\n"
+                            result += f"Protein: {total_protein:.1f}g"
+                        except Exception as e:
+                            result += f"\nEntry added with:\n"
+                            result += f"Calories: {calories:.1f}\n"
+                            result += f"Protein: {protein:.1f}g"
+                except Exception as e:
+                    result = ZettlFormatter.error(str(e))
             else:
-                result = ZettlFormatter.error("Please specify a nutrition subcommand (add, today, history)")            
+                # If no options specified, show today's summary as default behavior
+                try:
+                    result = tracker.format_today_summary()
+                except Exception as e:
+                    result = ZettlFormatter.error(str(e))         
 
         else:
             result = f"Unknown command: {cmd}. Try 'help' for available commands."
