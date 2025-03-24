@@ -400,7 +400,8 @@ document.addEventListener('DOMContentLoaded', function() {
         'untag': ['-h', '--help'],
         'unlink': ['-h', '--help'],
         'help': ['-h', '--help'],
-        'nutrition': ['-d','--days'],
+        'nutrition': ['-t', '--today', '-i', '--history', '-d', '--days'],
+        'nut': ['-t', '--today', '-i', '--history', '-d', '--days'],
     };
 
     // For commands that need auto-quotes
@@ -417,7 +418,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // Top-level commands for initial buttons
-    const topLevelCommands = ['new', 'list', 'show', 'search', 'todos', 'tags', 'link', 'related', 'rules', 'help', 'n', 'nutrition'];
+    const topLevelCommands = ['new', 'todos', 'rules', 'nut', 'tags', 'search', 'show', 'list', 'link', 'related', 'help'];
     
     // Define function for appending output to the terminal
     window.appendOutput = function(content, isHTML = false) {
@@ -659,45 +660,60 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
 
-        if (currentCmd === 'nutrition') {
+        if (currentCmd === 'nutrition' || currentCmd === 'nut') {
             // First add a separator
             const separator = document.createElement('div');
             separator.className = 'button-separator';
             shortcutButtons.appendChild(separator);
             
-            // Add shortcut buttons for nutrition subcommands
-            ['add', 'today', 'history'].forEach(subCmd => {
-                const button = document.createElement('button');
-                button.textContent = subCmd;
-                button.addEventListener('click', function() {
-                    let newValue = `${currentCmd} ${subCmd}`;
-                    if (subCmd === 'add') {
-                        // Special handling for add command to include quotes
-                        newValue += ' ""';
-                    }
-                    commandInput.value = newValue;
+            // Add shortcut buttons for nutrition options
+            const buttons = [
+                { text: "Add entry", action: () => {
+                    commandInput.value = `${currentCmd} ""`;
                     commandInput.focus();
                     autoResizeTextarea();
-                    
-                    // If this is an add command, put cursor between quotes
-                    if (subCmd === 'add') {
-                        const cursorPos = newValue.length - 1;
-                        setTimeout(() => {
-                            commandInput.selectionStart = commandInput.selectionEnd = cursorPos;
-                        }, 0);
-                    }
-                });
+                    // Position cursor between quotes
+                    const cursorPos = commandInput.value.length - 1;
+                    setTimeout(() => {
+                        commandInput.selectionStart = commandInput.selectionEnd = cursorPos;
+                    }, 0);
+                }},
+                { text: "Today", action: () => {
+                    commandInput.value = `${currentCmd} -t`;
+                    commandInput.focus();
+                    autoResizeTextarea();
+                }},
+                { text: "History", action: () => {
+                    commandInput.value = `${currentCmd} -i`;
+                    commandInput.focus();
+                    autoResizeTextarea();
+                }}
+            ];
+            
+            buttons.forEach(btn => {
+                const button = document.createElement('button');
+                button.textContent = btn.text;
+                button.addEventListener('click', btn.action);
                 shortcutButtons.appendChild(button);
             });
             
-            if (currentCmd === 'nutrition' && cmdParts.length === 2 && cmdParts[1] === 'history') {
+            // If history flag is present, show day options
+            if ((currentCmd === 'nutrition' || currentCmd === 'nut') && 
+                (cmdParts.includes('-i') || cmdParts.includes('--history'))) {
+                
+                // Add a subseparator
+                const subSeparator = document.createElement('div');
+                subSeparator.className = 'button-separator';
+                shortcutButtons.appendChild(subSeparator);
+                
                 // Add options for history command
                 const daysOptions = ['7', '14', '30'];
                 daysOptions.forEach(days => {
                     const button = document.createElement('button');
                     button.textContent = `${days} days`;
+                    button.dataset.subopt = days;
                     button.addEventListener('click', function() {
-                        commandInput.value = `nutrition history --days ${days}`;
+                        commandInput.value = `${currentCmd} -i -d ${days}`;
                         commandInput.focus();
                         autoResizeTextarea();
                     });
