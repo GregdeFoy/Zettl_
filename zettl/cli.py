@@ -1336,9 +1336,14 @@ def quick_nutrition(content):
             prev_calories = sum(entry['nutrition_data'].get('calories', 0) for entry in today_entries)
             prev_protein = sum(entry['nutrition_data'].get('protein', 0) for entry in today_entries)
             
-            # Add the current entry's values
-            total_calories = prev_calories + calories
-            total_protein = prev_protein + protein
+            # Check if our new entry is already in the list
+            new_entry_included = any(entry['id'] == note_id for entry in today_entries)
+            if not new_entry_included:
+                total_calories = prev_calories + calories
+                total_protein = prev_protein + protein
+            else:
+                total_calories = prev_calories
+                total_protein = prev_protein
             
             click.echo(f"\nToday's totals so far:")
             click.echo(f"Calories: {total_calories:.1f}")

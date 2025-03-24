@@ -189,33 +189,6 @@
             user-select: none;
             z-index: 1;
         }
-        /* Style for LLM action buttons */
-        .llm-action-button {
-            background-color: #3a7a50;
-            color: white;
-            border: none;
-            padding: 4px 8px;
-            border-radius: 3px;
-            font-size: 12px;
-            margin-right: 5px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-
-        .llm-action-button:hover {
-            background-color: #4a8a60;
-        }
-
-        /* Style for the actions container */
-        .llm-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-            margin-top: 10px;
-            padding: 8px;
-            background-color: rgba(0, 0, 0, 0.2);
-            border-radius: 4px;
-        }
 
         /* Style for sub-option buttons */
         #shortcut-buttons button[data-subopt] {
@@ -329,32 +302,6 @@
             padding: 5px;
             border-left: 2px solid #444;
             padding-left: 10px;
-        }
-
-        .nutrition-quick-input {
-            display: none;
-            margin-top: 10px;
-            padding: 10px;
-            background-color: rgba(0, 0, 0, 0.3);
-            border-radius: 4px;
-        }
-
-        .nutrition-quick-input input {
-            background-color: var(--input-bg);
-            color: var(--terminal-text);
-            border: 1px solid var(--input-border);
-            border-radius: 4px;
-            padding: 8px;
-            margin-right: 8px;
-            width: 80px;
-        }
-
-        .nutrition-quick-input button {
-            background-color: var(--primary-color);
-            color: #000;
-            border: none;
-            border-radius: 4px;
-            padding: 5px 8px;
         }
 
         /* Extra padding for safari to account for toolbar */
@@ -485,21 +432,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         terminalOutput.appendChild(line);
         terminalOutput.scrollTop = terminalOutput.scrollHeight;
-        
-        // Check if this is a note display (contains a note ID formatting)
-        if (isHTML && content.includes('class="cyan">#')) {
-            // Extract the note ID from the content
-            const noteIdMatch = content.match(/class="cyan">#([a-zA-Z0-9]+)/);
-            if (noteIdMatch && noteIdMatch[1]) {
-                const noteId = noteIdMatch[1];
-                
-                // Add LLM action buttons
-                setTimeout(() => {
-                    addLlmActionsToNoteDisplay(noteId, line);
-                }, 100);
-            }
-        }
-        enhanceNutritionOutput(line);
 
     };
     
@@ -707,104 +639,6 @@ document.addEventListener('DOMContentLoaded', function() {
         commandInput.focus();
     }
     
-    // Add this function to show LLM action buttons when a note ID is shown
-    function addLlmActionsToNoteDisplay(noteId, element) {
-        // Check if actions are already added
-        if (element.querySelector('.llm-actions')) {
-            return;
-        }
-        
-        // Create a container for the LLM action buttons
-        const actionsContainer = document.createElement('div');
-        actionsContainer.className = 'llm-actions';
-        
-        // Add a label
-        const label = document.createElement('div');
-        label.textContent = 'LLM Actions:';
-        label.style.marginRight = '10px';
-        label.style.alignSelf = 'center';
-        label.style.color = '#90ee90';
-        actionsContainer.appendChild(label);
-        
-        // Add buttons for each LLM action
-        ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'].forEach(action => {
-            const button = document.createElement('button');
-            button.textContent = action;
-            button.className = 'llm-action-button';
-            
-            button.addEventListener('click', function() {
-                processLlmCommand(noteId, action);
-            });
-            
-            actionsContainer.appendChild(button);
-        });
-        
-        // Add the actions container after the note content
-        element.appendChild(actionsContainer);
-    }
-    
-    // Custom function to process LLM commands for better UX
-    function processLlmCommand(note_id, action) {
-        const command = `llm ${note_id} -a ${action}`;
-        
-        // Add to command history
-        if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== command) {
-            commandHistory.push(command);
-            saveHistory(commandHistory);
-        }
-        
-        // Reset history index
-        historyIndex = commandHistory.length;
-        
-        // Show loading indicator with a unique ID
-        const loadingId = `loading-${Date.now()}`;
-        const processingElement = document.createElement('div');
-        processingElement.className = 'processing-message';
-        processingElement.id = loadingId;
-        processingElement.innerHTML = `Processing ${action} command for note #${note_id}... <span class="loading-indicator">⏳</span>`;
-        terminalOutput.appendChild(processingElement);
-        
-        // Scroll to the processing message
-        terminalOutput.scrollTop = terminalOutput.scrollHeight;
-        
-        // Send command to server
-        fetch('/api/command', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ command: command })
-        })
-        .then(response => response.json())
-        .then(data => {
-            // Remove loading indicator
-            const loadingElement = document.getElementById(loadingId);
-            if (loadingElement) {
-                loadingElement.remove();
-            }
-            
-            // Append result
-            appendOutput(`zettl> ${command}`);
-            appendOutput(data.result, true);
-            
-            // Scroll to bottom
-            terminalOutput.scrollTop = terminalOutput.scrollHeight;
-        })
-        .catch(error => {
-            // Remove loading indicator
-            const loadingElement = document.getElementById(loadingId);
-            if (loadingElement) {
-                loadingElement.remove();
-            }
-            
-            // Show error
-            appendOutput(`zettl> ${command}`);
-            appendOutput(`<span class="red">Error: ${error.message || 'Connection failed'}</span>`);
-            
-            // Scroll to bottom
-            terminalOutput.scrollTop = terminalOutput.scrollHeight;
-        });
-    }
     
     // Function to update shortcut buttons
     function updateShortcutButtons() {
@@ -1030,89 +864,6 @@ document.addEventListener('DOMContentLoaded', function() {
         barEl.style.width = percentage + '%';
         return barEl;
     }
-
-    // Function to enhance nutrition output with interactive elements
-    function enhanceNutritionOutput(element) {
-        // Check if this is a nutrition-related output
-        if (!element.innerHTML.includes('Nutrition Summary') && 
-            !element.innerHTML.includes('Nutrition History')) {
-            return;
-        }
-        
-        // Add quick entry button for nutrition
-        const quickEntryBtn = document.createElement('button');
-        quickEntryBtn.textContent = 'Quick Add Entry';
-        quickEntryBtn.style.marginTop = '10px';
-        quickEntryBtn.style.backgroundColor = '#3a7a50';
-        
-        quickEntryBtn.addEventListener('click', function() {
-            showQuickNutritionInput();
-        });
-        
-        element.appendChild(quickEntryBtn);
-    }
-
-    // Function to show a quick nutrition input form
-    function showQuickNutritionInput() {
-        // Check if the form already exists
-        let quickInput = document.querySelector('.nutrition-quick-input');
-        
-        if (quickInput) {
-            quickInput.style.display = 'block';
-            return;
-        }
-        
-        // Create the form
-        quickInput = document.createElement('div');
-        quickInput.className = 'nutrition-quick-input';
-        
-        const form = document.createElement('form');
-        form.innerHTML = `
-            <label>Calories: <input type="number" id="quick-cal" min="0" step="1"></label>
-            <label>Protein: <input type="number" id="quick-prot" min="0" step="0.1"></label>
-            <label>Description: <input type="text" id="quick-desc" style="width: 150px;"></label>
-            <button type="submit">Add</button>
-            <button type="button" id="cancel-quick">Cancel</button>
-        `;
-        
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const cal = document.getElementById('quick-cal').value;
-            const prot = document.getElementById('quick-prot').value;
-            const desc = document.getElementById('quick-desc').value;
-            
-            if (!cal && !prot) {
-                return;
-            }
-            
-            // Format the command
-            let cmd = `n "cal: ${cal} prot: ${prot}`;
-            if (desc) {
-                cmd += ` ${desc}`;
-            }
-            cmd += '"';
-            
-            // Execute the command
-            executeCommand(cmd);
-            
-            // Hide the form
-            quickInput.style.display = 'none';
-            
-            // Reset the form
-            document.getElementById('quick-cal').value = '';
-            document.getElementById('quick-prot').value = '';
-            document.getElementById('quick-desc').value = '';
-        });
-        
-        document.getElementById('cancel-quick').addEventListener('click', function() {
-            quickInput.style.display = 'none';
-        });
-        
-        quickInput.appendChild(form);
-        terminalOutput.appendChild(quickInput);
-    }
-
 
 
     // Adjust terminal height on orientation change
