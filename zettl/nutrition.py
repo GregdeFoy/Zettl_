@@ -59,9 +59,6 @@ class NutritionTracker:
         if end_date.tzinfo is None:
             end_date = end_date.replace(tzinfo=timezone.utc)
         
-        # Debug info
-        # print(f"Start date: {start_date}, End date: {end_date}", file=sys.stderr)
-        
         # Filter by date range
         filtered_notes = []
         for note in nutrition_notes:
@@ -70,28 +67,41 @@ class NutritionTracker:
                 continue
                             
             try:
-                # Simplest approach: truncate to second precision by removing fractional seconds entirely
-                if 'T' in created_at:
-                    date_part, time_part = created_at.split('T', 1)
+                # Fix for fractional seconds with less than 6 digits
+                if '.' in created_at:
+                    # Split into parts
+                    timestamp_parts = created_at.split('.')
+                    date_time = timestamp_parts[0]  # Part before decimal
+                    
+                    # Handle the fractional part
+                    fractional = timestamp_parts[1]
+                    
+                    # Separate the timezone part if any
+                    tz_part = ""
+                    for tz_char in ['+', '-', 'Z']:
+                        if tz_char in fractional:
+                            fractional_parts = fractional.split(tz_char, 1)
+                            fractional = fractional_parts[0]
+                            tz_part = tz_char + fractional_parts[1] if len(fractional_parts) > 1 else tz_char
+                            break
+                    
+                    # Ensure exactly 6 digits for microseconds (padding with zeros if needed)
+                    fractional = fractional.ljust(6, '0')[:6]
+                    
+                    # Reconstruct the timestamp
+                    normalized_timestamp = f"{date_time}.{fractional}{tz_part}"
                 else:
-                    date_part = created_at[:10]  # YYYY-MM-DD
-                    time_part = created_at[11:]
-                
-                # Remove any fractional seconds
-                if '.' in time_part:
-                    time_part = time_part.split('.', 1)[0]
-                
-                # Remove timezone info (Z, +xx:xx, etc.)
-                for separator in ['Z', '+', '-']:
-                    if separator in time_part and time_part.index(separator) > 2:  # Not part of time format
-                        time_part = time_part.split(separator, 1)[0]
-                        break
-                
-                # Create a normalized timestamp with second precision
-                normalized_timestamp = f"{date_part}T{time_part}"
-                
-                # Parse the date - add UTC timezone for consistency
-                note_date = datetime.fromisoformat(normalized_timestamp).replace(tzinfo=timezone.utc)
+                    normalized_timestamp = created_at
+                    
+                # Handle timezone for parsing
+                if 'Z' in normalized_timestamp:
+                    normalized_timestamp = normalized_timestamp.replace('Z', '+00:00')
+                elif 'T' in normalized_timestamp and not any(x in normalized_timestamp[10:] for x in ['+', '-']):
+                    # No timezone info - assume UTC
+                    normalized_timestamp = normalized_timestamp + '+00:00'
+                    
+                # Parse the date with timezone awareness
+                note_date = datetime.fromisoformat(normalized_timestamp)
                 
                 # Continue with date comparison
                 note_date_only = note_date.date()
@@ -108,9 +118,6 @@ class NutritionTracker:
                 # Log the error with the note ID for debugging
                 print(f"Error processing entry {note.get('id', 'unknown')}: {str(e)}", file=sys.stderr)
                 continue
-        
-        # Debug info
-        # print(f"Found {len(filtered_notes)} filtered notes", file=sys.stderr)
         
         return filtered_notes
     
@@ -156,19 +163,41 @@ class NutritionTracker:
                 continue
                 
             try:
-                # Normalize the datetime string
-                if 'Z' in created_at:
-                    created_at = created_at.replace('Z', '+00:00')
-                elif 'T' in created_at and not ('+' in created_at or '-' in created_at[10:]):
+                # Fix for fractional seconds with less than 6 digits
+                if '.' in created_at:
+                    # Split into parts
+                    timestamp_parts = created_at.split('.')
+                    date_time = timestamp_parts[0]  # Part before decimal
+                    
+                    # Handle the fractional part
+                    fractional = timestamp_parts[1]
+                    
+                    # Separate the timezone part if any
+                    tz_part = ""
+                    for tz_char in ['+', '-', 'Z']:
+                        if tz_char in fractional:
+                            fractional_parts = fractional.split(tz_char, 1)
+                            fractional = fractional_parts[0]
+                            tz_part = tz_char + fractional_parts[1] if len(fractional_parts) > 1 else tz_char
+                            break
+                    
+                    # Ensure exactly 6 digits for microseconds (padding with zeros if needed)
+                    fractional = fractional.ljust(6, '0')[:6]
+                    
+                    # Reconstruct the timestamp
+                    normalized_timestamp = f"{date_time}.{fractional}{tz_part}"
+                else:
+                    normalized_timestamp = created_at
+                
+                # Handle timezone for parsing
+                if 'Z' in normalized_timestamp:
+                    normalized_timestamp = normalized_timestamp.replace('Z', '+00:00')
+                elif 'T' in normalized_timestamp and not any(x in normalized_timestamp[10:] for x in ['+', '-']):
                     # No timezone info - assume UTC
-                    created_at = created_at + '+00:00'
+                    normalized_timestamp = normalized_timestamp + '+00:00'
                 
                 # Parse the date with timezone awareness
-                note_date = datetime.fromisoformat(created_at)
-                
-                # Ensure note_date is timezone-aware
-                if note_date.tzinfo is None:
-                    note_date = note_date.replace(tzinfo=timezone.utc)
+                note_date = datetime.fromisoformat(normalized_timestamp)
                 
                 # Use date without time as key - converted to string for dictionary key
                 note_date_only = note_date.date()
@@ -223,14 +252,40 @@ class NutritionTracker:
                     continue
                     
                 try:
-                    # Handle different ISO formats
-                    if 'Z' in created_at:
-                        created_at = created_at.replace('Z', '+00:00')
-                    elif 'T' in created_at and not ('+' in created_at or '-' in created_at[10:]):
-                        # No timezone info - assume UTC
-                        created_at = created_at + '+00:00'
+                    # Fix for fractional seconds with less than 6 digits
+                    if '.' in created_at:
+                        # Split into parts
+                        timestamp_parts = created_at.split('.')
+                        date_time = timestamp_parts[0]  # Part before decimal
+                        
+                        # Handle the fractional part
+                        fractional = timestamp_parts[1]
+                        
+                        # Separate the timezone part if any
+                        tz_part = ""
+                        for tz_char in ['+', '-', 'Z']:
+                            if tz_char in fractional:
+                                fractional_parts = fractional.split(tz_char, 1)
+                                fractional = fractional_parts[0]
+                                tz_part = tz_char + fractional_parts[1] if len(fractional_parts) > 1 else tz_char
+                                break
+                        
+                        # Ensure exactly 6 digits for microseconds (padding with zeros if needed)
+                        fractional = fractional.ljust(6, '0')[:6]
+                        
+                        # Reconstruct the timestamp
+                        normalized_timestamp = f"{date_time}.{fractional}{tz_part}"
+                    else:
+                        normalized_timestamp = created_at
                     
-                    time_str = datetime.fromisoformat(created_at).strftime('%H:%M')
+                    # Handle timezone for parsing
+                    if 'Z' in normalized_timestamp:
+                        normalized_timestamp = normalized_timestamp.replace('Z', '+00:00')
+                    elif 'T' in normalized_timestamp and not any(x in normalized_timestamp[10:] for x in ['+', '-']):
+                        # No timezone info - assume UTC
+                        normalized_timestamp = normalized_timestamp + '+00:00'
+                    
+                    time_str = datetime.fromisoformat(normalized_timestamp).strftime('%H:%M')
                     cal = entry['nutrition_data'].get('calories', 0)
                     prot = entry['nutrition_data'].get('protein', 0)
                     note_id = entry['id']
@@ -246,8 +301,10 @@ class NutritionTracker:
                     
                     result += f"[{time_str}] {ZettlFormatter.note_id(note_id)} Cal: {Colors.GREEN}{cal:.1f}{Colors.RESET}, "
                     result += f"Prot: {Colors.BLUE}{prot:.1f}g{Colors.RESET}{description}\n"
-                except Exception:
+                except Exception as e:
                     # Skip entries with formatting issues
+                    import sys
+                    print(f"Error formatting entry {entry.get('id', 'unknown')}: {str(e)}", file=sys.stderr)
                     continue
         
         return result
