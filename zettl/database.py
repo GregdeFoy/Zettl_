@@ -283,6 +283,43 @@ class Database:
             return []
         
         return result.data
+        
+    def search_notes_by_date(self, date_str: str) -> List[Dict[str, Any]]:
+        """
+        Search for notes created on a specific date.
+        
+        Args:
+            date_str: Date in YYYY-MM-DD format
+            
+        Returns:
+            List of notes created on the specified date
+        """
+        try:
+            # Parse the date to ensure it's valid
+            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+            
+            # Create start and end timestamps for the date (in UTC)
+            start_timestamp = f"{date_str}T00:00:00Z"
+            end_timestamp = f"{date_str}T23:59:59.999Z"
+            
+            # Query notes created between these timestamps
+            result = self.client.table('notes').select('*')\
+                .gte('created_at', start_timestamp)\
+                .lte('created_at', end_timestamp)\
+                .order('created_at', desc=True)\
+                .execute()
+            
+            if not result.data:
+                return []
+            
+            return result.data
+            
+        except ValueError:
+            # Invalid date format
+            raise ValueError(f"Invalid date format: {date_str}. Use YYYY-MM-DD format.")
+        except Exception as e:
+            # Re-raise any other exceptions
+            raise Exception(f"Error searching notes by date: {str(e)}")
 
     def get_notes_by_tag(self, tag: str) -> List[Dict[str, Any]]:
         """Get all notes that have a specific tag with caching."""

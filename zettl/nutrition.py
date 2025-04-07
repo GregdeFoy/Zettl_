@@ -87,8 +87,12 @@ class NutritionTracker:
                 # Debug info
                 # print(f"Note: {note['id']}, Date: {note_date}", file=sys.stderr)
                 
-                # Compare with start and end dates
-                if start_date <= note_date <= end_date:
+                # Compare only the date parts, ignoring time
+                note_date_only = note_date.date()
+                start_date_only = start_date.date()
+                end_date_only = end_date.date()
+                
+                if start_date_only <= note_date_only <= end_date_only:
                     # Parse the nutrition data
                     note_data = self.parse_nutrition_data(note['content'])
                     if note_data:  # Only include if it has valid nutrition data
@@ -96,7 +100,8 @@ class NutritionTracker:
                         filtered_notes.append(note)
             except Exception as e:
                 # Log the error with the note ID for debugging
-                #print(f"Error parsing date for note {note.get('id', 'unknown')}: {str(e)}", file=sys.stderr)
+                import sys
+                print(f"Error processing note {note.get('id', 'unknown')}: {str(e)}", file=sys.stderr)
                 continue
         
         # Debug info
@@ -160,8 +165,9 @@ class NutritionTracker:
                 if note_date.tzinfo is None:
                     note_date = note_date.replace(tzinfo=timezone.utc)
                 
-                # Use date without time as key
-                date_key = note_date.date().isoformat()
+                # Use date without time as key - converted to string for dictionary key
+                note_date_only = note_date.date()
+                date_key = note_date_only.isoformat()
                 
                 # Initialize if needed
                 if date_key not in daily_summaries:

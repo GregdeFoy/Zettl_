@@ -215,14 +215,15 @@ def tags(note_id, tag, help):
 @click.argument('query', required=False)
 @click.option('--tag', '-t', help='Search for notes with this tag')
 @click.option('--exclude-tag', '+t', help='Exclude notes with this tag')
+@click.option('--date', '-d', help='Search for notes created on a specific date (YYYY-MM-DD format)')
 @click.option('--full', '-f', is_flag=True, help='Show full content of matching notes')
 @click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def search(query, tag, exclude_tag, full, help):
+def search(query, tag, exclude_tag, date, full, help):
 
     if help:
         click.echo(CommandHelp.get_command_help("search"))
         return
-    """Search for notes containing text or with specific tag."""
+    """Search for notes containing text, with specific tag, or by date."""
     try:
         results = []
         
@@ -235,6 +236,19 @@ def search(query, tag, exclude_tag, full, help):
                 
             click.echo(ZettlFormatter.header(f"Found {len(notes)} notes with tag '{tag}':"))
             results = notes
+        elif date:
+            # Search by date
+            try:
+                notes = notes_manager.search_notes_by_date(date)
+                if not notes:
+                    click.echo(ZettlFormatter.warning(f"No notes found for date '{date}'"))
+                    return
+                    
+                click.echo(ZettlFormatter.header(f"Found {len(notes)} notes created on '{date}':"))
+                results = notes
+            except ValueError as e:
+                click.echo(ZettlFormatter.error(str(e)))
+                return
         elif query:
             # Search by content
             notes = notes_manager.search_notes(query)

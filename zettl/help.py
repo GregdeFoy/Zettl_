@@ -22,9 +22,10 @@ class CommandHelp:
   {Colors.YELLOW}{Colors.BOLD}show{Colors.RESET} - Display note content
     {Colors.BLUE}→{Colors.RESET} zettl show 22a4b
 
-  {Colors.YELLOW}{Colors.BOLD}search{Colors.RESET} - Search for notes containing text
+  {Colors.YELLOW}{Colors.BOLD}search{Colors.RESET} - Search for notes by text, tag, or date
     {Colors.BLUE}→{Colors.RESET} zettl search "concept"
     {Colors.BLUE}→{Colors.RESET} zettl search -t concept --full  # Show full content with tags
+    {Colors.BLUE}→{Colors.RESET} zettl search -d 2025-04-07      # Find notes from a specific date
     {Colors.BLUE}→{Colors.RESET} zettl search "concept" +t done  # Exclude notes with 'done' tag
 
 {Colors.BOLD}Connection Commands:{Colors.RESET}
@@ -143,16 +144,18 @@ class CommandHelp:
 """,
 
             "search": f"""
-{Colors.GREEN}{Colors.BOLD}search [QUERY]{Colors.RESET} - Search for notes containing text
+{Colors.GREEN}{Colors.BOLD}search [QUERY]{Colors.RESET} - Search for notes containing text, with tag, or by date
 
 {Colors.BOLD}Options:{Colors.RESET}
   {Colors.YELLOW}-t, --tag TAG{Colors.RESET}        Search for notes with this tag
   {Colors.YELLOW}+t, --exclude-tag TAG{Colors.RESET} Exclude notes with this tag
+  {Colors.YELLOW}-d, --date DATE{Colors.RESET}      Search for notes created on a specific date (YYYY-MM-DD)
   {Colors.YELLOW}-f, --full{Colors.RESET}           Show full content of matching notes
 
 {Colors.BOLD}Examples:{Colors.RESET}
   {Colors.BLUE}zettl search "keyword"{Colors.RESET}       Search notes containing "keyword"
   {Colors.BLUE}zettl search -t concept{Colors.RESET}      Show notes tagged with "concept"
+  {Colors.BLUE}zettl search -d 2025-04-07{Colors.RESET}   Show notes created on April 7, 2025
   {Colors.BLUE}zettl search -t work +t done{Colors.RESET} Show notes tagged "work" but not "done"
   {Colors.BLUE}zettl search "keyword" --full{Colors.RESET} Show full content of matching notes
 """,

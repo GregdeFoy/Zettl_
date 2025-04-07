@@ -39,6 +39,10 @@ class Notes:
         """Search for notes containing the query string."""
         return self.db.search_notes(query)
         
+    def search_notes_by_date(self, date_str: str) -> List[Dict[str, Any]]:
+        """Search for notes created on a specific date (YYYY-MM-DD format)."""
+        return self.db.search_notes_by_date(date_str)
+        
     def format_timestamp(self, date_str: str) -> str:
         """Format a timestamp for display."""
         return self.db.format_timestamp(date_str)
