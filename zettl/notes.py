@@ -11,6 +11,11 @@ class Notes:
         note_id = self.db.create_note(content)
         return note_id
         
+    def create_note_with_timestamp(self, content: str, timestamp: str) -> str:
+        """Create a new note with a specific timestamp."""
+        note_id = self.db.create_note_with_timestamp(content, timestamp)
+        return note_id
+        
     def get_note(self, note_id: str) -> Dict[str, Any]:
         """Get a note by its ID."""
         return self.db.get_note(note_id)

@@ -26,15 +26,35 @@ class NutritionTracker:
         
         return result
     
-    def add_entry(self, content: str) -> str:
-        """Add a new nutrition entry."""
+    def add_entry(self, content: str, past_date: Optional[str] = None) -> str:
+        """
+        Add a new nutrition entry.
+        
+        Args:
+            content: The nutrition entry content
+            past_date: Optional date string in YYYY-MM-DD format for backdating the entry
+        
+        Returns:
+            The ID of the created note
+        """
         # Validate format
         data = self.parse_nutrition_data(content)
         if not data:
             raise ValueError("Invalid nutrition data format. Use 'cal: XXX prot: YYY'")
         
-        # Create the note
-        note_id = self.notes_manager.create_note(content)
+        # Create the note with optional past date
+        if past_date:
+            try:
+                # Validate the date format
+                datetime.strptime(past_date, '%Y-%m-%d')
+                # Create timestamp at noon on the specified date (to avoid timezone issues)
+                timestamp = f"{past_date}T12:00:00Z"
+                note_id = self.notes_manager.create_note_with_timestamp(content, timestamp)
+            except ValueError:
+                raise ValueError(f"Invalid date format: {past_date}. Use YYYY-MM-DD format.")
+        else:
+            # Create with current timestamp
+            note_id = self.notes_manager.create_note(content)
         
         # Tag it with 'nutrition'
         self.notes_manager.add_tag(note_id, "nutrition")

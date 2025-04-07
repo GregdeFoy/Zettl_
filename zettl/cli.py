@@ -1162,8 +1162,9 @@ def workflow():
 @click.option('--today', '-t', is_flag=True, help='Show today\'s nutrition summary')
 @click.option('--history', '-i', is_flag=True, help='Show nutrition history')
 @click.option('--days', '-d', default=7, help='Number of days to show in history')
+@click.option('--past', '-p', help='Date for new entry (YYYY-MM-DD format)')
 @click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def nutrition(content, today, history, days,help):
+def nutrition(content, today, history, days, past, help):
 
     if help:
         click.echo(CommandHelp.get_command_help("nutrition"))
@@ -1205,21 +1206,30 @@ def nutrition(content, today, history, days,help):
             calories = data.get('calories', 0)
             protein = data.get('protein', 0)
             
-            # Create the note
-            note_id = tracker.add_entry(content)
-            click.echo(f"Added nutrition entry #{note_id}")
+            # Create the note, with optional past date
+            note_id = tracker.add_entry(content, past_date=past)
             
-            # Show today's totals
-            try:
-                today_entries = tracker.get_today_entries()
-                
-                total_calories = sum(entry['nutrition_data'].get('calories', 0) for entry in today_entries)
-                total_protein = sum(entry['nutrition_data'].get('protein', 0) for entry in today_entries)
-                
-                click.echo(f"\nToday's totals so far:")
-                click.echo(f"Calories: {total_calories:.1f}")
-                click.echo(f"Protein: {total_protein:.1f}g")
-            except Exception as e:
+            # Determine what day to show in the message
+            date_label = f"for {past}" if past else ""
+            click.echo(f"Added nutrition entry #{note_id} {date_label}")
+            
+            # Show today's totals if no past date was specified
+            if not past:
+                try:
+                    today_entries = tracker.get_today_entries()
+                    
+                    total_calories = sum(entry['nutrition_data'].get('calories', 0) for entry in today_entries)
+                    total_protein = sum(entry['nutrition_data'].get('protein', 0) for entry in today_entries)
+                    
+                    click.echo(f"\nToday's totals so far:")
+                    click.echo(f"Calories: {total_calories:.1f}")
+                    click.echo(f"Protein: {total_protein:.1f}g")
+                except Exception as e:
+                    click.echo(f"\nEntry added with:")
+                    click.echo(f"Calories: {calories:.1f}")
+                    click.echo(f"Protein: {protein:.1f}g")
+            else:
+                # Just show the entry's values
                 click.echo(f"\nEntry added with:")
                 click.echo(f"Calories: {calories:.1f}")
                 click.echo(f"Protein: {protein:.1f}g")
@@ -1239,12 +1249,13 @@ def nutrition(content, today, history, days,help):
 @click.option('--today', '-t', is_flag=True, help='Show today\'s nutrition summary')
 @click.option('--history', '-i', is_flag=True, help='Show nutrition history')
 @click.option('--days', '-d', default=7, help='Number of days to show in history')
+@click.option('--past', '-p', help='Date for new entry (YYYY-MM-DD format)')
 @click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def nut_cmd(content, today, history, days,help):
+def nut_cmd(content, today, history, days, past, help):
     """Alias for nutrition command."""
     # Call the implementation from the nutrition command
     ctx = click.get_current_context()
-    return ctx.invoke(nutrition, content=content, today=today, history=history, days=days,help=help)
+    return ctx.invoke(nutrition, content=content, today=today, history=history, days=days, past=past, help=help)
 
 if __name__ == '__main__':
     cli()

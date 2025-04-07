@@ -111,6 +111,35 @@ class Database:
         invalidate_cache("list_notes")
         
         return note_id
+        
+    def create_note_with_timestamp(self, content: str, timestamp: str) -> str:
+        """
+        Create a new note in the database with a specific timestamp.
+        
+        Args:
+            content: The note content
+            timestamp: The timestamp to use (ISO format)
+            
+        Returns:
+            The ID of the created note
+        """
+        note_id = self.generate_id()
+        
+        # Insert the note with the provided timestamp
+        result = self.client.table('notes').insert({
+            "id": note_id,
+            "content": content,
+            "created_at": timestamp,
+            "modified_at": timestamp
+        }).execute()
+        
+        if not result.data:
+            raise Exception("Failed to create note with custom timestamp")
+            
+        # Invalidate relevant caches
+        invalidate_cache("list_notes")
+        
+        return note_id
     
     def get_note(self, note_id: str) -> Dict[str, Any]:
         "Get a note by its ID with caching."

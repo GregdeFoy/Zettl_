@@ -339,9 +339,11 @@ class CommandHelp:
   {Colors.YELLOW}-t, --today{Colors.RESET}       Show today's nutrition summary
   {Colors.YELLOW}-i, --history{Colors.RESET}     Show nutrition history
   {Colors.YELLOW}-d, --days NUMBER{Colors.RESET} Number of days to show in history (default: 7)
+  {Colors.YELLOW}-p, --past DATE{Colors.RESET}   Add an entry for a past date (YYYY-MM-DD format)
 
 {Colors.BOLD}Examples:{Colors.RESET}
   {Colors.BLUE}zettl nutrition "Breakfast cal: 500 prot: 25"{Colors.RESET}
+  {Colors.BLUE}zettl nutrition "Dinner cal: 800 prot: 40" --past 2025-04-05{Colors.RESET}
   {Colors.BLUE}zettl nutrition --today{Colors.RESET}
   {Colors.BLUE}zettl nutrition --history --days 14{Colors.RESET}
   
@@ -362,9 +364,11 @@ class CommandHelp:
   {Colors.YELLOW}-t, --today{Colors.RESET}       Show today's nutrition summary
   {Colors.YELLOW}-i, --history{Colors.RESET}     Show nutrition history
   {Colors.YELLOW}-d, --days NUMBER{Colors.RESET} Number of days to show in history (default: 7)
+  {Colors.YELLOW}-p, --past DATE{Colors.RESET}   Add an entry for a past date (YYYY-MM-DD format)
 
 {Colors.BOLD}Examples:{Colors.RESET}
   {Colors.BLUE}zettl nut "Breakfast cal: 500 prot: 25"{Colors.RESET}
+  {Colors.BLUE}zettl nut "Dinner cal: 800 prot: 40" --past 2025-04-05{Colors.RESET}
   {Colors.BLUE}zettl nut --today{Colors.RESET}
   {Colors.BLUE}zettl nut --history --days 14{Colors.RESET}
 """,

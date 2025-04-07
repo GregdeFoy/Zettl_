@@ -251,10 +251,12 @@ COMMAND_OPTIONS = {
     },
     'nutrition': {
         'short_opts': {
-            'd': {'name': 'days', 'type': int}
+            'd': {'name': 'days', 'type': int},
+            'p': {'name': 'past'}
         },
         'long_opts': {
-            'days': {'type': int}
+            'days': {'type': int},
+            'past': {}
         }
     },
     'n': {
@@ -1326,6 +1328,7 @@ def execute_command():
             today = 't' in flags or 'today' in flags
             history = 'i' in flags or 'history' in flags
             days = int(options.get('days', options.get('d', 7)))  # Default to 7 days
+            past = options.get('past', options.get('p', None))  # Date for past entries
             
             # Determine what action to take based on provided options
             if today:
@@ -1352,21 +1355,30 @@ def execute_command():
                         calories = data.get('calories', 0)
                         protein = data.get('protein', 0)
                         
-                        # Create the note
-                        note_id = tracker.add_entry(content)
-                        result = f"Added nutrition entry #{note_id}\n\n"
+                        # Create the note with optional past date
+                        note_id = tracker.add_entry(content, past_date=past)
                         
-                        # Show today's totals
-                        try:
-                            today_entries = tracker.get_today_entries()
-                            
-                            total_calories = sum(entry['nutrition_data'].get('calories', 0) for entry in today_entries)
-                            total_protein = sum(entry['nutrition_data'].get('protein', 0) for entry in today_entries)
-                            
-                            result += f"Today's totals so far:\n"
-                            result += f"Calories: {total_calories:.1f}\n"
-                            result += f"Protein: {total_protein:.1f}g"
-                        except Exception as e:
+                        # Determine what day to show in the message
+                        date_label = f"for {past}" if past else ""
+                        result = f"Added nutrition entry #{note_id} {date_label}\n\n"
+                        
+                        # Show today's totals if no past date was specified
+                        if not past:
+                            try:
+                                today_entries = tracker.get_today_entries()
+                                
+                                total_calories = sum(entry['nutrition_data'].get('calories', 0) for entry in today_entries)
+                                total_protein = sum(entry['nutrition_data'].get('protein', 0) for entry in today_entries)
+                                
+                                result += f"Today's totals so far:\n"
+                                result += f"Calories: {total_calories:.1f}\n"
+                                result += f"Protein: {total_protein:.1f}g"
+                            except Exception as e:
+                                result += f"\nEntry added with:\n"
+                                result += f"Calories: {calories:.1f}\n"
+                                result += f"Protein: {protein:.1f}g"
+                        else:
+                            # Just show the entry's values for past entries
                             result += f"\nEntry added with:\n"
                             result += f"Calories: {calories:.1f}\n"
                             result += f"Protein: {protein:.1f}g"
