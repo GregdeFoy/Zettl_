@@ -400,12 +400,12 @@ document.addEventListener('DOMContentLoaded', function() {
         'untag': ['-h', '--help'],
         'unlink': ['-h', '--help'],
         'help': ['-h', '--help'],
-        'nutrition': ['-t', '--today', '-i', '--history', '-d', '--days'],
-        'nut': ['-t', '--today', '-i', '--history', '-d', '--days'],
+        'nutrition': ['-t', '--today', '-i', '--history', '-d', '--days', '-p', '--past'],
+        'nut': ['-t', '--today', '-i', '--history', '-d', '--days', '-p', '--past'],
     };
 
     // For commands that need auto-quotes
-    const autoQuoteCommands = ['new', 'add'];
+    const autoQuoteCommands = ['new', 'add', 'nut', 'nutrition'];
 
     // Sub-options for commands like llm
     const subOptions = {
@@ -666,58 +666,30 @@ document.addEventListener('DOMContentLoaded', function() {
             separator.className = 'button-separator';
             shortcutButtons.appendChild(separator);
             
-            // Add shortcut buttons for nutrition options - simpler buttons
-            const buttons = [
-                { text: "Add Entry", action: () => {
-                    commandInput.value = `${currentCmd} ""`;
-                    commandInput.focus();
-                    autoResizeTextarea();
-                    // Position cursor between quotes
-                    const cursorPos = commandInput.value.length - 1;
-                    setTimeout(() => {
-                        commandInput.selectionStart = commandInput.selectionEnd = cursorPos;
-                    }, 0);
-                }},
-                { text: "Past Entry", action: () => {
-                    const today = new Date();
-                    const yyyy = today.getFullYear();
-                    // Add leading zero for month/day if needed
-                    const mm = String(today.getMonth() + 1).padStart(2, '0');
-                    const dd = String(today.getDate()).padStart(2, '0');
-                    
-                    // Create date string in YYYY-MM-DD format
-                    const dateStr = `${yyyy}-${mm}-${dd}`;
-                    
-                    commandInput.value = `${currentCmd} "" -p ${dateStr}`;
-                    commandInput.focus();
-                    autoResizeTextarea();
-                    // Position cursor between quotes
-                    const quotePos = currentCmd.length + 2;
-                    setTimeout(() => {
-                        commandInput.selectionStart = quotePos;
-                        commandInput.selectionEnd = quotePos;
-                    }, 0);
-                }}
-            ];
-            
-            buttons.forEach(btn => {
-                const button = document.createElement('button');
-                button.textContent = btn.text;
-                button.addEventListener('click', btn.action);
-                shortcutButtons.appendChild(button);
+            // Add Past Entry button (only one special button needed)
+            const button = document.createElement('button');
+            button.textContent = "Past Entry";
+            button.addEventListener('click', () => {
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                // Add leading zero for month/day if needed
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                
+                // Create date string in YYYY-MM-DD format
+                const dateStr = `${yyyy}-${mm}-${dd}`;
+                
+                commandInput.value = `${currentCmd} "" -p ${dateStr}`;
+                commandInput.focus();
+                autoResizeTextarea();
+                // Position cursor between quotes
+                const quotePos = currentCmd.length + 2;
+                setTimeout(() => {
+                    commandInput.selectionStart = quotePos;
+                    commandInput.selectionEnd = quotePos;
+                }, 0);
             });
-            
-            // Add a subseparator
-            const subSeparator = document.createElement('div');
-            subSeparator.className = 'button-separator';
-            shortcutButtons.appendChild(subSeparator);
-            
-            viewButtons.forEach(btn => {
-                const button = document.createElement('button');
-                button.textContent = btn.text;
-                button.addEventListener('click', btn.action);
-                shortcutButtons.appendChild(button);
-            });
+            shortcutButtons.appendChild(button);
             
             // If history flag is present, show day options
             if ((currentCmd === 'nutrition' || currentCmd === 'nut') && 
