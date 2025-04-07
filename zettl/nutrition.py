@@ -68,26 +68,32 @@ class NutritionTracker:
             created_at = note.get('created_at', '')
             if not created_at:
                 continue
-                
+                            
             try:
-                # Normalize the datetime string
-                if 'Z' in created_at:
-                    created_at = created_at.replace('Z', '+00:00')
-                elif 'T' in created_at and not ('+' in created_at or '-' in created_at[10:]):
-                    # No timezone info - assume UTC
-                    created_at = created_at + '+00:00'
+                # Simplest approach: truncate to second precision by removing fractional seconds entirely
+                if 'T' in created_at:
+                    date_part, time_part = created_at.split('T', 1)
+                else:
+                    date_part = created_at[:10]  # YYYY-MM-DD
+                    time_part = created_at[11:]
                 
-                # Parse the date
-                note_date = datetime.fromisoformat(created_at)
+                # Remove any fractional seconds
+                if '.' in time_part:
+                    time_part = time_part.split('.', 1)[0]
                 
-                # Ensure note_date is timezone-aware
-                if note_date.tzinfo is None:
-                    note_date = note_date.replace(tzinfo=timezone.utc)
+                # Remove timezone info (Z, +xx:xx, etc.)
+                for separator in ['Z', '+', '-']:
+                    if separator in time_part and time_part.index(separator) > 2:  # Not part of time format
+                        time_part = time_part.split(separator, 1)[0]
+                        break
                 
-                # Debug info
-                # print(f"Note: {note['id']}, Date: {note_date}", file=sys.stderr)
+                # Create a normalized timestamp with second precision
+                normalized_timestamp = f"{date_part}T{time_part}"
                 
-                # Compare only the date parts, ignoring time
+                # Parse the date - add UTC timezone for consistency
+                note_date = datetime.fromisoformat(normalized_timestamp).replace(tzinfo=timezone.utc)
+                
+                # Continue with date comparison
                 note_date_only = note_date.date()
                 start_date_only = start_date.date()
                 end_date_only = end_date.date()
@@ -100,8 +106,7 @@ class NutritionTracker:
                         filtered_notes.append(note)
             except Exception as e:
                 # Log the error with the note ID for debugging
-                import sys
-                print(f"Error processing note {note.get('id', 'unknown')}: {str(e)}", file=sys.stderr)
+                print(f"Error processing entry {note.get('id', 'unknown')}: {str(e)}", file=sys.stderr)
                 continue
         
         # Debug info
