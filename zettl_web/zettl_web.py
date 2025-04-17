@@ -259,9 +259,15 @@ COMMAND_OPTIONS = {
             'past': {}
         }
     },
-    'n': {
-        'short_opts': {},
-        'long_opts': {}
+    'nut': {
+        'short_opts': {
+            'd': {'name': 'days', 'type': int},
+            'p': {'name': 'past'}
+        },
+        'long_opts': {
+            'days': {'type': int},
+            'past': {}
+        }
     },
 
 
