@@ -329,12 +329,13 @@ class NutritionTracker:
         
         return result
     
-    # In zettl/nutrition.py - update the format_history method
+
+
+
     def format_history(self, days: int = 7) -> str:
-        """Format nutrition history for display."""
+        """Format nutrition history with fixed-scale bars and proper alignment."""
         daily_summary = self.get_daily_summary(days=days)
         
-        # Fix for nested f-strings - separate them
         header_text = f"Nutrition History ({days} days)"
         header = ZettlFormatter.header(header_text)
         result = f"{header}\n"
@@ -356,36 +357,62 @@ class NutritionTracker:
         # Show daily breakdown
         result += "Daily Breakdown:\n"
         
-        # Find maximum values for visual scaling
-        max_calories = max((day['calories'] for day in daily_summary), default=1)
-        max_protein = max((day['protein'] for day in daily_summary), default=1)
-        
-        # Find max width needed for cal and prot values for padding calculation
-        max_cal_width = max(len(f"{day['calories']:.1f}") for day in daily_summary)
-        max_prot_width = max(len(f"{day['protein']:.1f}g") for day in daily_summary)
-        
         for day in daily_summary:
             date_str = day['date']
+            cal_value = day['calories']
+            prot_value = day['protein']
+            entry_count = len(day['entries'])
             
-            # Create simple bar charts using characters
-            cal_bar_len = int(20 * (day['calories'] / max_calories)) if max_calories > 0 else 0
-            prot_bar_len = int(10 * (day['protein'] / max_protein)) if max_protein > 0 else 0
+            # FIXED SCALE: 1 character = 100 calories (max 30 chars)
+            cal_bar_len = min(int(cal_value / 100), 30)
             
-            cal_bar = Colors.GREEN + "█" * cal_bar_len + Colors.RESET
-            prot_bar = Colors.BLUE + "█" * prot_bar_len + Colors.RESET
+            # FIXED SCALE: 1 character = 10g protein (max 25 chars)
+            prot_bar_len = min(int(prot_value / 10), 25)
             
-            # Right-justify values to consistent width before adding color
-            cal_str = f"{day['calories']:.1f}".rjust(max_cal_width)
-            prot_str = f"{day['protein']:.1f}g".rjust(max_prot_width)
+            # Handle special padding for values < 1000 calories
+            if cal_value < 1000:
+                cal_padding = 1  # One extra space for values < 1000
+            else:
+                cal_padding = 0
+                
+            # Format the calorie part with padding
+            cal_part = f"{date_str}: Cal: "
+            cal_value_part = f"{Colors.GREEN}{cal_value:.1f}{Colors.RESET}"
             
-            # Add colors after padding for consistent width
-            cal_value = f"{Colors.GREEN}{cal_str}{Colors.RESET}"
-            prot_value = f"{Colors.BLUE}{prot_str}{Colors.RESET}"
+            # Create the calorie bar
+            cal_bar = f"{Colors.GREEN}{'█' * cal_bar_len}{Colors.RESET}"
             
-            # Format the line consistently
-            line = f"{date_str}: Cal: {cal_value} {cal_bar}, "
-            line += f"Prot: {prot_value} {prot_bar} "
-            line += f"({len(day['entries'])} entries)"
+            # Add the calorie padding AFTER the value before the bar
+            cal_with_padding = cal_value_part + " " * cal_padding
+            
+            # We want "Prot:" to be at a fixed position
+            # First calculate how many visible characters we have so far
+            visible_len = len(date_str) + len(": Cal: ") + len(f"{cal_value:.1f}") + cal_padding + cal_bar_len
+            
+            # Target position for "Prot:" - adjust as needed 
+            prot_pos = 50
+            
+            # Calculate padding needed before "Prot:"
+            prot_padding = max(0, prot_pos - visible_len)
+            
+            # Create protein part
+            prot_label = "Prot: "
+            prot_value_part = f"{Colors.BLUE}{prot_value:.1f}g{Colors.RESET}"
+            
+            # Add padding for protein < 100g
+            if prot_value < 100:
+                prot_value_padding = 1  # One extra space for values < 100g
+            else:
+                prot_value_padding = 0
+                
+            # Create protein bar
+            prot_bar = f"{Colors.BLUE}{'█' * prot_bar_len}{Colors.RESET}"
+            
+            # Build the final line with all components and proper spacing
+            line = cal_part + cal_with_padding + cal_bar
+            line += " " * prot_padding + prot_label
+            line += prot_value_part + " " * prot_value_padding + prot_bar
+            line += f" ({entry_count} entries)"
             
             result += line + "\n"
         
