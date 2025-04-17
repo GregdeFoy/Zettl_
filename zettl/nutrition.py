@@ -329,6 +329,7 @@ class NutritionTracker:
         
         return result
     
+    # In zettl/nutrition.py - update the format_history method
     def format_history(self, days: int = 7) -> str:
         """Format nutrition history for display."""
         daily_summary = self.get_daily_summary(days=days)
@@ -359,6 +360,10 @@ class NutritionTracker:
         max_calories = max((day['calories'] for day in daily_summary), default=1)
         max_protein = max((day['protein'] for day in daily_summary), default=1)
         
+        # Find max width needed for cal and prot values for padding calculation
+        max_cal_width = max(len(f"{day['calories']:.1f}") for day in daily_summary)
+        max_prot_width = max(len(f"{day['protein']:.1f}g") for day in daily_summary)
+        
         for day in daily_summary:
             date_str = day['date']
             
@@ -369,8 +374,19 @@ class NutritionTracker:
             cal_bar = Colors.GREEN + "█" * cal_bar_len + Colors.RESET
             prot_bar = Colors.BLUE + "█" * prot_bar_len + Colors.RESET
             
-            result += f"{date_str}: Cal: {Colors.GREEN}{day['calories']:.1f}{Colors.RESET} {cal_bar}, "
-            result += f"Prot: {Colors.BLUE}{day['protein']:.1f}g{Colors.RESET} {prot_bar} "
-            result += f"({len(day['entries'])} entries)\n"
+            # Right-justify values to consistent width before adding color
+            cal_str = f"{day['calories']:.1f}".rjust(max_cal_width)
+            prot_str = f"{day['protein']:.1f}g".rjust(max_prot_width)
+            
+            # Add colors after padding for consistent width
+            cal_value = f"{Colors.GREEN}{cal_str}{Colors.RESET}"
+            prot_value = f"{Colors.BLUE}{prot_str}{Colors.RESET}"
+            
+            # Format the line consistently
+            line = f"{date_str}: Cal: {cal_value} {cal_bar}, "
+            line += f"Prot: {prot_value} {prot_bar} "
+            line += f"({len(day['entries'])} entries)"
+            
+            result += line + "\n"
         
         return result
