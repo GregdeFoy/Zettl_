@@ -993,7 +993,7 @@ def todos(donetoday, all, cancel, tag, eisenhower, help):
     except Exception as e:
         click.echo(ZettlFormatter.error(str(e)), err=True)
 
-def display_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=False):
+def display_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=False, include_cancel=False):
     """Display todos in an Eisenhower matrix format."""
     # Create four quadrants for Eisenhower categorization
     urgent_important = []      # do - Quadrant 1
@@ -1001,9 +1001,40 @@ def display_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=
     urgent_not_important = []  # dl - Quadrant 3
     not_urgent_not_important = []  # dr - Quadrant 4
     uncategorized = []
+    done_todos = []            # Completed todos
+    canceled_todos = []        # Canceled todos
     
     # Track unique note IDs for counting
     unique_ids = set()
+    
+    # Get notes with 'done' tag added today
+    from datetime import datetime, timezone
+    done_today_ids = set()
+    if include_donetoday:
+        today = datetime.now(timezone.utc).date()
+        
+        try:
+            # Query tags table for 'done' tags created today
+            tags_result = notes_manager.db.client.table('tags').select('note_id, created_at').eq('tag', 'done').execute()
+            
+            if tags_result.data:
+                for tag_data in tags_result.data:
+                    note_id = tag_data.get('note_id')
+                    created_at = tag_data.get('created_at', '')
+                    
+                    if note_id and created_at:
+                        try:
+                            # Parse the ISO format date
+                            tag_date = datetime.fromisoformat(created_at.replace('Z', '+00:00')).date()
+                            
+                            # Check if tag was created today
+                            if tag_date == today:
+                                done_today_ids.add(note_id)
+                        except Exception:
+                            # Skip tags with date parsing issues
+                            pass
+        except Exception as e:
+            click.echo(ZettlFormatter.warning(f"Could not determine todos completed today: {str(e)}"))
     
     for note in todo_notes:
         note_id = note['id']
@@ -1011,24 +1042,24 @@ def display_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=
         note_tags = notes_manager.get_tags(note_id)
         tags_lower = [t.lower() for t in note_tags]
         
-        # Check if this is a done todo
+        # Check status flags
         is_done = 'done' in tags_lower
+        is_canceled = 'cancel' in tags_lower
+        is_done_today = note_id in done_today_ids
         
-        # Skip done todos unless explicitly included
-        if is_done and not include_done and not include_donetoday:
+        # Skip based on flags
+        if is_canceled and not include_cancel:
             continue
-            
-        # Check if this is a done today todo if that's the only type we want
-        if include_donetoday and not include_done:
-            # Logic to check if done today would go here (similar to existing code)
-            # For now, we'll include all done todos in this case
-            pass
         
-        # Track unique ID
-        unique_ids.add(note_id)
+        if is_done and not include_done and not (is_done_today and include_donetoday):
+            continue
         
-        # Categorize based on Eisenhower tags
-        if 'do' in tags_lower:
+        # Add to appropriate category
+        if is_canceled:
+            canceled_todos.append(note)
+        elif is_done:
+            done_todos.append(note)
+        elif 'do' in tags_lower:
             urgent_important.append(note)
         elif 'pl' in tags_lower:
             not_urgent_important.append(note)
@@ -1038,10 +1069,11 @@ def display_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=
             not_urgent_not_important.append(note)
         else:
             uncategorized.append(note)
+        
+        # Track all displayed todos
+        unique_ids.add(note_id)
     
-    # Display the Eisenhower matrix
-    
-    # Matrix header
+    # Display matrix header
     click.echo(ZettlFormatter.header("Eisenhower Matrix"))
     click.echo(f"Total todos: {len(unique_ids)}")
     click.echo()
@@ -1052,73 +1084,80 @@ def display_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=
         content_lines = note['content'].split('\n')
         return f"  {formatted_id}: {content_lines[0]}"
     
-    # Matrix layout
-    matrix_width = 80
-    separator = "-" * matrix_width
+    # Matrix dimension and layout constants
+    MATRIX_WIDTH = 120
+    COL_WIDTH = MATRIX_WIDTH // 2 - 2  # Allow for the divider
+    separator = "-" * MATRIX_WIDTH
     
-    # Top row header
-    click.echo(f"{' ' * 20}URGENT{' ' * 22}NOT URGENT")
+    # Display top header
+    click.echo(f"{' ' * 20}URGENT{' ' * (COL_WIDTH - 26)}|{' ' * 10}NOT URGENT")
     click.echo(separator)
     
-    # Calculate row heights
-    max_height = max(
-        len(urgent_important), 
-        len(not_urgent_important),
-        len(urgent_not_important),
-        len(not_urgent_not_important)
-    )
+    # Display Q1 and Q2 headers (DO and PLAN)
+    q1_header = f"{Colors.BOLD}IMPORTANT{Colors.RESET}"
+    q1_label = f"{Colors.GREEN}DO{Colors.RESET} ({len(urgent_important)})"
+    q2_label = f"{Colors.BLUE}PLAN{Colors.RESET} ({len(not_urgent_important)})"
     
-    # Render matrix rows
-    for i in range(max_height + 2):  # +2 for header rows
-        if i == 0:
-            # First row header for important section
-            row = f"{Colors.BOLD}IMPORTANT{Colors.RESET}"
-            row = row.ljust(15)
-            row += f" | {Colors.GREEN}DO{Colors.RESET} ({len(urgent_important)})"
-            row = row.ljust(matrix_width // 2)
-            row += f" | {Colors.BLUE}PLAN{Colors.RESET} ({len(not_urgent_important)})"
-            click.echo(row)
-            click.echo(separator)
-        elif i <= len(urgent_important) and i <= len(not_urgent_important):
-            # Both columns have content
-            left = format_note(urgent_important[i-1]) if i <= len(urgent_important) else ""
-            right = format_note(not_urgent_important[i-1]) if i <= len(not_urgent_important) else ""
-            left = left.ljust(matrix_width // 2)
-            click.echo(f"{left} | {right}")
-        elif i <= len(urgent_important):
-            # Only left column has content
-            left = format_note(urgent_important[i-1])
-            left = left.ljust(matrix_width // 2)
-            click.echo(f"{left} | ")
-        elif i <= len(not_urgent_important):
-            # Only right column has content
-            right = format_note(not_urgent_important[i-1])
-            left = " ".ljust(matrix_width // 2)
-            click.echo(f"{left} | {right}")
-        elif i == len(max(urgent_important, not_urgent_important)) + 1:
-            # Separator after first row
-            click.echo(separator)
-            # Header for not important section
-            row = f"{Colors.BOLD}NOT{Colors.RESET}"
-            row = row.ljust(15)
-            row += f" | {Colors.YELLOW}DELEGATE{Colors.RESET} ({len(urgent_not_important)})"
-            row = row.ljust(matrix_width // 2)
-            row += f" | {Colors.RED}DROP{Colors.RESET} ({len(not_urgent_not_important)})"
-            click.echo(row)
-            click.echo(separator)
-        elif i - len(max(urgent_important, not_urgent_important)) - 2 < max(len(urgent_not_important), len(not_urgent_not_important)):
-            # Content for not important row
-            idx = i - len(max(urgent_important, not_urgent_important)) - 2
-            left = format_note(urgent_not_important[idx]) if idx < len(urgent_not_important) else ""
-            right = format_note(not_urgent_not_important[idx]) if idx < len(not_urgent_not_important) else ""
-            left = left.ljust(matrix_width // 2)
-            click.echo(f"{left} | {right}")
+    click.echo(f"{q1_header.ljust(15)} | {q1_label.ljust(COL_WIDTH - 3)}| {q2_label}")
+    click.echo(separator)
     
-    # Show uncategorized todos if any
+    # Display Q1 and Q2 content
+    q1_height = len(urgent_important)
+    q2_height = len(not_urgent_important)
+    max_top_height = max(q1_height, q2_height)
+    
+    for i in range(max_top_height):
+        left = format_note(urgent_important[i]) if i < q1_height else ""
+        right = format_note(not_urgent_important[i]) if i < q2_height else ""
+        
+        # Ensure columns align properly
+        if len(left) > COL_WIDTH:
+            left = left[:COL_WIDTH-3] + "..."
+            
+        click.echo(f"{left.ljust(COL_WIDTH)} | {right}")
+    
+    click.echo(separator)
+    
+    # Display Q3 and Q4 headers (DELEGATE and DROP)
+    q3_header = f"{Colors.BOLD}NOT IMPORTANT{Colors.RESET}"
+    q3_label = f"{Colors.YELLOW}DELEGATE{Colors.RESET} ({len(urgent_not_important)})"
+    q4_label = f"{Colors.RED}DROP{Colors.RESET} ({len(not_urgent_not_important)})"
+    
+    click.echo(f"{q3_header.ljust(15)} | {q3_label.ljust(COL_WIDTH - 3)}| {q4_label}")
+    click.echo(separator)
+    
+    # Display Q3 and Q4 content
+    q3_height = len(urgent_not_important)
+    q4_height = len(not_urgent_not_important)
+    max_bottom_height = max(q3_height, q4_height)
+    
+    for i in range(max_bottom_height):
+        left = format_note(urgent_not_important[i]) if i < q3_height else ""
+        right = format_note(not_urgent_not_important[i]) if i < q4_height else ""
+        
+        # Ensure columns align properly
+        if len(left) > COL_WIDTH:
+            left = left[:COL_WIDTH-3] + "..."
+            
+        click.echo(f"{left.ljust(COL_WIDTH)} | {right}")
+    
+    # Display additional categories if requested
     if uncategorized:
         click.echo("\n" + separator)
         click.echo(ZettlFormatter.warning(f"Uncategorized Todos ({len(uncategorized)})"))
         for note in uncategorized:
+            click.echo(format_note(note))
+    
+    if include_done and done_todos:
+        click.echo("\n" + separator)
+        click.echo(ZettlFormatter.header(f"Completed Todos ({len(done_todos)})"))
+        for note in done_todos:
+            click.echo(format_note(note))
+    
+    if include_cancel and canceled_todos:
+        click.echo("\n" + separator)
+        click.echo(ZettlFormatter.header(f"Canceled Todos ({len(canceled_todos)})"))
+        for note in canceled_todos:
             click.echo(format_note(note))
 
 
