@@ -206,14 +206,16 @@ COMMAND_OPTIONS = {
         'short_opts': {
             'dt': {'name': 'donetoday', 'flag': True},
             'a': {'name': 'all', 'flag': True},
-            'c': {'name': 'cancel', 'flag': True},  # Added cancel option
-            't': {'name': 'tag', 'multiple': True}
+            'c': {'name': 'cancel', 'flag': True},
+            't': {'name': 'tag', 'multiple': True},
+            'e': {'name': 'eisenhower', 'flag': True}  # Add the new flag
         },
         'long_opts': {
             'donetoday': {'flag': True},
             'all': {'flag': True},
-            'cancel': {'flag': True},  # Added cancel option
-            'tag': {'multiple': True}
+            'cancel': {'flag': True},
+            'tag': {'multiple': True},
+            'eisenhower': {'flag': True}  # Add the new flag
         }
     },
     'search': {

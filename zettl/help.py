@@ -219,7 +219,7 @@ class CommandHelp:
   {Colors.BLUE}zettl tags 22a4b "concept"{Colors.RESET} Add "concept" tag to note 22a4b
 """,
 
-            "todos": f"""
+"todos": f"""
 {Colors.GREEN}{Colors.BOLD}todos{Colors.RESET} - List all notes tagged with 'todo'
 
 {Colors.BOLD}Options:{Colors.RESET}
@@ -227,12 +227,13 @@ class CommandHelp:
   {Colors.YELLOW}-dt, --donetoday{Colors.RESET}     Show todos completed today
   {Colors.YELLOW}-c, --cancel{Colors.RESET}         Show canceled todos
   {Colors.YELLOW}-t, --tag TAG{Colors.RESET}        Filter todos by additional tag
+  {Colors.YELLOW}-e, --eisenhower{Colors.RESET}     Display todos in Eisenhower matrix format
 
 {Colors.BOLD}Examples:{Colors.RESET}
   {Colors.BLUE}zettl todos{Colors.RESET}                  Show active todos
   {Colors.BLUE}zettl todos -a{Colors.RESET}               Show all todos (active and completed)
   {Colors.BLUE}zettl todos -dt{Colors.RESET}              Show todos completed today
-  {Colors.BLUE}zettl todos -c{Colors.RESET}               Show canceled todos
+  {Colors.BLUE}zettl todos -e{Colors.RESET}               Show todos in Eisenhower matrix
   {Colors.BLUE}zettl todos -t work{Colors.RESET}          Show todos tagged with "work"
   {Colors.BLUE}zettl todos -t work -t urgent{Colors.RESET} Show todos with multiple tags
 """,
