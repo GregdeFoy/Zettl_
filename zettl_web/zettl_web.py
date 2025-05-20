@@ -1528,8 +1528,14 @@ def format_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=F
         content_lines = note['content'].split('\n')
         return f"<div style='margin: 5px 0'>{formatted_id}: {content_lines[0]}</div>"
     
-    # Create HTML matrix table
-    output += """
+    # Store the counts
+    do_count = len(urgent_important)
+    plan_count = len(not_urgent_important)
+    delegate_count = len(urgent_not_important)
+    drop_count = len(not_urgent_not_important)
+    
+    # Create HTML matrix table with explicit count values
+    output += f"""
     <div style="overflow-x: auto;">
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
         <tr>
@@ -1540,40 +1546,40 @@ def format_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=F
         <tr>
           <th style="text-align: center; padding: 10px; border: 1px solid #444; font-weight: bold;">IMPORTANT</th>
           <td style="border: 1px solid #444; padding: 10px; vertical-align: top; background-color: rgba(0, 255, 0, 0.05);">
-            <div style="color: #90ee90; font-weight: bold; margin-bottom: 10px;">DO ({len(urgent_important)})</div>
+            <div style="color: #90ee90; font-weight: bold; margin-bottom: 10px;">DO ({do_count})</div>
     """
     
     # Add Q1 todos (Do - Urgent & Important)
     for note in urgent_important:
         output += format_note_html(note)
     
-    output += """
+    output += f"""
           </td>
           <td style="border: 1px solid #444; padding: 10px; vertical-align: top; background-color: rgba(0, 0, 255, 0.05);">
-            <div style="color: #add8e6; font-weight: bold; margin-bottom: 10px;">PLAN ({len(not_urgent_important)})</div>
+            <div style="color: #add8e6; font-weight: bold; margin-bottom: 10px;">PLAN ({plan_count})</div>
     """
     
     # Add Q2 todos (Plan - Not Urgent & Important)
     for note in not_urgent_important:
         output += format_note_html(note)
     
-    output += """
+    output += f"""
           </td>
         </tr>
         <tr>
           <th style="text-align: center; padding: 10px; border: 1px solid #444; font-weight: bold;">NOT<br>IMPORTANT</th>
           <td style="border: 1px solid #444; padding: 10px; vertical-align: top; background-color: rgba(255, 255, 0, 0.05);">
-            <div style="color: #ffff00; font-weight: bold; margin-bottom: 10px;">DELEGATE ({len(urgent_not_important)})</div>
+            <div style="color: #ffff00; font-weight: bold; margin-bottom: 10px;">DELEGATE ({delegate_count})</div>
     """
     
     # Add Q3 todos (Delegate - Urgent & Not Important)
     for note in urgent_not_important:
         output += format_note_html(note)
     
-    output += """
+    output += f"""
           </td>
           <td style="border: 1px solid #444; padding: 10px; vertical-align: top; background-color: rgba(255, 0, 0, 0.05);">
-            <div style="color: #ff6347; font-weight: bold; margin-bottom: 10px;">DROP ({len(not_urgent_not_important)})</div>
+            <div style="color: #ff6347; font-weight: bold; margin-bottom: 10px;">DROP ({drop_count})</div>
     """
     
     # Add Q4 todos (Drop - Not Urgent & Not Important)
