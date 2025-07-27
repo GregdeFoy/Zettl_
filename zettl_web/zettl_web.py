@@ -1042,8 +1042,7 @@ def execute_command():
             all_todos = 'all' in options or 'a' in flags
             cancel = 'cancel' in options or 'c' in options
             filter_tags = []
-            if all_todos:
-                done = True
+            done = all_todos
             if 'tag' in options:
                 if isinstance(options['tag'], list):  # Multiple tags
                     filter_tags.extend(options['tag'])
