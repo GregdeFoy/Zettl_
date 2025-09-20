@@ -1,0 +1,249 @@
+# docker-compose.yml - Complete Zettl Deployment
+
+services:
+  # PostgreSQL Database Server
+  postgresql:
+    image: postgres:16-alpine
+    container_name: zettl-postgres
+    hostname: postgres-server
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./config/postgresql/init:/docker-entrypoint-initdb.d:ro
+      - ./secrets:/run/secrets:ro
+    environment:
+      - TZ=${TZ:-UTC}
+      - POSTGRES_USER=${DB_POSTGRES_USER:-postgres}
+      - POSTGRES_DB=${DB_NAME:-zettl}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    networks:
+      - zettl-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_POSTGRES_USER:-postgres} -d ${DB_NAME:-zettl}"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: zettl-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+      - ./secrets:/run/secrets:ro
+    networks:
+      - zettl-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Authentication Service
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: zettl-auth
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - AUTH_PORT=3001
+      - DB_HOST=postgresql
+      - DB_PORT=5432
+      - DB_USER=zettl_auth
+      - DB_PASSWORD_FILE=/run/secrets/db_auth_password
+      - DB_NAME=${DB_NAME:-zettl}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
+      - JWT_SECRET_FILE=/run/secrets/jwt_secret
+      - JWT_EXPIRES_IN=24h
+      - JWT_REFRESH_EXPIRES_IN=7d
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:8080,https://zettlnotes.app}
+    volumes:
+      - ./secrets:/run/secrets:ro
+    networks:
+      - zettl-network
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => {r.statusCode === 200 ? process.exit(0) : process.exit(1)}).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # PostgREST API
+  postgrest:
+    image: postgrest/postgrest:latest
+    container_name: zettl-api
+    restart: unless-stopped
+    environment:
+      # Connection with authenticator role
+      - PGRST_DB_URI=postgres://authenticator:${AUTHENTICATOR_PASSWORD:-authenticator_pass}@postgresql:5432/${DB_NAME:-zettl}
+      - PGRST_DB_SCHEMAS=${POSTGREST_SCHEMAS:-public,zettl}
+      - PGRST_DB_ANON_ROLE=web_anon
+      - PGRST_JWT_SECRET_FILE=/run/secrets/jwt_secret
+      - PGRST_SERVER_HOST=0.0.0.0
+      - PGRST_SERVER_PORT=3000
+      - PGRST_DB_MAX_ROWS=1000
+      - PGRST_DB_POOL=10
+      - PGRST_DB_POOL_TIMEOUT=3600
+    volumes:
+      - ./secrets:/run/secrets:ro
+    networks:
+      - zettl-network
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-O", "-", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Zettl Web Application
+  zettl-web:
+    build:
+      context: ./zettl_web
+      dockerfile: Dockerfile
+    container_name: zettl-web
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+      - API_URL=http://postgrest:3000
+      - AUTH_URL=http://auth-service:3001
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
+      - SECRET_KEY_FILE=/run/secrets/flask_secret
+    volumes:
+      - ./zettl_web:/app
+      - ./secrets:/run/secrets:ro
+    networks:
+      - zettl-network
+    depends_on:
+      postgrest:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: zettl-nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_cache:/var/cache/nginx
+    networks:
+      - zettl-network
+    depends_on:
+      - zettl-web
+      - postgrest
+      - auth-service
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Cloudflare Tunnel
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: zettl-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - zettl-network
+    depends_on:
+      - nginx
+
+  # Database Backup Service (Optional but recommended)
+  db-backup:
+    image: prodrigestivill/postgres-backup-local:16
+    container_name: zettl-db-backup
+    restart: unless-stopped
+    volumes:
+      - ./backups/postgresql:/backups
+      - ./secrets:/run/secrets:ro
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${DB_POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+      - POSTGRES_DB=${DB_NAME:-zettl}
+      - POSTGRES_EXTRA_OPTS=-Z6 --blobs
+      - SCHEDULE=0 2 * * *
+      - BACKUP_KEEP_DAYS=7
+      - BACKUP_KEEP_WEEKS=4
+      - BACKUP_KEEP_MONTHS=6
+      - HEALTHCHECK_PORT=8080
+    networks:
+      - zettl-network
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+  # pgAdmin for database management (Optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: zettl-pgadmin
+    restart: unless-stopped
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@zettlnotes.app}
+      - PGADMIN_DEFAULT_PASSWORD_FILE=/run/secrets/pgadmin_password
+      - PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION=True
+      - PGADMIN_CONFIG_CONSOLE_LOG_LEVEL=10
+      - PGADMIN_LISTEN_PORT=5050
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./secrets:/run/secrets:ro
+    networks:
+      - zettl-network
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+# Persistent volumes
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  nginx_cache:
+    driver: local
+
+# Network
+networks:
+  zettl-network:
+    driver: bridge
+    name: zettl-network
+    ipam:
+      config:
+        - subnet: 172.26.0.0/16

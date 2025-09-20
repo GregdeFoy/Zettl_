@@ -1,0 +1,33 @@
+# Core CLI dependencies
+Click>=8.0.0
+python-dotenv>=0.19.0
+rich>=10.0.0
+
+# Database
+supabase>=2.0.0
+
+# HTTP and API
+requests>=2.28.0
+urllib3>=1.26.0
+
+# AI/LLM
+anthropic>=0.3.0
+
+# Terminal interface and interactive features
+prompt-toolkit>=3.0.0
+tqdm>=4.64.0
+
+# Web interface (optional)
+Flask>=2.0.0
+Flask-HTTPAuth>=4.0.0
+Werkzeug>=2.0.0
+
+# Development and testing (optional)
+pytest>=7.0.0
+pylint>=2.15.0
+mypy>=0.991
+black>=22.0.0
+
+# Platform-specific (Windows)
+pyreadline3>=3.4.0; sys_platform == "win32"
+colorama>=0.4.0; sys_platform == "win32"
