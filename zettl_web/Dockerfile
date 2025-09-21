@@ -7,12 +7,20 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy and install the main zettl package first
+COPY setup.py requirements.txt README.md ./
+COPY zettl ./zettl
 
-# Copy application
-COPY . .
+# Install the zettl package in development mode
+RUN pip install --no-cache-dir -e .
+
+# Copy web app requirements and install
+COPY zettl_web/requirements.txt ./web_requirements.txt
+RUN pip install --no-cache-dir -r web_requirements.txt
+
+# Copy web application files
+COPY zettl_web ./web_app
+WORKDIR /app/web_app
 
 # Create non-root user
 RUN useradd -m -u 1000 zettl && chown -R zettl:zettl /app

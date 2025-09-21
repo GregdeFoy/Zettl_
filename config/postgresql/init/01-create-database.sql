@@ -1,5 +1,5 @@
 -- Create zettl database if it doesn't exist
-CREATE DATABASE zettl;
+--CREATE DATABASE zettl;
 
 -- Switch to zettl database
 \c zettl;
@@ -30,15 +30,7 @@ BEGIN
         CREATE ROLE zettl_auth LOGIN;
     END IF;
 END $$;
-
--- Set password for zettl_auth from file
-DO $$
-DECLARE
-    auth_password text;
-BEGIN
-    -- Read password from file (this is handled by Docker init)
-    auth_password := current_setting('zettl.auth_password', true);
-    IF auth_password IS NOT NULL THEN
-        EXECUTE format('ALTER ROLE zettl_auth PASSWORD %L', auth_password);
-    END IF;
-END $$;
+-- Set password using environment variable
+-- This requires ZETTL_AUTH_PASSWORD to be set during container initialization
+\set auth_password `echo "$ZETTL_AUTH_PASSWORD"`
+ALTER ROLE zettl_auth PASSWORD 'KXGoezyUIYLrjy8qjQQ6xiZPQHtk0eZdya1C3QXU0Ho=';

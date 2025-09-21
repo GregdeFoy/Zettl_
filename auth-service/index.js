@@ -1,4 +1,4 @@
-// auth-service/index.js
+// auth-service/index.js (Redis-free version)
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -6,7 +6,6 @@ const { Pool } = require('pg');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const Redis = require('ioredis');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -32,15 +31,6 @@ const pool = new Pool({
     ? fs.readFileSync(process.env.DB_PASSWORD_FILE, 'utf8').trim()
     : process.env.DB_PASSWORD,
   database: process.env.DB_NAME || 'zettl'
-});
-
-// Redis connection for session management
-const redis = new Redis({
-  host: process.env.REDIS_HOST || 'redis',
-  port: process.env.REDIS_PORT || 6379,
-  password: process.env.REDIS_PASSWORD_FILE
-    ? fs.readFileSync(process.env.REDIS_PASSWORD_FILE, 'utf8').trim()
-    : process.env.REDIS_PASSWORD
 });
 
 // Middleware
@@ -164,7 +154,7 @@ function generateTokens(userId, username, role) {
   return { accessToken, refreshToken };
 }
 
-// Middleware to verify JWT
+// Middleware to verify JWT (simplified - no Redis blacklist)
 async function verifyToken(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
@@ -175,12 +165,6 @@ async function verifyToken(req, res, next) {
 
     const token = authHeader.replace('Bearer ', '');
     
-    // Check if token is blacklisted in Redis
-    const isBlacklisted = await redis.get(`blacklist:${token}`);
-    if (isBlacklisted) {
-      return res.status(401).json({ error: 'Token has been revoked' });
-    }
-
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
@@ -204,10 +188,10 @@ async function verifyApiKey(req, res, next) {
     const keyHash = hashApiKey(apiKey);
     
     const result = await pool.query(
-      `SELECT u.*, ak.permissions, ak.expires_at 
+      `SELECT u.id, u.username, u.role 
        FROM api_keys ak 
        JOIN users u ON ak.user_id = u.id 
-       WHERE ak.key_hash = $1 AND u.is_active = true`,
+       WHERE ak.key_hash = $1 AND (ak.expires_at IS NULL OR ak.expires_at > NOW())`,
       [keyHash]
     );
 
@@ -215,40 +199,31 @@ async function verifyApiKey(req, res, next) {
       return res.status(401).json({ error: 'Invalid API key' });
     }
 
-    const keyData = result.rows[0];
-    
-    if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
-      return res.status(401).json({ error: 'API key expired' });
-    }
-
-    // Update last_used timestamp
+    // Update last used timestamp
     await pool.query(
       'UPDATE api_keys SET last_used = CURRENT_TIMESTAMP WHERE key_hash = $1',
       [keyHash]
     );
 
     req.user = {
-      sub: keyData.id,
-      username: keyData.username,
-      role: keyData.role,
-      permissions: keyData.permissions
+      sub: result.rows[0].id,
+      username: result.rows[0].username,
+      role: result.rows[0].role
     };
-
+    
     next();
   } catch (error) {
     console.error('API key verification error:', error);
-    res.status(500).json({ error: 'Authentication error' });
+    res.status(500).json({ error: 'Authentication failed' });
   }
 }
 
-// Routes
-
-// Health check
+// Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'healthy', service: 'auth', timestamp: new Date() });
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Register new user
+// User registration
 app.post('/api/auth/register', async (req, res) => {
   const { username, email, password } = req.body;
 
@@ -261,14 +236,14 @@ app.post('/api/auth/register', async (req, res) => {
   }
 
   try {
-    // Check if user exists
+    // Check if user already exists
     const existingUser = await pool.query(
       'SELECT id FROM users WHERE username = $1 OR email = $2',
       [username, email]
     );
 
     if (existingUser.rows.length > 0) {
-      return res.status(409).json({ error: 'User already exists' });
+      return res.status(409).json({ error: 'Username or email already exists' });
     }
 
     // Hash password
@@ -278,23 +253,23 @@ app.post('/api/auth/register', async (req, res) => {
     const result = await pool.query(
       `INSERT INTO users (username, email, password_hash) 
        VALUES ($1, $2, $3) 
-       RETURNING id, username, role`,
+       RETURNING id, username, email, role, created_at`,
       [username, email, passwordHash]
     );
 
     const user = result.rows[0];
-    const { accessToken, refreshToken } = generateTokens(user.id, user.username, user.role);
+    const tokens = generateTokens(user.id, user.username, user.role);
 
     // Store refresh token
     await pool.query(
-      `INSERT INTO refresh_tokens (user_id, token, expires_at, ip_address, user_agent)
+      `INSERT INTO refresh_tokens (user_id, token, expires_at, ip_address, user_agent) 
        VALUES ($1, $2, $3, $4, $5)`,
       [
         user.id,
-        refreshToken,
+        tokens.refreshToken,
         new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
         req.ip,
-        req.headers['user-agent']
+        req.get('User-Agent')
       ]
     );
 
@@ -302,11 +277,10 @@ app.post('/api/auth/register', async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
-        email: email,
+        email: user.email,
         role: user.role
       },
-      accessToken,
-      refreshToken
+      ...tokens
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -314,18 +288,20 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// Login
+// User login
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
-    return res.status(400).json({ error: 'Missing credentials' });
+    return res.status(400).json({ error: 'Missing username or password' });
   }
 
   try {
-    // Get user
+    // Find user by username or email
     const result = await pool.query(
-      'SELECT * FROM users WHERE (username = $1 OR email = $1) AND is_active = true',
+      `SELECT id, username, email, password_hash, role, is_active 
+       FROM users 
+       WHERE (username = $1 OR email = $1) AND is_active = true`,
       [username]
     );
 
@@ -341,26 +317,26 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Generate tokens
+    const tokens = generateTokens(user.id, user.username, user.role);
+
+    // Store refresh token
+    await pool.query(
+      `INSERT INTO refresh_tokens (user_id, token, expires_at, ip_address, user_agent) 
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        user.id,
+        tokens.refreshToken,
+        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        req.ip,
+        req.get('User-Agent')
+      ]
+    );
+
     // Update last login
     await pool.query(
       'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1',
       [user.id]
-    );
-
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user.id, user.username, user.role);
-
-    // Store refresh token
-    await pool.query(
-      `INSERT INTO refresh_tokens (user_id, token, expires_at, ip_address, user_agent)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [
-        user.id,
-        refreshToken,
-        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        req.ip,
-        req.headers['user-agent']
-      ]
     );
 
     res.json({
@@ -370,8 +346,7 @@ app.post('/api/auth/login', async (req, res) => {
         email: user.email,
         role: user.role
       },
-      accessToken,
-      refreshToken
+      ...tokens
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -379,7 +354,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Refresh token
+// Token refresh
 app.post('/api/auth/refresh', async (req, res) => {
   const { refreshToken } = req.body;
 
@@ -388,16 +363,9 @@ app.post('/api/auth/refresh', async (req, res) => {
   }
 
   try {
-    // Verify refresh token
-    const decoded = jwt.verify(refreshToken, JWT_SECRET);
-    
-    if (decoded.type !== 'refresh') {
-      return res.status(401).json({ error: 'Invalid token type' });
-    }
-
-    // Check if token exists in database
+    // Verify refresh token exists and is valid
     const tokenResult = await pool.query(
-      `SELECT rt.*, u.username, u.role 
+      `SELECT rt.user_id, u.username, u.role 
        FROM refresh_tokens rt 
        JOIN users u ON rt.user_id = u.id 
        WHERE rt.token = $1 AND rt.expires_at > NOW()`,
@@ -432,20 +400,9 @@ app.post('/api/auth/refresh', async (req, res) => {
   }
 });
 
-// Logout (revoke tokens)
+// Logout (simplified - just remove refresh tokens)
 app.post('/api/auth/logout', verifyToken, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader.replace('Bearer ', '');
-    
-    // Blacklist the current access token
-    await redis.set(
-      `blacklist:${token}`,
-      '1',
-      'EX',
-      24 * 60 * 60 // 24 hours
-    );
-
     // Remove refresh tokens for this user
     await pool.query(
       'DELETE FROM refresh_tokens WHERE user_id = $1',
@@ -488,48 +445,12 @@ app.post('/api/auth/api-key', verifyToken, async (req, res) => {
   }
 });
 
-// List API keys
-app.get('/api/auth/api-keys', verifyToken, async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT id, name, permissions, last_used, expires_at, created_at
-       FROM api_keys
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
-      [req.user.sub]
-    );
-
-    res.json(result.rows);
-  } catch (error) {
-    console.error('API key listing error:', error);
-    res.status(500).json({ error: 'Failed to list API keys' });
-  }
-});
-
-// Revoke API key
-app.delete('/api/auth/api-key/:id', verifyToken, async (req, res) => {
-  try {
-    const result = await pool.query(
-      'DELETE FROM api_keys WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user.sub]
-    );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'API key not found' });
-    }
-
-    res.json({ message: 'API key revoked' });
-  } catch (error) {
-    console.error('API key revocation error:', error);
-    res.status(500).json({ error: 'Failed to revoke API key' });
-  }
-});
-
 // Get user profile
-app.get('/api/auth/profile', verifyApiKey, async (req, res) => {
+app.get('/api/auth/profile', verifyToken, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, username, email, role, created_at, last_login FROM users WHERE id = $1',
+      `SELECT id, username, email, role, created_at, updated_at, last_login, metadata 
+       FROM users WHERE id = $1`,
       [req.user.sub]
     );
 
@@ -593,7 +514,7 @@ app.post('/api/auth/change-password', verifyToken, async (req, res) => {
   }
 });
 
-// Validate token endpoint (for other services)
+// Validate token endpoint (for other services) - simplified
 app.post('/api/auth/validate', async (req, res) => {
   const { token } = req.body;
 
@@ -604,12 +525,6 @@ app.post('/api/auth/validate', async (req, res) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     
-    // Check if token is blacklisted
-    const isBlacklisted = await redis.get(`blacklist:${token}`);
-    if (isBlacklisted) {
-      return res.status(401).json({ valid: false, error: 'Token has been revoked' });
-    }
-
     res.json({ 
       valid: true, 
       user: {
@@ -629,7 +544,7 @@ async function start() {
     await initDatabase();
     
     app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Auth service running on port ${PORT}`);
+      console.log(`Auth service running on port ${PORT} (Redis-free!)`);
     });
   } catch (error) {
     console.error('Failed to start auth service:', error);

@@ -17,6 +17,7 @@ services:
       - POSTGRES_DB=${DB_NAME:-zettl}
       - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+      - ZETTL_AUTH_PASSWORD_FILE=/run/secrets/db_auth_password
     networks:
       - zettl-network
     healthcheck:
@@ -25,26 +26,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-
-  # Redis Cache
-  redis:
-    image: redis:7-alpine
-    container_name: zettl-redis
-    restart: unless-stopped
-    command: >
-      redis-server
-      --appendonly yes
-      --requirepass ${REDIS_PASSWORD:-}
-    volumes:
-      - redis_data:/data
-      - ./secrets:/run/secrets:ro
-    networks:
-      - zettl-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
 
   # Authentication Service
   auth-service:
@@ -61,8 +42,6 @@ services:
       - DB_USER=zettl_auth
       - DB_PASSWORD_FILE=/run/secrets/db_auth_password
       - DB_NAME=${DB_NAME:-zettl}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
       - REDIS_PASSWORD_FILE=/run/secrets/redis_password
       - JWT_SECRET_FILE=/run/secrets/jwt_secret
       - JWT_EXPIRES_IN=24h
@@ -74,8 +53,6 @@ services:
       - zettl-network
     depends_on:
       postgresql:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => {r.statusCode === 200 ? process.exit(0) : process.exit(1)}).on('error', () => process.exit(1))"]
@@ -108,26 +85,18 @@ services:
         condition: service_healthy
       auth-service:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-O", "-", "http://localhost:3000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # Zettl Web Application
   zettl-web:
     build:
-      context: ./zettl_web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: zettl_web/Dockerfile
     container_name: zettl-web
     restart: unless-stopped
     environment:
       - FLASK_ENV=production
       - API_URL=http://postgrest:3000
       - AUTH_URL=http://auth-service:3001
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
       - SECRET_KEY_FILE=/run/secrets/flask_secret
     volumes:
       - ./zettl_web:/app
@@ -136,14 +105,9 @@ services:
       - zettl-network
     depends_on:
       postgrest:
-        condition: service_healthy
+        condition: service_started
       auth-service:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # Nginx Reverse Proxy
   nginx:
@@ -218,7 +182,7 @@ services:
       - PGADMIN_DEFAULT_PASSWORD_FILE=/run/secrets/pgadmin_password
       - PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION=True
       - PGADMIN_CONFIG_CONSOLE_LOG_LEVEL=10
-      - PGADMIN_LISTEN_PORT=5050
+      - PGADMIN_LISTEN_PORT=5051
     volumes:
       - pgadmin_data:/var/lib/pgadmin
       - ./secrets:/run/secrets:ro
@@ -231,8 +195,6 @@ services:
 # Persistent volumes
 volumes:
   postgres_data:
-    driver: local
-  redis_data:
     driver: local
   pgadmin_data:
     driver: local
