@@ -4,11 +4,16 @@ import os
 import json
 import logging
 import shlex
+import sys
 from flask import Flask, request, jsonify, render_template, Response, session
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 import re
+
+# Add the parent directory to the Python path to find the zettl module
+sys.path.insert(0, '/app')
+
 from zettl.nutrition import NutritionTracker
 from zettl.help import CommandHelp
 

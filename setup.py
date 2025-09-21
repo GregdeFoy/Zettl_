@@ -16,7 +16,6 @@ setup(
     include_package_data=True,
     install_requires=[
         'Click',
-        'supabase',
         'python-dotenv',
         'requests',
         'rich',  # For enhanced terminal formatting

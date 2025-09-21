@@ -5,9 +5,9 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# Supabase configuration
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+# PostgREST API configuration
+POSTGREST_URL = os.getenv("POSTGREST_URL", "http://localhost:3000")
+AUTH_URL = os.getenv("AUTH_URL", "http://localhost:3001")
 
 # Claude API configuration
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")

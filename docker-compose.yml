@@ -99,7 +99,6 @@ services:
       - AUTH_URL=http://auth-service:3001
       - SECRET_KEY_FILE=/run/secrets/flask_secret
     volumes:
-      - ./zettl_web:/app
       - ./secrets:/run/secrets:ro
     networks:
       - zettl-network
