@@ -95,7 +95,7 @@ services:
     restart: unless-stopped
     environment:
       - FLASK_ENV=production
-      - API_URL=http://postgrest:3000
+      - POSTGREST_URL=http://postgrest:3000
       - AUTH_URL=http://auth-service:3001
       - SECRET_KEY_FILE=/run/secrets/flask_secret
     volumes:

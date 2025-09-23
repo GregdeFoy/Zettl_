@@ -154,10 +154,14 @@ class Database:
             "modified_at": now
         }
 
-        response = self._make_request('POST', 'notes', data=note_data)
+        try:
+            response = self._make_request('POST', 'notes', data=note_data)
+        except Exception as e:
+            raise Exception(f"Failed to create note - Request failed: {str(e)}")
 
-        if not response.text:
-            raise Exception("Failed to create note")
+        # PostgREST returns 201 Created with empty body on successful creation
+        if response.status_code != 201:
+            raise Exception(f"Failed to create note - Unexpected status: {response.status_code}, Response: {response.text}")
 
         # Invalidate relevant caches
         invalidate_cache("list_notes")
