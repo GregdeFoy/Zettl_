@@ -52,10 +52,12 @@ def invalidate_cache(prefix=None):
         _global_cache_ttl.clear()
 
 class Database:
-    def __init__(self):
+    def __init__(self, jwt_token=None, api_key=None):
         self.session = get_http_session()
         self.postgrest_url = POSTGREST_URL
         self.auth_url = AUTH_URL
+        self.jwt_token = jwt_token
+        self.api_key = api_key
         # Keep this for backward compatibility with any code that might access it
         self._cache = {}
         self._cache_ttl = {}
@@ -64,6 +66,21 @@ class Database:
     def invalidate_cache(self, prefix=None):
         """Instance method that calls the module-level function."""
         invalidate_cache(prefix)
+
+    def _get_jwt_from_api_key(self):
+        """Convert API key to JWT token via auth service."""
+        if not self.api_key:
+            return
+
+        try:
+            response = requests.post(f'{self.auth_url}/api/auth/token-from-key',
+                                   headers={'X-API-Key': self.api_key},
+                                   timeout=5)
+            if response.status_code == 200:
+                self.jwt_token = response.json().get('token')
+        except requests.RequestException:
+            # API key authentication failed, will result in 401 errors
+            pass
 
     def _get_iso_timestamp(self) -> str:
         """Generate a properly formatted ISO timestamp for database operations."""
@@ -103,6 +120,20 @@ class Database:
             kwargs['json'] = data
         if params:
             kwargs['params'] = params
+
+        # Add authorization headers
+        headers = kwargs.get('headers', {})
+
+        # If we have an API key but no JWT token, get one
+        if self.api_key and not self.jwt_token:
+            self._get_jwt_from_api_key()
+
+        # Add JWT authorization header if token is available
+        if self.jwt_token:
+            headers['Authorization'] = f'Bearer {self.jwt_token}'
+
+        if headers:
+            kwargs['headers'] = headers
 
         response = self.session.request(method, url, **kwargs)
         response.raise_for_status()

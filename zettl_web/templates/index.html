@@ -341,6 +341,7 @@
         <span>Zettl Web Terminal</span>
         <div class="actions">
             <button id="clear-terminal">Clear</button>
+            <button id="logout-button">Logout</button>
             <span id="username">{{ username }}</span>
         </div>
     </div>
@@ -372,6 +373,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const shortcutButtons = document.getElementById('shortcut-buttons');
     const clearTerminalButton = document.getElementById('clear-terminal');
     const clearInputButton = document.getElementById('clear-input-button');
+    const logoutButton = document.getElementById('logout-button');
     
     // Command history
     let commandHistory = loadHistory();
@@ -556,6 +558,25 @@ document.addEventListener('DOMContentLoaded', function() {
         commandInput.focus();
         autoResizeTextarea();
         updateShortcutButtons();
+    });
+
+    // Handle logout button
+    logoutButton.addEventListener('click', function() {
+        if (confirm('Are you sure you want to logout?')) {
+            fetch('/api/logout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(() => {
+                window.location.href = '/login';
+            })
+            .catch(() => {
+                // Even if logout fails, redirect to login
+                window.location.href = '/login';
+            });
+        }
     });
 
     // Handle iOS focus issues

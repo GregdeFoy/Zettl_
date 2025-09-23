@@ -5,11 +5,14 @@ import json
 import logging
 import shlex
 import sys
-from flask import Flask, request, jsonify, render_template, Response, session
-from flask_httpauth import HTTPBasicAuth
+import requests
+from flask import Flask, request, jsonify, render_template, Response, session, redirect, url_for
+from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 import re
+import jwt
+from datetime import datetime, timezone
 
 # Add the parent directory to the Python path to find the zettl module
 sys.path.insert(0, '/app')
@@ -30,130 +33,98 @@ logger = logging.getLogger(__name__)
 
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24))
-auth = HTTPBasicAuth()
 
-# Get username/password from environment variables
-ZETTL_WEB_USER = os.getenv("ZETTL_WEB_USER")
-ZETTL_WEB_PASS = os.getenv("ZETTL_WEB_PASS")
-
-# Print debug info to console
-print(f"Auth credentials from env: User='{ZETTL_WEB_USER}', Pass set: {'Yes' if ZETTL_WEB_PASS else 'No'}")
-
-# Set up users dictionary for authentication
-users = {}
-if ZETTL_WEB_USER and ZETTL_WEB_PASS:
-    users[ZETTL_WEB_USER] = generate_password_hash(ZETTL_WEB_PASS)
-    print(f"Added user '{ZETTL_WEB_USER}' to authentication system")
+# Read secret key from file if available, otherwise use environment or generate random
+secret_key_file = os.getenv('SECRET_KEY_FILE')
+if secret_key_file and os.path.exists(secret_key_file):
+    with open(secret_key_file, 'r') as f:
+        app.secret_key = f.read().strip()
 else:
-    # For development, add a default user if environment variables aren't set
-    users["admin"] = generate_password_hash("admin")
-    print("WARNING: Using default credentials (admin/admin) - not secure for production!")
+    app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24))
 
-print(f"Authentication users: {list(users.keys())}")
+# Auth service configuration
+AUTH_URL = os.getenv('AUTH_URL', 'http://auth-service:3001')
+JWT_SECRET_FILE = os.getenv('JWT_SECRET_FILE')
 
-# Now import Zettl components - do this after environment is set up
-try:
-    from zettl.notes import Notes
-    from zettl.database import Database
-    from zettl.llm import LLMHelper
-    from zettl.formatting import ZettlFormatter, Colors
-    
-    # Initialize core Zettl components
-    notes_manager = Notes()
-    llm_helper = LLMHelper()
-    logger.debug("Successfully imported and initialized Zettl components")
-except ImportError as e:
-    logger.error(f"Error importing Zettl modules: {e}")
-    # Provide dummy implementations for testing if needed
-    class DummyNotes:
-        def list_notes(self, limit=10):
-            return [{"id": "12345", "content": "This is a test note", "created_at": "2025-03-13T12:00:00Z"}]
-        def format_timestamp(self, date_str):
-            return "2025-03-13 12:00"
-        def create_note(self, content):
-            return "12345"
-        def get_note(self, note_id):
-            return {"id": note_id, "content": "This is a test note", "created_at": "2025-03-13T12:00:00Z"}
-        def get_tags(self, note_id):
-            return ["test", "dummy"]
-        def add_tag(self, note_id, tag):
-            pass
-        def search_notes(self, query):
-            return [{"id": "12345", "content": "This is a test note containing " + query, "created_at": "2025-03-13T12:00:00Z"}]
-        def create_link(self, source_id, target_id, context=""):
-            pass
-        def get_related_notes(self, note_id):
-            return [{"id": "67890", "content": "This is a related test note", "created_at": "2025-03-13T12:00:00Z"}]
-        def delete_note(self, note_id, cascade=True):
-            pass
-        def delete_tag(self, note_id, tag):
-            pass
-        def delete_link(self, source_id, target_id):
-            pass
-        def get_notes_by_tag(self, tag):
-            return [{"id": "12345", "content": "This is a todo note", "created_at": "2025-03-13T12:00:00Z"}]
-        def get_all_tags_with_counts(self):
-            return [{"tag": "test", "count": 1}, {"tag": "todo", "count": 2}]
-    
-    class DummyLLM:
-        def summarize_note(self, note_id):
-            return "This is a test summary."
-        def suggest_tags(self, note_id, count=3):
-            return ["test", "dummy", "example"]
-    
-    class DummyColors:
-        GREEN = "\033[92m"
-        BLUE = "\033[94m"
-        YELLOW = "\033[93m"
-        RED = "\033[91m"
-        CYAN = "\033[96m"
-        BOLD = "\033[1m"
-        RESET = "\033[0m"
-    
-    class DummyFormatter:
-        @staticmethod
-        def header(text):
-            return f"\033[1m\033[92m{text}\033[0m"
-        
-        @staticmethod
-        def note_id(note_id):
-            return f"\033[96m#{note_id}\033[0m"
-        
-        @staticmethod
-        def timestamp(date_str):
-            return f"\033[94m{date_str}\033[0m"
-        
-        @staticmethod
-        def tag(tag_text):
-            return f"\033[93m#{tag_text}\033[0m"
-        
-        @staticmethod
-        def error(text):
-            return f"\033[91mError: {text}\033[0m"
-        
-        @staticmethod
-        def warning(text):
-            return f"\033[93mWarning: {text}\033[0m"
-        
-        @staticmethod
-        def success(text):
-            return f"\033[92m{text}\033[0m"
-    
-    notes_manager = DummyNotes()
-    llm_helper = DummyLLM()
-    Colors = DummyColors()
-    ZettlFormatter = DummyFormatter()
-    logger.debug("Using dummy implementations for testing")
+# Read JWT secret for token validation
+JWT_SECRET = None
+if JWT_SECRET_FILE and os.path.exists(JWT_SECRET_FILE):
+    with open(JWT_SECRET_FILE, 'r') as f:
+        JWT_SECRET = f.read().strip()
+else:
+    JWT_SECRET = os.getenv('JWT_SECRET')
 
-@auth.verify_password
-def verify_password(username, password):
-    print(f"Verifying password for user: {username}")
-    if username in users and check_password_hash(users.get(username), password):
-        print(f"Authentication successful for user: {username}")
-        return username
-    print(f"Authentication failed for user: {username}")
-    return None
+print(f"Auth service URL: {AUTH_URL}")
+print(f"JWT secret configured: {'Yes' if JWT_SECRET else 'No'}")
+
+# Import Zettl components
+from zettl.notes import Notes
+from zettl.database import Database
+from zettl.llm import LLMHelper
+from zettl.formatting import ZettlFormatter, Colors
+from zettl.nutrition import NutritionTracker
+from zettl.help import CommandHelp
+
+logger.debug("Successfully imported Zettl components")
+
+# JWT token validation decorator
+def jwt_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = None
+
+        # Check for token in session first
+        if 'access_token' in session:
+            token = session['access_token']
+        # Check Authorization header as fallback
+        elif 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            if auth_header.startswith('Bearer '):
+                token = auth_header.split(' ')[1]
+
+        if not token:
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'No token provided'}), 401
+            else:
+                return redirect(url_for('login_page'))
+
+        try:
+            # Validate token with auth service
+            response = requests.post(f'{AUTH_URL}/api/auth/validate',
+                                   json={'token': token},
+                                   timeout=5)
+
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('valid'):
+                    request.current_user = data.get('user')
+                    return f(*args, **kwargs)
+
+            # Token invalid - clear session and redirect
+            session.clear()
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Invalid or expired token'}), 401
+            else:
+                return redirect(url_for('login_page'))
+
+        except requests.RequestException as e:
+            logger.error(f"Auth service connection error: {e}")
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Authentication service unavailable'}), 503
+            else:
+                return render_template('login.html', error='Authentication service unavailable')
+
+    return decorated_function
+
+def get_notes_manager():
+    """Get a Notes manager instance with the current user's JWT token."""
+    # Get JWT token from session
+    jwt_token = session.get('access_token')
+    return Notes(jwt_token=jwt_token)
+
+def get_llm_helper():
+    """Get an LLM helper instance."""
+    return LLMHelper()
 
 # Command parsing utilities
 def parse_command(command_str):
@@ -451,21 +422,199 @@ def show_command_help(cmd):
 
 
 # Routes
+@app.route('/login')
+def login_page():
+    # If user is already logged in, redirect to main page
+    if 'access_token' in session:
+        try:
+            response = requests.post(f'{AUTH_URL}/api/auth/validate',
+                                   json={'token': session['access_token']},
+                                   timeout=5)
+            if response.status_code == 200 and response.json().get('valid'):
+                return redirect(url_for('index'))
+        except:
+            session.clear()
+
+    return render_template('login.html')
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return jsonify({'error': 'Username and password required', 'success': False}), 400
+
+    try:
+        # Authenticate with auth service
+        response = requests.post(f'{AUTH_URL}/api/auth/login',
+                               json={'username': username, 'password': password},
+                               timeout=10)
+
+        if response.status_code == 200:
+            data = response.json()
+            # Store tokens in session
+            session['access_token'] = data['accessToken']
+            session['refresh_token'] = data['refreshToken']
+            session['user'] = data['user']
+
+            return jsonify({
+                'success': True,
+                'message': 'Login successful',
+                'user': data['user']
+            })
+        else:
+            error_data = response.json() if response.content else {}
+            return jsonify({
+                'error': error_data.get('error', 'Login failed'),
+                'success': False
+            }), response.status_code
+
+    except requests.RequestException as e:
+        logger.error(f"Auth service connection error: {e}")
+        return jsonify({
+            'error': 'Authentication service unavailable',
+            'success': False
+        }), 503
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    username = data.get('username')
+    email = data.get('email')
+    password = data.get('password')
+
+    if not username or not email or not password:
+        return jsonify({'error': 'Username, email and password required', 'success': False}), 400
+
+    try:
+        # Register with auth service
+        response = requests.post(f'{AUTH_URL}/api/auth/register',
+                               json={'username': username, 'email': email, 'password': password},
+                               timeout=10)
+
+        if response.status_code == 201:
+            return jsonify({
+                'success': True,
+                'message': 'Registration successful'
+            })
+        else:
+            error_data = response.json() if response.content else {}
+            return jsonify({
+                'error': error_data.get('error', 'Registration failed'),
+                'success': False
+            }), response.status_code
+
+    except requests.RequestException as e:
+        logger.error(f"Auth service connection error: {e}")
+        return jsonify({
+            'error': 'Authentication service unavailable',
+            'success': False
+        }), 503
+
+@app.route('/api/logout', methods=['POST'])
+@jwt_required
+def logout():
+    try:
+        # Call auth service logout if we have tokens
+        if 'access_token' in session:
+            requests.post(f'{AUTH_URL}/api/auth/logout',
+                        headers={'Authorization': f'Bearer {session["access_token"]}'},
+                        timeout=5)
+    except:
+        pass  # Ignore auth service errors during logout
+
+    session.clear()
+    return jsonify({'success': True, 'message': 'Logged out successfully'})
+
+@app.route('/api/generate-api-key', methods=['POST'])
+@jwt_required
+def generate_api_key():
+    data = request.get_json() or {}
+    name = data.get('name', 'CLI Key')
+
+    try:
+        # Generate API key via auth service
+        response = requests.post(f'{AUTH_URL}/api/auth/api-key',
+                               headers={'Authorization': f'Bearer {session["access_token"]}'},
+                               json={'name': name},
+                               timeout=10)
+
+        if response.status_code == 200:
+            return jsonify({
+                'success': True,
+                'api_key': response.json()['apiKey'],
+                'name': response.json()['name']
+            })
+        else:
+            error_data = response.json() if response.content else {}
+            return jsonify({
+                'error': error_data.get('error', 'Failed to generate API key'),
+                'success': False
+            }), response.status_code
+
+    except requests.RequestException as e:
+        logger.error(f"Auth service connection error: {e}")
+        return jsonify({
+            'error': 'Authentication service unavailable',
+            'success': False
+        }), 503
+
+@app.route('/api/list-api-keys', methods=['GET'])
+@jwt_required
+def list_api_keys():
+    try:
+        # List API keys via auth service
+        response = requests.get(f'{AUTH_URL}/api/auth/api-keys',
+                              headers={'Authorization': f'Bearer {session["access_token"]}'},
+                              timeout=10)
+
+        if response.status_code == 200:
+            return jsonify({
+                'success': True,
+                'api_keys': response.json()
+            })
+        else:
+            error_data = response.json() if response.content else {}
+            return jsonify({
+                'error': error_data.get('error', 'Failed to list API keys'),
+                'success': False
+            }), response.status_code
+
+    except requests.RequestException as e:
+        logger.error(f"Auth service connection error: {e}")
+        return jsonify({
+            'error': 'Authentication service unavailable',
+            'success': False
+        }), 503
+
 @app.route('/')
-@auth.login_required
+@jwt_required
 def index():
-    logger.debug(f"Rendering index page for user: {auth.current_user()}")
-    return render_template('index.html', username=auth.current_user())
+    user = getattr(request, 'current_user', session.get('user', {}))
+    username = user.get('username', 'Unknown')
+    logger.debug(f"Rendering index page for user: {username}")
+    return render_template('index.html', username=username)
 
 @app.route('/api/command', methods=['POST'])
-@auth.login_required
+@jwt_required
 def execute_command():
     command = request.json.get('command', '').strip()
     logger.debug(f"Executing command: {command}")
-    
+
     if not command:
         return jsonify({'result': 'No command provided'})
-        
+
+    try:
+        # Get Notes manager with JWT token for this request
+        notes_manager = get_notes_manager()
+        llm_helper = get_llm_helper()
+    except Exception as e:
+        logger.error(f"Failed to initialize Zettl components: {e}")
+        error_msg = ZettlFormatter.error("Unable to connect to the database. Please check your authentication and try again.")
+        return jsonify({'result': ansi_to_html(error_msg)})
+
     # Parse the command with better handling for options and quotes
     cmd, args = parse_command(command)
 
@@ -497,7 +646,7 @@ def execute_command():
 
             for note in notes:
                 note_id = note['id']
-                created_at = notes_manager.format_timestamp(note['created_at'])
+                created_at = notes_manager.db.format_timestamp(note['created_at'])
                 
                 if compact:
                     # Very compact mode - just IDs
@@ -595,7 +744,7 @@ def execute_command():
                     note = notes_manager.get_note(note_id)
                     logger.debug(f"Note loaded successfully: {note is not None}")
                     
-                    created_at = notes_manager.format_timestamp(note['created_at'])
+                    created_at = notes_manager.db.format_timestamp(note['created_at'])
                     
                     result = f"{ZettlFormatter.note_id(note_id)} [{ZettlFormatter.timestamp(created_at)}]\n"
                     result += "-" * 40 + "\n"
@@ -750,7 +899,7 @@ def execute_command():
                 try:
                     source_note = notes_manager.get_note(note_id)
                     result = f"{ZettlFormatter.header('Source Note')}\n"
-                    created_at = notes_manager.format_timestamp(source_note['created_at'])
+                    created_at = notes_manager.db.format_timestamp(source_note['created_at'])
                     result += f"{ZettlFormatter.note_id(note_id)} [{ZettlFormatter.timestamp(created_at)}]\n"
                     result += "-" * 40 + "\n"
                     result += f"{source_note['content']}\n\n"
@@ -767,7 +916,7 @@ def execute_command():
                     for note in related_notes:
                         if full:
                             # Full content mode
-                            note_created_at = notes_manager.format_timestamp(note['created_at'])
+                            note_created_at = notes_manager.db.format_timestamp(note['created_at'])
                             result += f"{ZettlFormatter.note_id(note['id'])} [{ZettlFormatter.timestamp(note_created_at)}]\n"
                             result += "-" * 40 + "\n"
                             result += f"{note['content']}\n\n"
@@ -1420,7 +1569,19 @@ def execute_command():
         
     except Exception as e:
         logger.exception(f"Error executing command: {e}")
-        return jsonify({'result': ansi_to_html(ZettlFormatter.error(str(e)))})
+
+        # Provide more specific error messages based on the type of error
+        error_str = str(e).lower()
+        if "401" in error_str or "unauthorized" in error_str:
+            error_msg = ZettlFormatter.error("Authentication failed. Please log out and log back in.")
+        elif "connection" in error_str or "timeout" in error_str:
+            error_msg = ZettlFormatter.error("Database connection error. Please try again.")
+        elif "404" in error_str or "not found" in error_str:
+            error_msg = ZettlFormatter.error("Requested resource not found.")
+        else:
+            error_msg = ZettlFormatter.error(f"Command execution failed: {str(e)}")
+
+        return jsonify({'result': ansi_to_html(error_msg)})
 
 
 def format_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=False, include_cancel=False, filter_tags=None):

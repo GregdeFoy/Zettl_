@@ -51,8 +51,13 @@ CREATE TRIGGER update_notes_modified
     FOR EACH ROW 
     EXECUTE FUNCTION update_modified_column();
 
+-- Create PostgreSQL roles for PostgREST
+CREATE ROLE IF NOT EXISTS anon;
+CREATE ROLE IF NOT EXISTS web_user;
+CREATE ROLE IF NOT EXISTS "user"; -- Role for authenticated users from JWT
+
 -- Grant permissions for PostgREST
-GRANT USAGE ON SCHEMA public TO anon, web_user;
+GRANT USAGE ON SCHEMA public TO anon, web_user, "user";
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO web_user;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO web_user;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO web_user, "user";
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO web_user, "user";

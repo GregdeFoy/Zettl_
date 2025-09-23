@@ -13,20 +13,30 @@ import re
 import random
 from zettl.nutrition import NutritionTracker
 from zettl.help import CommandHelp
+from zettl.auth import auth as zettl_auth
 
+# Get authenticated components
+def get_notes_manager():
+    """Get an authenticated Notes manager."""
+    api_key = zettl_auth.require_auth()
+    return Notes(api_key=api_key)
 
-# Initialize the notes manager, graph manager and LLM helper
-notes_manager = Notes()
-graph_manager = NoteGraph()
-llm_helper = LLMHelper()
+def get_graph_manager():
+    """Get a graph manager (doesn't need auth currently)."""
+    return NoteGraph()
+
+def get_llm_helper():
+    """Get an LLM helper (doesn't need auth currently)."""
+    return LLMHelper()
 
 # Define the function that both commands will use
 def create_new_note(content, tag, link=None):
     """Create a new note with the given content and optional tags."""
     try:
+        notes_manager = get_notes_manager()
         note_id = notes_manager.create_note(content)
         click.echo(f"Created note #{note_id}")
-        
+
         # Add tags if provided
         if tag:
             for t in tag:
@@ -35,7 +45,7 @@ def create_new_note(content, tag, link=None):
                     click.echo(f"Added tag '{t}' to note #{note_id}")
                 except Exception as e:
                     click.echo(f"Warning: Could not add tag '{t}': {str(e)}", err=True)
-        
+
         # Create link if provided
         if link:
             try:
@@ -52,6 +62,49 @@ def create_new_note(content, tag, link=None):
 def cli():
     """A Zettelkasten-style note-taking CLI tool."""
     pass
+
+@cli.group()
+def auth():
+    """Authentication commands."""
+    pass
+
+@auth.command()
+def setup():
+    """Set up API key authentication."""
+    click.echo("Setting up Zettl CLI authentication...")
+    click.echo("")
+    click.echo("1. Go to your Zettl web interface")
+    click.echo("2. Log in to your account")
+    click.echo("3. Generate an API key for CLI access")
+    click.echo("")
+
+    api_key = click.prompt("Enter your API key", hide_input=True)
+
+    if not api_key.startswith('zettl_'):
+        click.echo("Warning: API key should start with 'zettl_'", err=True)
+
+    # Test the API key
+    click.echo("Testing API key...")
+    if zettl_auth.test_api_key(api_key):
+        if zettl_auth.set_api_key(api_key):
+            click.echo(ZettlFormatter.success("✓ API key saved successfully!"))
+            click.echo("You can now use the Zettl CLI.")
+        else:
+            click.echo(ZettlFormatter.error("✗ Failed to save API key"))
+    else:
+        click.echo(ZettlFormatter.error("✗ Invalid API key. Please check and try again."))
+
+@auth.command()
+def status():
+    """Check authentication status."""
+    api_key = zettl_auth.get_api_key()
+    if api_key:
+        if zettl_auth.test_api_key(api_key):
+            click.echo(ZettlFormatter.success("✓ Authenticated"))
+        else:
+            click.echo(ZettlFormatter.error("✗ API key is invalid or expired"))
+    else:
+        click.echo(ZettlFormatter.warning("⚠ Not authenticated. Run 'zettl auth setup'"))
 
 @cli.command()
 def commands():
@@ -97,7 +150,7 @@ def list(limit, full, compact, help):
         return
 
     try:
-        notes = notes_manager.list_notes(limit)
+        notes = get_notes_manager().list_notes(limit)
         if not notes:
             click.echo("No notes found.")
             return
@@ -106,7 +159,7 @@ def list(limit, full, compact, help):
         
         for note in notes:
             note_id = note['id']
-            created_at = notes_manager.format_timestamp(note['created_at'])
+            created_at = get_notes_manager().format_timestamp(note['created_at'])
             
             if compact:
                 # Very compact mode - just IDs
@@ -117,7 +170,7 @@ def list(limit, full, compact, help):
                 
                 # Add tags if there are any
                 try:
-                    tags = notes_manager.get_tags(note_id)
+                    tags = get_notes_manager().get_tags(note_id)
                     if tags:
                         click.echo(f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}")
                 except Exception:
@@ -144,12 +197,12 @@ def show(note_id, help):
 
     """Display note content."""
     try:
-        note = notes_manager.get_note(note_id)
+        note = get_notes_manager().get_note(note_id)
         click.echo(ZettlFormatter.format_note_display(note, notes_manager))
         
         # Show tags if any
         try:
-            tags = notes_manager.get_tags(note_id)
+            tags = get_notes_manager().get_tags(note_id)
             if tags:
                 click.echo(f"Tags: {', '.join(tags)}")
         except Exception:
@@ -169,7 +222,7 @@ def link(source_id, target_id, context, help):
 
     """Create link between notes."""
     try:
-        notes_manager.create_link(source_id, target_id, context)
+        get_notes_manager().create_link(source_id, target_id, context)
         click.echo(f"Created link from #{source_id} to #{target_id}")
     except Exception as e:
         click.echo(f"Error creating link: {str(e)}", err=True)
@@ -187,7 +240,7 @@ def tags(note_id, tag, help):
     try:
         # If no note_id is provided, list all tags
         if not note_id:
-            tags_with_counts = notes_manager.get_all_tags_with_counts()
+            tags_with_counts = get_notes_manager().get_all_tags_with_counts()
             if tags_with_counts:
                 click.echo(ZettlFormatter.header(f"All Tags (showing {len(tags_with_counts)})"))
                 for tag_info in tags_with_counts:
@@ -199,11 +252,11 @@ def tags(note_id, tag, help):
             
         # If a tag was provided, add it
         if tag:
-            notes_manager.add_tag(note_id, tag)
+            get_notes_manager().add_tag(note_id, tag)
             click.echo(f"Added tag '{tag}' to note #{note_id}")
             
         # Show all tags for the note
-        tags = notes_manager.get_tags(note_id)
+        tags = get_notes_manager().get_tags(note_id)
         if tags:
             click.echo(f"Tags for note #{note_id}: {', '.join([ZettlFormatter.tag(t) for t in tags])}")
         else:
@@ -229,7 +282,7 @@ def search(query, tag, exclude_tag, date, full, help):
         
         if tag:
             # Search by tag inclusion
-            notes = notes_manager.get_notes_by_tag(tag)
+            notes = get_notes_manager().get_notes_by_tag(tag)
             if not notes:
                 click.echo(ZettlFormatter.warning(f"No notes found with tag '{tag}'"))
                 return
@@ -239,7 +292,7 @@ def search(query, tag, exclude_tag, date, full, help):
         elif date:
             # Search by date
             try:
-                notes = notes_manager.search_notes_by_date(date)
+                notes = get_notes_manager().search_notes_by_date(date)
                 if not notes:
                     click.echo(ZettlFormatter.warning(f"No notes found for date '{date}'"))
                     return
@@ -251,7 +304,7 @@ def search(query, tag, exclude_tag, date, full, help):
                 return
         elif query:
             # Search by content
-            notes = notes_manager.search_notes(query)
+            notes = get_notes_manager().search_notes(query)
             if not notes:
                 click.echo(ZettlFormatter.warning(f"No notes found containing '{query}'"))
                 return
@@ -260,13 +313,13 @@ def search(query, tag, exclude_tag, date, full, help):
             results = notes
         else:
             # No search criteria specified, use a larger set
-            results = notes_manager.list_notes(limit=50)
+            results = get_notes_manager().list_notes(limit=50)
             click.echo(ZettlFormatter.header(f"Listing notes (showing {len(results)}):"))
         
         # Filter out excluded tags if specified
         if exclude_tag:
             # Get IDs of notes with the excluded tag
-            excluded_notes = notes_manager.get_notes_by_tag(exclude_tag)
+            excluded_notes = get_notes_manager().get_notes_by_tag(exclude_tag)
             excluded_ids = {note['id'] for note in excluded_notes}
             
             # Filter out notes with the excluded tag
@@ -289,7 +342,7 @@ def search(query, tag, exclude_tag, date, full, help):
                 
                 # Add tags if there are any
                 try:
-                    tags = notes_manager.get_tags(note['id'])
+                    tags = get_notes_manager().get_tags(note['id'])
                     if tags:
                         click.echo(f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}")
                 except Exception:
@@ -321,7 +374,7 @@ def related(note_id, full, help):
     try:
         # First, show the source note
         try:
-            source_note = notes_manager.get_note(note_id)
+            source_note = get_notes_manager().get_note(note_id)
             click.echo(ZettlFormatter.header(f"Source Note"))
             click.echo(ZettlFormatter.format_note_display(source_note, notes_manager))
             click.echo("\n")  # Extra space after source note
@@ -329,7 +382,7 @@ def related(note_id, full, help):
             click.echo(ZettlFormatter.warning(f"Could not display source note: {str(e)}"))
         
         # Now show related notes
-        related_notes = notes_manager.get_related_notes(note_id)
+        related_notes = get_notes_manager().get_related_notes(note_id)
         if not related_notes:
             click.echo(ZettlFormatter.warning(f"No notes connected to note #{note_id}"))
             return
@@ -387,7 +440,7 @@ def llm(note_id, action, count, show_source, help):
         # Show the source note if requested
         if show_source:
             try:
-                source_note = notes_manager.get_note(note_id)
+                source_note = get_notes_manager().get_note(note_id)
                 click.echo(ZettlFormatter.header("Source Note"))
                 click.echo(ZettlFormatter.format_note_display(source_note, notes_manager))
                 click.echo("\n")  # Extra space after source note
@@ -427,13 +480,13 @@ def llm(note_id, action, count, show_source, help):
                 
                 # Try to show a preview of the connected note
                 try:
-                    conn_note = notes_manager.get_note(conn_id)
+                    conn_note = get_notes_manager().get_note(conn_id)
                     content_preview = conn_note['content'][:100] + "..." if len(conn_note['content']) > 100 else conn_note['content']
                     click.echo(f"  {Colors.CYAN}Preview:{Colors.RESET} {content_preview}")
                     
                     # Add option to link notes
                     if click.confirm(f"\nCreate link from #{note_id} to #{conn_id}?"):
-                        notes_manager.create_link(note_id, conn_id, conn['explanation'])
+                        get_notes_manager().create_link(note_id, conn_id, conn['explanation'])
                         click.echo(ZettlFormatter.success(f"Created link from #{note_id} to #{conn_id}"))
                 except Exception:
                     pass
@@ -461,7 +514,7 @@ def llm(note_id, action, count, show_source, help):
             if click.confirm("\nWould you like to add these tags to the note?"):
                 for tag in tags:
                     try:
-                        notes_manager.add_tag(note_id, tag)
+                        get_notes_manager().add_tag(note_id, tag)
                         click.echo(ZettlFormatter.success(f"Added tag '{tag}' to note #{note_id}"))
                     except Exception as e:
                         click.echo(ZettlFormatter.error(f"Error adding tag '{tag}': {str(e)}"), err=True)
@@ -482,18 +535,18 @@ def llm(note_id, action, count, show_source, help):
             if click.confirm("\nCreate a new note with this expanded content?"):
                 try:
                     # Create new note with expanded content
-                    new_note_id = notes_manager.create_note(expanded_content)
+                    new_note_id = get_notes_manager().create_note(expanded_content)
                     click.echo(ZettlFormatter.success(f"Created expanded note #{new_note_id}"))
                     
                     # Create link from original to expanded note
-                    notes_manager.create_link(note_id, new_note_id, "Expanded version")
+                    get_notes_manager().create_link(note_id, new_note_id, "Expanded version")
                     click.echo(ZettlFormatter.success(f"Linked original #{note_id} to expanded #{new_note_id}"))
                     
                     # Copy tags from original note to new note
                     try:
-                        original_tags = notes_manager.get_tags(note_id)
+                        original_tags = get_notes_manager().get_tags(note_id)
                         for tag in original_tags:
-                            notes_manager.add_tag(new_note_id, tag)
+                            get_notes_manager().add_tag(new_note_id, tag)
                         if original_tags:
                             click.echo(ZettlFormatter.success(f"Copied {len(original_tags)} tags to new note"))
                     except Exception:
@@ -526,11 +579,11 @@ def llm(note_id, action, count, show_source, help):
                         concept_content = f"{concept['concept']}\n\n{concept['explanation']}"
                         
                         # Create new note
-                        new_note_id = notes_manager.create_note(concept_content)
+                        new_note_id = get_notes_manager().create_note(concept_content)
                         click.echo(ZettlFormatter.success(f"Created concept note #{new_note_id}"))
                         
                         # Create link from original to concept note
-                        notes_manager.create_link(note_id, new_note_id, f"Concept: {concept['concept']}")
+                        get_notes_manager().create_link(note_id, new_note_id, f"Concept: {concept['concept']}")
                         click.echo(ZettlFormatter.success(f"Linked original #{note_id} to concept #{new_note_id}"))
                     except Exception as e:
                         click.echo(ZettlFormatter.error(f"Error creating concept note: {str(e)}"), err=True)
@@ -560,11 +613,11 @@ def llm(note_id, action, count, show_source, help):
                         question_content = f"{question['question']}\n\n{question['explanation']}"
                         
                         # Create new note
-                        new_note_id = notes_manager.create_note(question_content)
+                        new_note_id = get_notes_manager().create_note(question_content)
                         click.echo(ZettlFormatter.success(f"Created question note #{new_note_id}"))
                         
                         # Create link from original to question note
-                        notes_manager.create_link(note_id, new_note_id, "Question derived from this note")
+                        get_notes_manager().create_link(note_id, new_note_id, "Question derived from this note")
                         click.echo(ZettlFormatter.success(f"Linked original #{note_id} to question #{new_note_id}"))
                     except Exception as e:
                         click.echo(ZettlFormatter.error(f"Error creating question note: {str(e)}"), err=True)
@@ -620,12 +673,12 @@ def delete(note_id, force, keep_links, keep_tags,help):
     try:
         # First get the note to show what will be deleted
         try:
-            note = notes_manager.get_note(note_id)
+            note = get_notes_manager().get_note(note_id)
             
             # Get related data counts for information
             try:
-                tags = notes_manager.get_tags(note_id)
-                related_notes = notes_manager.get_related_notes(note_id)
+                tags = get_notes_manager().get_tags(note_id)
+                related_notes = get_notes_manager().get_related_notes(note_id)
                 tag_count = len(tags)
                 link_count = len(related_notes)
             except Exception:
@@ -658,18 +711,18 @@ def delete(note_id, force, keep_links, keep_tags,help):
         if cascade and (keep_links or keep_tags):
             # Custom deletion flow
             if not keep_tags:
-                notes_manager.delete_note_tags(note_id)
+                get_notes_manager().delete_note_tags(note_id)
                 click.echo(f"Deleted tags for note #{note_id}")
             
             if not keep_links:
-                notes_manager.delete_note_links(note_id)
+                get_notes_manager().delete_note_links(note_id)
                 click.echo(f"Deleted links for note #{note_id}")
             
             # Now delete the note itself (with cascade=False since we handled dependencies)
-            notes_manager.delete_note(note_id, cascade=False)
+            get_notes_manager().delete_note(note_id, cascade=False)
         else:
             # Standard cascade deletion
-            notes_manager.delete_note(note_id, cascade=cascade)
+            get_notes_manager().delete_note(note_id, cascade=cascade)
         
         click.echo(ZettlFormatter.success(f"Deleted note #{note_id}"))
         
@@ -687,7 +740,7 @@ def untag(note_id, tag,help):
         return
     """Remove a tag from a note."""
     try:
-        notes_manager.delete_tag(note_id, tag)
+        get_notes_manager().delete_tag(note_id, tag)
         click.echo(ZettlFormatter.success(f"Removed tag '{tag}' from note #{note_id}"))
     except Exception as e:
         click.echo(ZettlFormatter.error(f"Error removing tag: {str(e)}"), err=True)
@@ -704,7 +757,7 @@ def unlink(source_id, target_id,help):
 
     """Remove a link between two notes."""
     try:
-        notes_manager.delete_link(source_id, target_id)
+        get_notes_manager().delete_link(source_id, target_id)
         click.echo(ZettlFormatter.success(f"Removed link from note #{source_id} to note #{target_id}"))
     except Exception as e:
         click.echo(ZettlFormatter.error(f"Error removing link: {str(e)}"), err=True)
@@ -727,7 +780,7 @@ def todos(donetoday, all, cancel, tag, eisenhower, help):
         done = all
             
         # Get all notes tagged with 'todo'
-        todo_notes = notes_manager.get_notes_by_tag('todo')
+        todo_notes = get_notes_manager().get_notes_by_tag('todo')
         
         if not todo_notes:
             click.echo(ZettlFormatter.warning("No todos found."))
@@ -747,7 +800,7 @@ def todos(donetoday, all, cancel, tag, eisenhower, help):
             # We need to directly query the tags table to check when the 'done' tag was added
             try:
                 # Query tags table for 'done' tags created today
-                tags_result = notes_manager.db.client.table('tags').select('note_id, created_at').eq('tag', 'done').execute()
+                tags_result = get_notes_manager().db.client.table('tags').select('note_id, created_at').eq('tag', 'done').execute()
                 
                 if tags_result.data:
                     for tag_data in tags_result.data:
@@ -775,7 +828,7 @@ def todos(donetoday, all, cancel, tag, eisenhower, help):
             
             for note in todo_notes:
                 note_id = note['id']
-                note_tags = [t.lower() for t in notes_manager.get_tags(note_id)]
+                note_tags = [t.lower() for t in get_notes_manager().get_tags(note_id)]
                 
                 # Check if all filters are in the note's tags
                 has_all_filters = True
@@ -813,7 +866,7 @@ def todos(donetoday, all, cancel, tag, eisenhower, help):
         for note in todo_notes:
             note_id = note['id']
             # Get all tags for this note
-            note_tags = notes_manager.get_tags(note_id)
+            note_tags = get_notes_manager().get_tags(note_id)
             tags_lower = [t.lower() for t in note_tags]
             
             # Check if this is a done todo
@@ -1015,7 +1068,7 @@ def display_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=
         
         try:
             # Query tags table for 'done' tags created today
-            tags_result = notes_manager.db.client.table('tags').select('note_id, created_at').eq('tag', 'done').execute()
+            tags_result = get_notes_manager().db.client.table('tags').select('note_id, created_at').eq('tag', 'done').execute()
             
             if tags_result.data:
                 for tag_data in tags_result.data:
@@ -1039,7 +1092,7 @@ def display_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=
     for note in todo_notes:
         note_id = note['id']
         # Get all tags for this note
-        note_tags = notes_manager.get_tags(note_id)
+        note_tags = get_notes_manager().get_tags(note_id)
         tags_lower = [t.lower() for t in note_tags]
         
         # Check status flags
@@ -1173,7 +1226,7 @@ def rules(source,help):
     """Display a random rule from notes tagged with 'rules'."""
     try:
         # Get all notes tagged with 'rules'
-        rules_notes = notes_manager.get_notes_by_tag('rules')
+        rules_notes = get_notes_manager().get_notes_by_tag('rules')
         
         if not rules_notes:
             click.echo(ZettlFormatter.warning("No notes found with tag 'rules'"))

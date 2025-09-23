@@ -3,8 +3,8 @@ from typing import List, Dict, Any
 from zettl.database import Database
 
 class Notes:
-    def __init__(self):
-        self.db = Database()
+    def __init__(self, jwt_token=None, api_key=None):
+        self.db = Database(jwt_token=jwt_token, api_key=api_key)
     
     def create_note(self, content: str) -> str:
         """Create a new note with the given content."""
