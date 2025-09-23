@@ -1,5 +1,4 @@
 Click
-supabase
 python-dotenv
 requests
 rich

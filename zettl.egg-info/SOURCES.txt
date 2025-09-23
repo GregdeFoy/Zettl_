@@ -1,6 +1,7 @@
 README.md
 setup.py
 zettl/__init__.py
+zettl/auth.py
 zettl/cli.py
 zettl/cli_wrapper.py
 zettl/completion.py
