@@ -151,7 +151,7 @@ services:
     container_name: zettl-db-backup
     restart: unless-stopped
     volumes:
-      - ./backups/postgresql:/backups
+      - /var/lib/postgresql/backups:/backups  # Good: outside repo
       - ./secrets:/run/secrets:ro
     environment:
       - POSTGRES_HOST=postgresql
