@@ -714,42 +714,20 @@ def execute_command():
 
                     
         elif cmd == "show":
-            # Debugging for the show command
-            logger.debug(f"Executing show command with args: {remaining_args}")
-            
             if not remaining_args:
                 result = ZettlFormatter.error("Please provide a note ID")
             else:
                 note_id = remaining_args[0]
-                logger.debug(f"Attempting to retrieve note with ID: {note_id}")
-                
+
                 try:
-                    # Try to directly access the database to check if the note exists
-                    db_client = notes_manager.db.client
-                    logger.debug(f"Database client initialized: {db_client is not None}")
-                    
-                    # Check if the note exists directly with a database query
-                    query_result = db_client.table('notes').select('*').eq('id', note_id).execute()
-                    logger.debug(f"Direct DB query result: {query_result}")
-                    
-                    if not query_result.data:
-                        logger.debug(f"Note {note_id} not found in direct DB query")
-                        result = ZettlFormatter.error(f"Note {note_id} not found")
-                        return jsonify({'result': ansi_to_html(result)})
-                        
-                    # If we get here, the note exists in the database
-                    logger.debug(f"Note {note_id} found in database, attempting to load")
-                    
-                    # Now try to load it using the notes_manager
+                    # Get the note using the standard method
                     note = notes_manager.get_note(note_id)
-                    logger.debug(f"Note loaded successfully: {note is not None}")
-                    
                     created_at = notes_manager.db.format_timestamp(note['created_at'])
-                    
+
                     result = f"{ZettlFormatter.note_id(note_id)} [{ZettlFormatter.timestamp(created_at)}]\n"
                     result += "-" * 40 + "\n"
                     result += f"{note['content']}\n\n"
-                    
+
                     # Show tags if any
                     try:
                         tags = notes_manager.get_tags(note_id)
@@ -757,24 +735,19 @@ def execute_command():
                             result += f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}"
                     except Exception as e:
                         logger.exception(f"Error getting tags for note {note_id}: {e}")
+
                 except Exception as e:
                     logger.exception(f"Error in show command for note {note_id}: {e}")
-                    
-                    # Provide a more helpful error message based on the exception
-                    if "connection" in str(e).lower():
-                        result = ZettlFormatter.error(f"Database connection error: {str(e)}")
-                    elif "not found" in str(e).lower():
+
+                    # Provide a helpful error message based on the exception
+                    if "not found" in str(e).lower():
                         result = ZettlFormatter.error(f"Note {note_id} not found")
-                    elif "authentication" in str(e).lower():
+                    elif "connection" in str(e).lower() or "request failed" in str(e).lower():
+                        result = ZettlFormatter.error(f"Database connection error: {str(e)}")
+                    elif "authentication" in str(e).lower() or "401" in str(e):
                         result = ZettlFormatter.error(f"Authentication error: {str(e)}")
                     else:
-                        # Detailed error message with exception type
-                        error_type = type(e).__name__
-                        result = ZettlFormatter.error(f"Error ({error_type}): {str(e)}")
-                        
-                    # Log the full stack trace for server debugging
-                    import traceback
-                    logger.error(f"Full stack trace for show command error:\n{traceback.format_exc()}")
+                        result = ZettlFormatter.error(f"Error retrieving note: {str(e)}")
 
                 
         elif cmd == "search":
@@ -1224,42 +1197,17 @@ def execute_command():
                             logger.debug(f"Today's date (UTC): {today}")
                             
                             try:
-                                tags_result = notes_manager.db.client.table('tags').select('note_id, created_at').eq('tag', 'done').execute()
-                                
-                                if tags_result.data:
-                                    logger.debug(f"Found {len(tags_result.data)} 'done' tags")
-                                    for tag_data in tags_result.data:
-                                        note_id = tag_data.get('note_id')
-                                        created_at = tag_data.get('created_at', '')
-                                        
-                                        if note_id and created_at:
-                                            try:
-                                                # Better handling of date format
-                                                logger.debug(f"Processing date: {created_at} for note_id: {note_id}")
-                                                
-                                                # Handle different ISO formats
-                                                if 'Z' in created_at:
-                                                    created_at = created_at.replace('Z', '+00:00')
-                                                elif 'T' in created_at and not ('+' in created_at or '-' in created_at[10:]):
-                                                    # No timezone info - assume UTC
-                                                    created_at = created_at + '+00:00'
-                                                    
-                                                # Parse with timezone awareness
-                                                parsed_datetime = datetime.fromisoformat(created_at)
-                                                # Convert to UTC for comparison
-                                                utc_datetime = parsed_datetime.astimezone(timezone.utc)
-                                                tag_date = utc_datetime.date()
-                                                
-                                                logger.debug(f"Parsed date: {tag_date}")
-                                                
-                                                # Check if tag was created today
-                                                if tag_date == today:
-                                                    logger.debug(f"Match found for note_id: {note_id}")
-                                                    done_today_ids.add(note_id)
-                                            except Exception as e:
-                                                logger.debug(f"Error parsing date '{created_at}': {str(e)}")
-                                    
-                                    logger.debug(f"Total todos done today: {len(done_today_ids)}")
+                                # Get tags created today using the proper PostgREST method
+                                done_tags_today = notes_manager.db.get_tags_created_today('done')
+
+                                logger.debug(f"Found {len(done_tags_today)} 'done' tags created today")
+                                for tag_data in done_tags_today:
+                                    note_id = tag_data.get('note_id')
+                                    if note_id:
+                                        done_today_ids.add(note_id)
+                                        logger.debug(f"Added note_id {note_id} to done today list")
+
+                                logger.debug(f"Total todos done today: {len(done_today_ids)}")
                             except Exception as e:
                                 error_msg = f"Could not determine todos completed today: {str(e)}"
                                 logger.error(error_msg)
@@ -1605,31 +1553,13 @@ def format_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=F
         today = datetime.now(timezone.utc).date()
         
         try:
-            tags_result = notes_manager.db.client.table('tags').select('note_id, created_at').eq('tag', 'done').execute()
-            
-            if tags_result.data:
-                for tag_data in tags_result.data:
-                    note_id = tag_data.get('note_id')
-                    created_at = tag_data.get('created_at', '')
-                    
-                    if note_id and created_at:
-                        try:
-                            # Parse the ISO format date
-                            if 'Z' in created_at:
-                                created_at = created_at.replace('Z', '+00:00')
-                            elif 'T' in created_at and not ('+' in created_at or '-' in created_at[10:]):
-                                # No timezone info - assume UTC
-                                created_at = created_at + '+00:00'
-                                
-                            # Parse with timezone awareness
-                            tag_date = datetime.fromisoformat(created_at).date()
-                            
-                            # Check if tag was created today
-                            if tag_date == today:
-                                done_today_ids.add(note_id)
-                        except Exception:
-                            # Skip tags with date parsing issues
-                            pass
+            # Get tags created today using the proper PostgREST method
+            done_tags_today = notes_manager.db.get_tags_created_today('done')
+
+            for tag_data in done_tags_today:
+                note_id = tag_data.get('note_id')
+                if note_id:
+                    done_today_ids.add(note_id)
         except Exception as e:
             logger.error(f"Could not determine todos completed today: {str(e)}")
     

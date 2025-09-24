@@ -189,10 +189,14 @@ class Database:
             "modified_at": timestamp
         }
 
-        response = self._make_request('POST', 'notes', data=note_data)
+        try:
+            response = self._make_request('POST', 'notes', data=note_data)
+        except Exception as e:
+            raise Exception(f"Failed to create note with custom timestamp - Request failed: {str(e)}")
 
-        if not response.text:
-            raise Exception("Failed to create note with custom timestamp")
+        # PostgREST returns 201 Created with empty body on successful creation
+        if response.status_code != 201:
+            raise Exception(f"Failed to create note with custom timestamp - Unexpected status: {response.status_code}, Response: {response.text}")
 
         # Invalidate relevant caches
         invalidate_cache("list_notes")
@@ -267,10 +271,14 @@ class Database:
             "created_at": now
         }
 
-        response = self._make_request('POST', 'links', data=link_data)
+        try:
+            response = self._make_request('POST', 'links', data=link_data)
+        except Exception as e:
+            raise Exception(f"Failed to create link - Request failed: {str(e)}")
 
-        if not response.text:
-            raise Exception("Failed to create link")
+        # PostgREST returns 201 Created with empty body on successful creation
+        if response.status_code != 201:
+            raise Exception(f"Failed to create link - Unexpected status: {response.status_code}, Response: {response.text}")
 
         # Invalidate related caches
         invalidate_cache(f"related_notes:{source_id}")
@@ -343,10 +351,14 @@ class Database:
             "created_at": now
         }
 
-        response = self._make_request('POST', 'tags', data=tag_data)
+        try:
+            response = self._make_request('POST', 'tags', data=tag_data)
+        except Exception as e:
+            raise Exception(f"Failed to add tag - Request failed: {str(e)}")
 
-        if not response.text:
-            raise Exception("Failed to add tag")
+        # PostgREST returns 201 Created with empty body on successful creation
+        if response.status_code != 201:
+            raise Exception(f"Failed to add tag - Unexpected status: {response.status_code}, Response: {response.text}")
 
         # Invalidate related caches
         invalidate_cache(f"tags:{note_id}")
@@ -409,8 +421,7 @@ class Database:
 
             # Query notes created between these timestamps
             params = {
-                'created_at': f'gte.{start_timestamp}',
-                'created_at': f'lte.{end_timestamp}',
+                'created_at': f'gte.{start_timestamp}&created_at=lte.{end_timestamp}',
                 'order': 'created_at.desc'
             }
             response = self._make_request('GET', 'notes', params=params)
@@ -649,3 +660,30 @@ class Database:
         invalidate_cache(f"related_notes:{target_id}")
 
         return None
+
+    def get_tags_created_today(self, tag: str) -> List[str]:
+        """Get note IDs for tags created today."""
+        from datetime import datetime, timezone
+
+        # Get today's date range
+        today = datetime.now(timezone.utc)
+        start_of_day = today.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_day = today.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        # Format as ISO strings
+        start_timestamp = start_of_day.isoformat().replace('+00:00', 'Z')
+        end_timestamp = end_of_day.isoformat().replace('+00:00', 'Z')
+
+        # Query tags created today with the specified tag name
+        params = {
+            'tag': f'eq.{tag.lower().strip()}',
+            'created_at': f'gte.{start_timestamp}&created_at=lte.{end_timestamp}',
+            'select': 'note_id,created_at'
+        }
+
+        try:
+            response = self._make_request('GET', 'tags', params=params)
+            data = response.json()
+            return data if data else []
+        except Exception:
+            return []
