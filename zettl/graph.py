@@ -32,18 +32,17 @@ class NoteGraph:
                     "title": title
                 })
                 
-                # Get connections - ideally, this would be cached too
-                outgoing_result = self.db.client.table('links').select('*').eq('source_id', note_id).execute()
-                
-                # Add edges for outgoing connections
-                if outgoing_result.data:
-                    for link in outgoing_result.data:
-                        target_id = link['target_id']
+                # Get connections using proper database method
+                related_notes = self.db.get_related_notes(note_id)
+
+                # Add edges for connections
+                for related_note in related_notes:
+                        target_id = related_note['id']
                         edges.append({
                             "from": note_id,
                             "to": target_id
                         })
-                        
+
                         # Process the connected note recursively
                         if current_depth < depth:
                             process_note(target_id, current_depth + 1)
@@ -55,11 +54,10 @@ class NoteGraph:
         if center_note_id:
             process_note(center_note_id, 1)
         else:
-            # Otherwise, get all notes
-            notes_result = self.db.client.table('notes').select('id').execute()
-            if notes_result.data:
-                for note_data in notes_result.data:
-                    process_note(note_data['id'], 1)
+            # Otherwise, get all notes using the proper database method
+            all_notes = self.db.list_notes(limit=10000)  # Get a large number to include all notes
+            for note in all_notes:
+                process_note(note['id'], 1)
         
         return {
             "nodes": nodes,

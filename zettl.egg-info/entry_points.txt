@@ -1,3 +1,5 @@
 [console_scripts]
 z = zettl.cli:cli
+zettl = zettl.cli:cli
 zi = zettl.interactive:main
+zt = zettl.cli:cli

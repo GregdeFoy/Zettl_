@@ -25,6 +25,8 @@ setup(
     entry_points='''
         [console_scripts]
         z=zettl.cli:cli
+        zt=zettl.cli:cli
+        zettl=zettl.cli:cli
         zi=zettl.interactive:main
     ''',
 )

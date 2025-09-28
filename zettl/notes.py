@@ -11,9 +11,9 @@ class Notes:
         note_id = self.db.create_note(content)
         return note_id
         
-    def create_note_with_timestamp(self, content: str, timestamp: str) -> str:
-        """Create a new note with a specific timestamp."""
-        note_id = self.db.create_note_with_timestamp(content, timestamp)
+    def create_note_with_timestamp(self, content: str, timestamp: str, note_id: str = None) -> str:
+        """Create a new note with a specific timestamp and optionally a specific ID."""
+        note_id = self.db.create_note_with_timestamp(content, timestamp, note_id)
         return note_id
         
     def get_note(self, note_id: str) -> Dict[str, Any]:
@@ -55,6 +55,10 @@ class Notes:
     def get_notes_by_tag(self, tag: str) -> List[Dict[str, Any]]:
         """Get all notes that have a specific tag."""
         return self.db.get_notes_by_tag(tag)
+
+    def get_notes_with_all_tags_by_tag(self, tag: str) -> List[Dict[str, Any]]:
+        """Get all notes that have a specific tag, along with ALL their tags in one or two efficient queries."""
+        return self.db.get_notes_with_all_tags_by_tag(tag)
 
     def get_all_tags_with_counts(self) -> List[Dict[str, Any]]:
         """Get all tags with the count of notes associated with each tag."""

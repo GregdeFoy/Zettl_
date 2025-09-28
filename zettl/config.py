@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # PostgREST API configuration
-POSTGREST_URL = os.getenv("POSTGREST_URL", "http://localhost:3000")
-AUTH_URL = os.getenv("AUTH_URL", "http://localhost:3001")
+POSTGREST_URL = os.getenv("POSTGREST_URL", "https://zettlnotes.app/api/v1")
+AUTH_URL = os.getenv("AUTH_URL", "https://zettlnotes.app/api/auth")
 
 # Claude API configuration
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")

@@ -1435,6 +1435,61 @@ def execute_command():
         elif cmd == "help" or cmd == "--help":
             result = CommandHelp.get_main_help()
 
+        elif cmd == "api-key" or cmd == "apikey":
+            # Handle API key operations
+            if not remaining_args:
+                # List existing API keys
+                try:
+                    token = session.get('access_token')
+                    if not token:
+                        result = ZettlFormatter.error("Not authenticated. Please login first.")
+                    else:
+                        response = requests.get(f'{AUTH_URL}/api/auth/api-keys',
+                                              headers={'Authorization': f'Bearer {token}'})
+                        if response.status_code == 200:
+                            api_keys = response.json()
+                            if api_keys:
+                                result = "🔑 Your API Keys:\n\n"
+                                for key in api_keys:
+                                    created = key.get('created_at', 'Unknown')
+                                    name = key.get('name', 'Unnamed')
+                                    last_used = key.get('last_used', 'Never')
+                                    result += f"• {name}\n"
+                                    result += f"  Created: {created}\n"
+                                    result += f"  Last used: {last_used}\n\n"
+                            else:
+                                result = "No API keys found. Use 'api-key generate' to create one."
+                        else:
+                            result = ZettlFormatter.error("Failed to list API keys")
+                except Exception as e:
+                    result = ZettlFormatter.error(f"Error listing API keys: {str(e)}")
+            elif remaining_args[0] == "generate" or remaining_args[0] == "create":
+                # Generate new API key
+                try:
+                    token = session.get('access_token')
+                    if not token:
+                        result = ZettlFormatter.error("Not authenticated. Please login first.")
+                    else:
+                        key_name = remaining_args[1] if len(remaining_args) > 1 else "Web Interface Key"
+                        response = requests.post(f'{AUTH_URL}/api/auth/api-key',
+                                               headers={'Authorization': f'Bearer {token}'},
+                                               json={'name': key_name})
+                        if response.status_code == 200:
+                            api_key = response.json()['apiKey']
+                            result = "🎉 API Key Generated Successfully!\n\n"
+                            result += f"🔑 Your new API key: {api_key}\n\n"
+                            result += "⚠️  IMPORTANT: Copy this key now! You won't be able to see it again.\n\n"
+                            result += "To use this key with the CLI:\n"
+                            result += f"  export ZETTL_API_KEY={api_key}\n"
+                            result += "  # OR\n"
+                            result += "  zettl auth setup\n"
+                        else:
+                            result = ZettlFormatter.error("Failed to generate API key")
+                except Exception as e:
+                    result = ZettlFormatter.error(f"Error generating API key: {str(e)}")
+            else:
+                result = ZettlFormatter.error("Usage: api-key [list|generate [name]]")
+
         elif cmd == "nutrition" or cmd == "nut":
             # Handle nutrition commands with the new structure
             tracker = NutritionTracker()

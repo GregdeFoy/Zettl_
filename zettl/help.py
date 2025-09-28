@@ -76,6 +76,12 @@ class CommandHelp:
     {Colors.BLUE}→{Colors.RESET} zettl rules
     {Colors.BLUE}→{Colors.RESET} zettl rules --source  # Show source note ID
 
+{Colors.BOLD}System Commands:{Colors.RESET}
+  {Colors.YELLOW}{Colors.BOLD}api-key{Colors.RESET} - Manage API keys for CLI access
+    {Colors.BLUE}→{Colors.RESET} api-key                    # List your API keys
+    {Colors.BLUE}→{Colors.RESET} api-key generate           # Generate new API key
+    {Colors.BLUE}→{Colors.RESET} api-key generate "My Key"  # Generate with custom name
+
   {Colors.YELLOW}{Colors.BOLD}workflow{Colors.RESET} - Show example Zettl workflow
     {Colors.BLUE}→{Colors.RESET} zettl workflow
 """
@@ -301,6 +307,29 @@ class CommandHelp:
   {Colors.BLUE}zettl llm 22a4b -a concepts{Colors.RESET}     Extract key concepts from the note
   {Colors.BLUE}zettl llm 22a4b -a questions{Colors.RESET}    Generate questions based on the note
   {Colors.BLUE}zettl llm 22a4b -a critique{Colors.RESET}     Get constructive feedback on the note
+""",
+
+            "api-key": f"""
+{Colors.GREEN}{Colors.BOLD}api-key{Colors.RESET} - Manage API keys for CLI access
+
+{Colors.BOLD}Usage:{Colors.RESET}
+  api-key                    # List your existing API keys
+  api-key generate           # Generate new API key with default name
+  api-key generate "My Key"  # Generate new API key with custom name
+
+{Colors.BOLD}Description:{Colors.RESET}
+  API keys allow you to authenticate with the Zettl CLI from the command line.
+  Each key can have a custom name to help you identify its purpose.
+
+{Colors.BOLD}Examples:{Colors.RESET}
+  api-key generate "Development Key"  # Create key for development
+  api-key                           # View all your keys
+
+{Colors.BOLD}Notes:{Colors.RESET}
+  - API keys are only shown once when generated
+  - Copy and save them immediately
+  - Use with CLI: export ZETTL_API_KEY=your_key
+  - Or run: zettl auth setup
 """,
 
             "workflow": f"""

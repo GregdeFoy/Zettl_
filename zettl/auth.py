@@ -63,7 +63,7 @@ class ZettlAuth:
             return False
 
         try:
-            response = requests.post(f'{AUTH_URL}/api/auth/token-from-key',
+            response = requests.post(f'{AUTH_URL}/token-from-key',
                                    headers={'X-API-Key': api_key},
                                    timeout=5)
             return response.status_code == 200

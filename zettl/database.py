@@ -73,7 +73,7 @@ class Database:
             return
 
         try:
-            response = requests.post(f'{self.auth_url}/api/auth/token-from-key',
+            response = requests.post(f'{self.auth_url}/token-from-key',
                                    headers={'X-API-Key': self.api_key},
                                    timeout=5)
             if response.status_code == 200:
@@ -168,18 +168,20 @@ class Database:
 
         return note_id
 
-    def create_note_with_timestamp(self, content: str, timestamp: str) -> str:
+    def create_note_with_timestamp(self, content: str, timestamp: str, note_id: str = None) -> str:
         """
-        Create a new note in the database with a specific timestamp.
+        Create a new note in the database with a specific timestamp and optionally a specific ID.
 
         Args:
             content: The note content
             timestamp: The timestamp to use (ISO format)
+            note_id: Optional specific ID to use
 
         Returns:
             The ID of the created note
         """
-        note_id = self.generate_id()
+        if note_id is None:
+            note_id = self.generate_id()
 
         # Insert the note with the provided timestamp
         note_data = {
@@ -473,6 +475,40 @@ class Database:
         set_in_cache(cache_key, notes, ttl=300)
 
         return notes
+
+    def get_notes_with_all_tags_by_tag(self, tag: str) -> List[Dict[str, Any]]:
+        """Get all notes that have a specific tag, along with ALL their tags using a PostgreSQL view."""
+        cache_key = f"notes_with_all_tags_by_tag:{tag.lower().strip()}"
+
+        # Check if in cache
+        cached_result = get_from_cache(cache_key)
+        if cached_result is not None:
+            return cached_result
+
+        # Use the PostgreSQL view that aggregates all tags
+        # Filter for notes that contain the specified tag in their all_tags_array
+        params = {
+            'all_tags_array': f'cs.{{{tag.lower().strip()}}}',  # PostgreSQL array contains operator
+            'select': 'id,content,created_at,all_tags_str,all_tags_array',
+            'order': 'created_at.desc'
+        }
+
+        response = self._make_request('GET', 'notes_with_tags', params=params)
+        notes_data = response.json()
+
+        # Transform to the format we want
+        result = []
+        for note_data in notes_data:
+            note = {
+                'id': note_data['id'],
+                'content': note_data['content'],
+                'created_at': note_data['created_at'],
+                'all_tags': note_data.get('all_tags_array', []) if note_data.get('all_tags_array') else []
+            }
+            result.append(note)
+
+        set_in_cache(cache_key, result, ttl=300)
+        return result
 
     def get_all_tags_with_counts(self) -> List[Dict[str, Any]]:
         """Get all tags with the count of notes associated with each tag."""
