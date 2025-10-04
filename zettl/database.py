@@ -723,3 +723,157 @@ class Database:
             return data if data else []
         except Exception:
             return []
+
+    def merge_notes(self, note_ids: List[str]) -> str:
+        """
+        Merge multiple notes into a single note.
+
+        This will:
+        1. Combine the content of all notes (ordered by creation date)
+        2. Collect all unique tags from all notes
+        3. Preserve all external links (updating them to point to the new note)
+        4. Delete the old notes
+
+        Args:
+            note_ids: List of note IDs to merge (must have at least 2 notes)
+
+        Returns:
+            The ID of the newly created merged note
+
+        Raises:
+            Exception: If merge fails or invalid input
+        """
+        # Validate input
+        if not note_ids or len(note_ids) < 2:
+            raise Exception("Must provide at least 2 notes to merge")
+
+        # Remove duplicates while preserving order
+        unique_ids = []
+        seen = set()
+        for note_id in note_ids:
+            if note_id not in seen:
+                unique_ids.append(note_id)
+                seen.add(note_id)
+        note_ids = unique_ids
+
+        if len(note_ids) < 2:
+            raise Exception("Must provide at least 2 unique notes to merge")
+
+        # Fetch all notes to merge
+        notes_to_merge = []
+        for note_id in note_ids:
+            try:
+                note = self.get_note(note_id)
+                notes_to_merge.append(note)
+            except Exception as e:
+                raise Exception(f"Failed to fetch note {note_id}: {str(e)}")
+
+        # Sort notes by creation date (oldest first)
+        notes_to_merge.sort(key=lambda x: x['created_at'])
+
+        # Combine content
+        merged_content_parts = [note['content'] for note in notes_to_merge]
+        merged_content = "\n\n".join(merged_content_parts)
+
+        # Collect all unique tags
+        all_tags = set()
+        for note_id in note_ids:
+            try:
+                tags = self.get_tags(note_id)
+                all_tags.update(tags)
+            except Exception:
+                # If we can't get tags, continue without them
+                pass
+
+        # Collect all external links
+        # Links are external if they connect to notes NOT in the merge set
+        note_ids_set = set(note_ids)
+        external_links = []
+
+        for note_id in note_ids:
+            # Get outgoing links
+            params = {'source_id': f'eq.{note_id}', 'select': 'target_id,context'}
+            try:
+                response = self._make_request('GET', 'links', params=params)
+                outgoing = response.json()
+                if outgoing:
+                    for link in outgoing:
+                        # Only keep if target is external
+                        if link['target_id'] not in note_ids_set:
+                            external_links.append({
+                                'type': 'outgoing',
+                                'target_id': link['target_id'],
+                                'context': link.get('context', '')
+                            })
+            except Exception:
+                pass
+
+            # Get incoming links
+            params = {'target_id': f'eq.{note_id}', 'select': 'source_id,context'}
+            try:
+                response = self._make_request('GET', 'links', params=params)
+                incoming = response.json()
+                if incoming:
+                    for link in incoming:
+                        # Only keep if source is external
+                        if link['source_id'] not in note_ids_set:
+                            external_links.append({
+                                'type': 'incoming',
+                                'source_id': link['source_id'],
+                                'context': link.get('context', '')
+                            })
+            except Exception:
+                pass
+
+        # Remove duplicate links (same source, target, and context)
+        unique_links = []
+        seen_links = set()
+        for link in external_links:
+            if link['type'] == 'outgoing':
+                key = ('outgoing', link['target_id'], link['context'])
+            else:
+                key = ('incoming', link['source_id'], link['context'])
+
+            if key not in seen_links:
+                unique_links.append(link)
+                seen_links.add(key)
+
+        # Create the new merged note
+        merged_note_id = self.create_note(merged_content)
+
+        # Add all tags to the new note
+        for tag in all_tags:
+            try:
+                self.add_tag(merged_note_id, tag)
+            except Exception:
+                # If tag addition fails, continue
+                pass
+
+        # Add all external links to the new note
+        for link in unique_links:
+            try:
+                if link['type'] == 'outgoing':
+                    self.create_link(merged_note_id, link['target_id'], link['context'])
+                else:  # incoming
+                    self.create_link(link['source_id'], merged_note_id, link['context'])
+            except Exception:
+                # If link creation fails, continue
+                pass
+
+        # Delete all old notes (with cascade to clean up any remaining data)
+        for note_id in note_ids:
+            try:
+                self.delete_note(note_id, cascade=True)
+            except Exception as e:
+                # If deletion fails, we should still try to delete the others
+                # but we should report this error
+                raise Exception(f"Failed to delete note {note_id} during merge: {str(e)}")
+
+        # Invalidate relevant caches
+        invalidate_cache("list_notes")
+        for note_id in note_ids:
+            invalidate_cache(f"note:{note_id}")
+            invalidate_cache(f"tags:{note_id}")
+            invalidate_cache(f"related_notes:{note_id}")
+
+        return merged_note_id

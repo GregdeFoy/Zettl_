@@ -50,6 +50,10 @@ class CommandHelp:
     {Colors.BLUE}→{Colors.RESET} zettl todos --tag work  # Filter todos by tag
 
 {Colors.BOLD}Management Commands:{Colors.RESET}
+  {Colors.YELLOW}{Colors.BOLD}merge{Colors.RESET} - Merge multiple notes into a single note
+    {Colors.BLUE}→{Colors.RESET} zettl merge 22a4b 18c3d 45f6g
+    {Colors.BLUE}→{Colors.RESET} zettl merge 22a4b 18c3d --force  # Skip confirmation
+
   {Colors.YELLOW}{Colors.BOLD}delete{Colors.RESET} - Delete a note and its associated data
     {Colors.BLUE}→{Colors.RESET} zettl delete 22a4b
     {Colors.BLUE}→{Colors.RESET} zettl delete 22a4b --keep-tags
@@ -279,6 +283,31 @@ class CommandHelp:
 
 {Colors.BOLD}Examples:{Colors.RESET}
   {Colors.BLUE}zettl unlink 22a4b 18c3d{Colors.RESET}  Remove link from note 22a4b to 18c3d
+""",
+
+            "merge": f"""
+{Colors.GREEN}{Colors.BOLD}merge NOTE_ID1 NOTE_ID2 [NOTE_ID3 ...]{Colors.RESET} - Merge multiple notes into a single note
+
+{Colors.BOLD}Usage:{Colors.RESET}
+  zettl merge NOTE_ID1 NOTE_ID2 [NOTE_ID3 ...]
+
+{Colors.BOLD}What it does:{Colors.RESET}
+  • Combines content from all notes (ordered by creation date)
+  • Collects all unique tags from all notes
+  • Preserves external links (updates them to point to new note)
+  • Deletes the old notes after successful merge
+
+{Colors.BOLD}Options:{Colors.RESET}
+  {Colors.YELLOW}-f, --force{Colors.RESET}  Skip confirmation prompt
+
+{Colors.BOLD}Examples:{Colors.RESET}
+  {Colors.BLUE}zettl merge 22a4b 18c3d{Colors.RESET}            Merge two notes
+  {Colors.BLUE}zettl merge 22a4b 18c3d 45f6g{Colors.RESET}       Merge three notes
+  {Colors.BLUE}zettl merge 22a4b 18c3d --force{Colors.RESET}     Merge without confirmation
+
+{Colors.BOLD}Note:{Colors.RESET}
+  This is useful for consolidating related notes or combining duplicates.
+  All tags and external links are preserved in the new merged note.
 """,
 
             "llm": f"""

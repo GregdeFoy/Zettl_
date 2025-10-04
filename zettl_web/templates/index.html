@@ -401,6 +401,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'delete': ['--keep-links', '--keep-tags', '-f', '--force', '-h', '--help'],
         'untag': ['-h', '--help'],
         'unlink': ['-h', '--help'],
+        'merge': ['-f', '--force', '-h', '--help'],
         'help': ['-h', '--help'],
         'nutrition': ['-t', '--today', '-i', '--history', '-d', '--days', '-p', '--past'],
         'nut': ['-t', '--today', '-i', '--history', '-d', '--days', '-p', '--past'],
@@ -420,7 +421,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // Top-level commands for initial buttons
-    const topLevelCommands = ['new', 'todos', 'rules', 'nut', 'tags', 'search', 'show', 'list', 'link', 'related', 'help'];
+    const topLevelCommands = ['new', 'todos', 'rules', 'nut', 'tags', 'search', 'show', 'list', 'link', 'merge', 'related', 'help'];
     
     // Define function for appending output to the terminal
     window.appendOutput = function(content, isHTML = false) {

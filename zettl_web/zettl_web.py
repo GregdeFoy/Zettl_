@@ -247,8 +247,14 @@ COMMAND_OPTIONS = {
             'past': {}
         }
     },
-
-
+    'merge': {
+        'short_opts': {
+            'f': {'name': 'force', 'flag': True}
+        },
+        'long_opts': {
+            'force': {'flag': True}
+        }
+    },
 
     # Add similar configs for other commands
 }
@@ -1088,10 +1094,67 @@ def execute_command():
             else:
                 source_id = remaining_args[0]
                 target_id = remaining_args[1]
-                
+
                 notes_manager.delete_link(source_id, target_id)
                 result = ZettlFormatter.success(f"Removed link from note #{source_id} to note #{target_id}")
-                        
+
+        elif cmd == "merge":
+            # Merge multiple notes into one
+            if len(remaining_args) < 2:
+                result = ZettlFormatter.error("Must provide at least 2 notes to merge")
+            else:
+                note_ids = remaining_args
+                force = 'f' in flags or 'force' in flags
+
+                # Show preview of notes to be merged
+                result = f"{ZettlFormatter.header(f'Notes to merge ({len(note_ids)} total):')}\n\n"
+
+                all_tags = set()
+                valid_notes = True
+
+                for note_id in note_ids:
+                    try:
+                        note = notes_manager.get_note(note_id)
+                        content_preview = note['content'][:100] + "..." if len(note['content']) > 100 else note['content']
+                        formatted_id = ZettlFormatter.note_id(note_id)
+                        result += f"{formatted_id}\n"
+                        result += f"  {content_preview}\n"
+
+                        # Show tags
+                        try:
+                            tags = notes_manager.get_tags(note_id)
+                            if tags:
+                                all_tags.update(tags)
+                                result += f"  Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}\n"
+                        except Exception:
+                            pass
+
+                        result += "\n"
+                    except Exception as e:
+                        result = ZettlFormatter.error(f"Error fetching note {note_id}: {str(e)}")
+                        valid_notes = False
+                        break
+
+                if valid_notes:
+                    # Show what will be preserved
+                    if all_tags:
+                        result += f"{ZettlFormatter.header('Tags that will be added to merged note:')}\n"
+                        result += f"{', '.join([ZettlFormatter.tag(t) for t in sorted(all_tags)])}\n\n"
+
+                    # In web version, we can't do interactive confirmation easily
+                    # So we'll proceed if force is set, otherwise show warning
+                    if not force:
+                        result += f"{ZettlFormatter.warning('⚠️  This will delete the original notes!')}\n"
+                        result += f"{ZettlFormatter.warning('Use --force to proceed with merge')}\n"
+                    else:
+                        # Perform the merge
+                        try:
+                            merged_note_id = notes_manager.merge_notes(list(note_ids))
+                            result = ZettlFormatter.success(f"Successfully merged {len(note_ids)} notes into #{merged_note_id}")
+                            result += f"\n\nView merged note with: show {merged_note_id}"
+                        except Exception as e:
+                            result = ZettlFormatter.error(f"Error merging notes: {str(e)}")
+
         elif cmd == "rules":
             # Parse the source flag
             source = 'source' in flags or 's' in flags

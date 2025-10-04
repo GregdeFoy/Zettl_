@@ -84,3 +84,14 @@ class Notes:
         """Delete a specific link between two notes."""
         return self.db.delete_link(source_id, target_id)
 
+    def merge_notes(self, note_ids: List[str]) -> str:
+        """
+        Merge multiple notes into a single note.
+
+        Args:
+            note_ids: List of note IDs to merge
+
+        Returns:
+            ID of the newly created merged note
+        """
+        return self.db.merge_notes(note_ids)

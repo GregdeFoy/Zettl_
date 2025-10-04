@@ -763,6 +763,77 @@ def unlink(source_id, target_id,help):
         click.echo(ZettlFormatter.error(f"Error removing link: {str(e)}"), err=True)
 
 @cli.command()
+@click.argument('note_ids', nargs=-1, required=False)
+@click.option('--force', '-f', is_flag=True, help='Skip confirmation prompt')
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def merge(note_ids, force, help):
+    """Merge multiple notes into a single note.
+
+    This command combines the content of multiple notes, preserves all tags
+    and external links, and deletes the original notes.
+
+    Usage: zettl merge NOTE_ID1 NOTE_ID2 [NOTE_ID3 ...]
+    """
+    if help:
+        click.echo(CommandHelp.get_command_help("merge"))
+        return
+
+    try:
+        # Validate we have at least 2 notes
+        if not note_ids or len(note_ids) < 2:
+            click.echo(ZettlFormatter.error("Must provide at least 2 notes to merge"))
+            return
+
+        # Show preview of notes to be merged
+        click.echo(ZettlFormatter.header(f"Notes to merge ({len(note_ids)} total):"))
+        notes_manager = get_notes_manager()
+
+        all_tags = set()
+        for note_id in note_ids:
+            try:
+                note = notes_manager.get_note(note_id)
+                content_preview = note['content'][:100] + "..." if len(note['content']) > 100 else note['content']
+                formatted_id = ZettlFormatter.note_id(note_id)
+                click.echo(f"\n{formatted_id}")
+                click.echo(f"  {content_preview}")
+
+                # Show tags
+                try:
+                    tags = notes_manager.get_tags(note_id)
+                    if tags:
+                        all_tags.update(tags)
+                        click.echo(f"  Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}")
+                except Exception:
+                    pass
+
+            except Exception as e:
+                click.echo(ZettlFormatter.error(f"Error fetching note {note_id}: {str(e)}"), err=True)
+                return
+
+        # Show what will be preserved
+        if all_tags:
+            click.echo(f"\n{ZettlFormatter.header('Tags that will be added to merged note:')}")
+            click.echo(f"{', '.join([ZettlFormatter.tag(t) for t in sorted(all_tags)])}")
+
+        # Confirm merge if not forced
+        if not force:
+            click.echo("")
+            if not click.confirm("Proceed with merge? This will delete the original notes."):
+                click.echo("Merge cancelled.")
+                return
+
+        # Perform the merge
+        # Note: we pass note_ids directly (it's a tuple, which works fine)
+        # Can't use list() here because there's a Click command named 'list'
+        merged_note_id = notes_manager.merge_notes(note_ids)
+
+        click.echo(ZettlFormatter.success(f"\nSuccessfully merged {len(note_ids)} notes into #{merged_note_id}"))
+        click.echo(f"\nView merged note with: zettl show {merged_note_id}")
+
+    except Exception as e:
+        click.echo(ZettlFormatter.error(f"Error merging notes: {str(e)}"), err=True)
+
+@cli.command()
 @click.option('--donetoday', '-dt', is_flag=True, help='List todos that were completed today')
 @click.option('--all', '-a', is_flag=True, help='Show all todos (both active and completed)')
 @click.option('--cancel', '-c', is_flag=True, help='Show canceled todos')
@@ -1244,6 +1315,11 @@ def workflow():
             "title": "Search your notes with tags",
             "command": "zettl search \"technique\" --full",
             "explanation": "This finds all notes containing the word 'technique' and shows full content including tags."
+        },
+        {
+            "title": "Merge related notes",
+            "command": "zettl merge 22a4b 18c3d",
+            "explanation": "This combines two related notes into one, preserving all tags and links from both."
         },
         {
             "title": "Manage todos with filtering",
