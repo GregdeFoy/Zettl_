@@ -344,17 +344,33 @@ class Database:
         # Verify note exists
         self.get_note(note_id)
 
+        # Normalize tag
+        normalized_tag = tag.lower().strip()
+
+        # Check if tag already exists for this note
+        existing_tags = self.get_tags(note_id)
+        if normalized_tag in existing_tags:
+            # Tag already exists, return silently (idempotent operation)
+            return None
+
         # Get current time
         now = self._get_iso_timestamp()
 
         tag_data = {
             "note_id": note_id,
-            "tag": tag.lower().strip(),
+            "tag": normalized_tag,
             "created_at": now
         }
 
         try:
             response = self._make_request('POST', 'tags', data=tag_data)
+        except requests.exceptions.HTTPError as e:
+            # Handle 409 Conflict - tag already exists (race condition)
+            if e.response.status_code == 409:
+                # Tag was added between our check and insert, treat as success
+                invalidate_cache(f"tags:{note_id}")
+                return None
+            raise Exception(f"Failed to add tag - Request failed: {str(e)}")
         except Exception as e:
             raise Exception(f"Failed to add tag - Request failed: {str(e)}")
 
