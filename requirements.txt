@@ -10,8 +10,7 @@ urllib3>=1.26.0
 # AI/LLM
 anthropic>=0.3.0
 
-# Terminal interface and interactive features
-prompt-toolkit>=3.0.0
+# Terminal interface
 tqdm>=4.64.0
 
 # Web interface (optional)
