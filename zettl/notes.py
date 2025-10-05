@@ -64,6 +64,10 @@ class Notes:
         """Get all tags with the count of notes associated with each tag."""
         return self.db.get_all_tags_with_counts()
 
+    def get_tags_created_today(self, tag: str) -> List[str]:
+        """Get note IDs for tags created today."""
+        return self.db.get_tags_created_today(tag)
+
     def delete_note(self, note_id: str, cascade: bool = True) -> None:
         """Delete a note and optionally its associated tags and links."""
         return self.db.delete_note(note_id, cascade)

@@ -437,12 +437,20 @@ class Database:
             start_timestamp = f"{date_str}T00:00:00Z"
             end_timestamp = f"{date_str}T23:59:59.999Z"
 
-            # Query notes created between these timestamps
-            params = {
-                'created_at': f'gte.{start_timestamp}&created_at=lte.{end_timestamp}',
-                'order': 'created_at.desc'
-            }
-            response = self._make_request('GET', 'notes', params=params)
+            # Build URL manually to support multiple filters on same field
+            url = f"{self.postgrest_url}/notes"
+            query_params = f"created_at=gte.{start_timestamp}&created_at=lte.{end_timestamp}&order=created_at.desc"
+            full_url = f"{url}?{query_params}"
+
+            # Add authorization headers
+            headers = {}
+            if self.api_key and not self.jwt_token:
+                self._get_jwt_from_api_key()
+            if self.jwt_token:
+                headers['Authorization'] = f'Bearer {self.jwt_token}'
+
+            response = self.session.get(full_url, headers=headers)
+            response.raise_for_status()
 
             data = response.json()
             if not data:
@@ -726,15 +734,21 @@ class Database:
         start_timestamp = start_of_day.isoformat().replace('+00:00', 'Z')
         end_timestamp = end_of_day.isoformat().replace('+00:00', 'Z')
 
-        # Query tags created today with the specified tag name
-        params = {
-            'tag': f'eq.{tag.lower().strip()}',
-            'created_at': f'gte.{start_timestamp}&created_at=lte.{end_timestamp}',
-            'select': 'note_id,created_at'
-        }
+        # Build URL manually to support multiple filters on same field
+        url = f"{self.postgrest_url}/tags"
+        query_params = f"tag=eq.{tag.lower().strip()}&created_at=gte.{start_timestamp}&created_at=lte.{end_timestamp}&select=note_id,created_at"
+        full_url = f"{url}?{query_params}"
+
+        # Add authorization headers
+        headers = {}
+        if self.api_key and not self.jwt_token:
+            self._get_jwt_from_api_key()
+        if self.jwt_token:
+            headers['Authorization'] = f'Bearer {self.jwt_token}'
 
         try:
-            response = self._make_request('GET', 'tags', params=params)
+            response = self.session.get(full_url, headers=headers)
+            response.raise_for_status()
             data = response.json()
             return data if data else []
         except Exception:
