@@ -835,12 +835,12 @@ def merge(note_ids, force, help):
 
 @cli.command()
 @click.option('--donetoday', '-dt', is_flag=True, help='List todos that were completed today')
-@click.option('--all', '-a', is_flag=True, help='Show all todos (both active and completed)')
+@click.option('--all', '-a', 'show_all', is_flag=True, help='Show all todos (both active and completed)')
 @click.option('--cancel', '-c', is_flag=True, help='Show canceled todos')
 @click.option('--tag', '-t', multiple=True, help='Filter todos by one or more additional tags')
 @click.option('--eisenhower', '-e', is_flag=True, help='Display todos in Eisenhower matrix format')
 @click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def todos(donetoday, all, cancel, tag, eisenhower, help):
+def todos(donetoday, show_all, cancel, tag, eisenhower, help):
     """List all notes tagged with 'todo' grouped by category."""
     if help:
         click.echo(CommandHelp.get_command_help("todos"))
@@ -876,7 +876,7 @@ def todos(donetoday, all, cancel, tag, eisenhower, help):
 
         # Special handling for Eisenhower matrix display
         if eisenhower:
-            display_eisenhower_matrix(todo_notes, all, donetoday, cancel)
+            display_eisenhower_matrix(todo_notes, show_all, donetoday, cancel)
             return
 
         # Apply filters if specified - now using pre-loaded tags
@@ -923,7 +923,7 @@ def todos(donetoday, all, cancel, tag, eisenhower, help):
             is_canceled = 'cancel' in tags_lower
 
             # Skip done todos if not explicitly included
-            if is_done and not all and not donetoday:
+            if is_done and not show_all and not donetoday:
                 continue
 
             # Skip canceled todos if not explicitly requested
@@ -978,7 +978,7 @@ def todos(donetoday, all, cancel, tag, eisenhower, help):
 
         # Display todos by category
         if (not active_todos_by_category and not uncategorized_active and
-            (not all and not donetoday or (not done_todos_by_category and not uncategorized_done)) and
+            (not show_all and not donetoday or (not done_todos_by_category and not uncategorized_done)) and
             (not cancel or (not canceled_todos_by_category and not uncategorized_canceled))):
             click.echo(ZettlFormatter.warning("No todos match your criteria."))
             return
@@ -1033,7 +1033,7 @@ def todos(donetoday, all, cancel, tag, eisenhower, help):
             display_todos_group(active_todos_by_category, uncategorized_active, active_header)
 
         # Display all done todos if requested
-        if (all or donetoday) and (done_todos_by_category or uncategorized_done):
+        if (show_all or donetoday) and (done_todos_by_category or uncategorized_done):
             done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids)} total)")
             click.echo(f"\n{done_header}")
             display_todos_group(done_todos_by_category, uncategorized_done, "")
