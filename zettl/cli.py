@@ -1,6 +1,10 @@
 # cli.py
 import click
 import os
+import sys
+import tempfile
+import subprocess
+import shutil
 from datetime import datetime
 import time
 from typing import Optional
@@ -809,6 +813,89 @@ def prepend(note_id, text, help):
         click.echo(ZettlFormatter.error(f"Error prepending to note: {str(e)}"), err=True)
 
 @cli.command()
+@click.argument('note_id', required=False)
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def edit(note_id, help):
+    if help:
+        click.echo(CommandHelp.get_command_help("edit"))
+        return
+
+    """Edit a note using your system's default editor."""
+    if not note_id:
+        click.echo(ZettlFormatter.error("Error: Missing required argument NOTE_ID"), err=True)
+        click.echo("Usage: zettl edit NOTE_ID")
+        click.echo("Try 'zettl edit -h' for help")
+        return
+
+    try:
+        notes_manager = get_notes_manager()
+
+        # Get the current note
+        note = notes_manager.db.get_note(note_id)
+        current_content = note['content']
+
+        # Platform-specific editing
+        if sys.platform == 'win32':
+            # Windows: Use notepad
+            editor = os.environ.get('EDITOR', 'notepad')
+
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as f:
+                temp_path = f.name
+                f.write(current_content)
+
+            try:
+                # Run editor
+                if editor == 'notepad':
+                    subprocess.call([editor, temp_path])
+                else:
+                    # Handle editors with arguments
+                    subprocess.call(editor + ' ' + temp_path, shell=True)
+
+                # Read edited content
+                with open(temp_path, 'r', encoding='utf-8') as f:
+                    new_content = f.read()
+            finally:
+                # Clean up temp file
+                os.unlink(temp_path)
+        else:
+            # Unix/Linux/Mac: Try nvim first, then nano
+            if shutil.which('nvim'):
+                editor = 'nvim'
+            elif shutil.which('nano'):
+                editor = 'nano'
+            else:
+                raise FileNotFoundError("No suitable editor found. Please install nvim or nano.")
+
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as f:
+                temp_path = f.name
+                f.write(current_content)
+
+            try:
+                # Run editor
+                subprocess.call([editor, temp_path])
+
+                # Read edited content
+                with open(temp_path, 'r', encoding='utf-8') as f:
+                    new_content = f.read()
+            finally:
+                # Clean up temp file
+                os.unlink(temp_path)
+
+        # Check if content changed
+        if new_content.strip() == current_content.strip():
+            click.echo(ZettlFormatter.info("No changes made"))
+            return
+
+        # Update the note
+        notes_manager.update_note(note_id, new_content)
+        click.echo(ZettlFormatter.success(f"Updated note #{note_id}"))
+
+    except FileNotFoundError:
+        click.echo(ZettlFormatter.error(f"Editor not found. Set EDITOR environment variable."), err=True)
+    except Exception as e:
+        click.echo(ZettlFormatter.error(f"Error editing note: {str(e)}"), err=True)
+
+@cli.command()
 @click.argument('note_ids', nargs=-1, required=False)
 @click.option('--force', '-f', is_flag=True, help='Skip confirmation prompt')
 @click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
@@ -1357,7 +1444,7 @@ def workflow():
         {
             "title": "Update existing notes",
             "command": "zettl append 22a4b \"Additional insight: This technique works best when teaching complex topics.\"",
-            "explanation": "This adds new text to the end of your note. You can also use 'prepend' to add text at the beginning."
+            "explanation": "This adds new text to the end of your note. You can also use 'prepend' to add text at the beginning, or 'edit' to open the note in your default editor for full editing."
         },
         {
             "title": "List all recent notes with full content",

@@ -56,6 +56,9 @@ class CommandHelp:
   {Colors.YELLOW}{Colors.BOLD}prepend{Colors.RESET} - Prepend text to the beginning of a note
     {Colors.BLUE}→{Colors.RESET} zettl prepend 22a4b "UPDATE: "
 
+  {Colors.YELLOW}{Colors.BOLD}edit{Colors.RESET} - Edit a note in your default text editor
+    {Colors.BLUE}→{Colors.RESET} zettl edit 22a4b
+
   {Colors.YELLOW}{Colors.BOLD}merge{Colors.RESET} - Merge multiple notes into a single note
     {Colors.BLUE}→{Colors.RESET} zettl merge 22a4b 18c3d 45f6g
     {Colors.BLUE}→{Colors.RESET} zettl merge 22a4b 18c3d --force  # Skip confirmation
@@ -329,6 +332,30 @@ class CommandHelp:
   • Adding status updates at the top of notes
   • Inserting important context before original content
   • Marking notes with time-sensitive information
+""",
+
+            "edit": f"""
+{Colors.GREEN}{Colors.BOLD}edit NOTE_ID{Colors.RESET} - Edit a note in your default text editor
+
+{Colors.BOLD}Usage:{Colors.RESET}
+  zettl edit NOTE_ID
+
+{Colors.BOLD}Description:{Colors.RESET}
+  Opens the note in your system's default text editor for full editing.
+
+  {Colors.BOLD}Platform-specific behavior:{Colors.RESET}
+  • {Colors.CYAN}Linux/Mac:{Colors.RESET} Uses $EDITOR or $VISUAL environment variable (defaults to nano)
+  • {Colors.CYAN}Windows:{Colors.RESET} Uses notepad or $EDITOR environment variable
+
+{Colors.BOLD}Examples:{Colors.RESET}
+  {Colors.BLUE}zettl edit 22a4b{Colors.RESET}                  # Edit note 22a4b
+  {Colors.BLUE}export EDITOR=vim && zettl edit 22a4b{Colors.RESET}  # Use vim (Linux/Mac)
+  {Colors.BLUE}set EDITOR=code && zettl edit 22a4b{Colors.RESET}    # Use VS Code (Windows)
+
+{Colors.BOLD}Tips:{Colors.RESET}
+  • Set your preferred editor: export EDITOR=vim (or nano, emacs, etc.)
+  • Changes are saved when you exit the editor
+  • If no changes are made, the note remains unchanged
 """,
 
             "merge": f"""

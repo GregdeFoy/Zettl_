@@ -58,7 +58,12 @@ class ZettlFormatter:
     def success(text):
         """Format a success message."""
         return f"{Colors.GREEN}{text}{Colors.RESET}"
-    
+
+    @staticmethod
+    def info(text):
+        """Format an info message."""
+        return f"{Colors.CYAN}{text}{Colors.RESET}"
+
     @staticmethod
     def format_note_display(note, notes_manager):
         """Format a full note for display."""
