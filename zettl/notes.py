@@ -99,3 +99,21 @@ class Notes:
             ID of the newly created merged note
         """
         return self.db.merge_notes(note_ids)
+
+    def update_note(self, note_id: str, content: str) -> None:
+        """Update the content of a note."""
+        return self.db.update_note(note_id, content)
+
+    def append_to_note(self, note_id: str, text: str) -> None:
+        """Append text to the end of a note."""
+        note = self.db.get_note(note_id)
+        current_content = note['content']
+        new_content = f"{current_content}\n{text}"
+        return self.db.update_note(note_id, new_content)
+
+    def prepend_to_note(self, note_id: str, text: str) -> None:
+        """Prepend text to the beginning of a note."""
+        note = self.db.get_note(note_id)
+        current_content = note['content']
+        new_content = f"{text}\n{current_content}"
+        return self.db.update_note(note_id, new_content)

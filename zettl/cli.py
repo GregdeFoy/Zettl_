@@ -763,6 +763,52 @@ def unlink(source_id, target_id,help):
         click.echo(ZettlFormatter.error(f"Error removing link: {str(e)}"), err=True)
 
 @cli.command()
+@click.argument('note_id', required=False)
+@click.argument('text', required=False)
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def append(note_id, text, help):
+    if help:
+        click.echo(CommandHelp.get_command_help("append"))
+        return
+
+    """Append text to the end of a note."""
+    if not note_id or not text:
+        click.echo(ZettlFormatter.error("Error: Missing required arguments NOTE_ID and TEXT"), err=True)
+        click.echo("Usage: zettl append NOTE_ID TEXT")
+        click.echo("Try 'zettl append -h' for help")
+        return
+
+    try:
+        notes_manager = get_notes_manager()
+        notes_manager.append_to_note(note_id, text)
+        click.echo(ZettlFormatter.success(f"Appended text to note #{note_id}"))
+    except Exception as e:
+        click.echo(ZettlFormatter.error(f"Error appending to note: {str(e)}"), err=True)
+
+@cli.command()
+@click.argument('note_id', required=False)
+@click.argument('text', required=False)
+@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
+def prepend(note_id, text, help):
+    if help:
+        click.echo(CommandHelp.get_command_help("prepend"))
+        return
+
+    """Prepend text to the beginning of a note."""
+    if not note_id or not text:
+        click.echo(ZettlFormatter.error("Error: Missing required arguments NOTE_ID and TEXT"), err=True)
+        click.echo("Usage: zettl prepend NOTE_ID TEXT")
+        click.echo("Try 'zettl prepend -h' for help")
+        return
+
+    try:
+        notes_manager = get_notes_manager()
+        notes_manager.prepend_to_note(note_id, text)
+        click.echo(ZettlFormatter.success(f"Prepended text to note #{note_id}"))
+    except Exception as e:
+        click.echo(ZettlFormatter.error(f"Error prepending to note: {str(e)}"), err=True)
+
+@cli.command()
 @click.argument('note_ids', nargs=-1, required=False)
 @click.option('--force', '-f', is_flag=True, help='Skip confirmation prompt')
 @click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
@@ -1307,6 +1353,11 @@ def workflow():
             "title": "View note details",
             "command": "zettl show 22a4b",
             "explanation": "This displays the full content of the note, along with any tags."
+        },
+        {
+            "title": "Update existing notes",
+            "command": "zettl append 22a4b \"Additional insight: This technique works best when teaching complex topics.\"",
+            "explanation": "This adds new text to the end of your note. You can also use 'prepend' to add text at the beginning."
         },
         {
             "title": "List all recent notes with full content",

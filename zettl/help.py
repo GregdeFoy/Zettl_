@@ -50,6 +50,12 @@ class CommandHelp:
     {Colors.BLUE}→{Colors.RESET} zettl todos --tag work  # Filter todos by tag
 
 {Colors.BOLD}Management Commands:{Colors.RESET}
+  {Colors.YELLOW}{Colors.BOLD}append{Colors.RESET} - Append text to the end of a note
+    {Colors.BLUE}→{Colors.RESET} zettl append 22a4b "Additional thoughts..."
+
+  {Colors.YELLOW}{Colors.BOLD}prepend{Colors.RESET} - Prepend text to the beginning of a note
+    {Colors.BLUE}→{Colors.RESET} zettl prepend 22a4b "UPDATE: "
+
   {Colors.YELLOW}{Colors.BOLD}merge{Colors.RESET} - Merge multiple notes into a single note
     {Colors.BLUE}→{Colors.RESET} zettl merge 22a4b 18c3d 45f6g
     {Colors.BLUE}→{Colors.RESET} zettl merge 22a4b 18c3d --force  # Skip confirmation
@@ -283,6 +289,46 @@ class CommandHelp:
 
 {Colors.BOLD}Examples:{Colors.RESET}
   {Colors.BLUE}zettl unlink 22a4b 18c3d{Colors.RESET}  Remove link from note 22a4b to 18c3d
+""",
+
+            "append": f"""
+{Colors.GREEN}{Colors.BOLD}append NOTE_ID TEXT{Colors.RESET} - Append text to the end of a note
+
+{Colors.BOLD}Usage:{Colors.RESET}
+  zettl append NOTE_ID "Text to append"
+
+{Colors.BOLD}Description:{Colors.RESET}
+  Adds the provided text to the end of an existing note.
+  A newline is automatically added between the existing content and new text.
+
+{Colors.BOLD}Examples:{Colors.RESET}
+  {Colors.BLUE}zettl append 22a4b "Additional thoughts on this topic"{Colors.RESET}
+  {Colors.BLUE}zettl append 22a4b "Follow-up: new research findings"{Colors.RESET}
+
+{Colors.BOLD}Use cases:{Colors.RESET}
+  • Adding new information to existing notes
+  • Appending updates or follow-ups
+  • Building notes incrementally over time
+""",
+
+            "prepend": f"""
+{Colors.GREEN}{Colors.BOLD}prepend NOTE_ID TEXT{Colors.RESET} - Prepend text to the beginning of a note
+
+{Colors.BOLD}Usage:{Colors.RESET}
+  zettl prepend NOTE_ID "Text to prepend"
+
+{Colors.BOLD}Description:{Colors.RESET}
+  Adds the provided text to the beginning of an existing note.
+  A newline is automatically added between the new text and existing content.
+
+{Colors.BOLD}Examples:{Colors.RESET}
+  {Colors.BLUE}zettl prepend 22a4b "UPDATE: "{Colors.RESET}
+  {Colors.BLUE}zettl prepend 22a4b "IMPORTANT: This has been revised"{Colors.RESET}
+
+{Colors.BOLD}Use cases:{Colors.RESET}
+  • Adding status updates at the top of notes
+  • Inserting important context before original content
+  • Marking notes with time-sensitive information
 """,
 
             "merge": f"""

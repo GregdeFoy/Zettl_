@@ -205,6 +205,45 @@ class Database:
 
         return note_id
 
+    def update_note(self, note_id: str, content: str) -> None:
+        """
+        Update the content of an existing note.
+
+        Args:
+            note_id: ID of the note to update
+            content: New content for the note
+
+        Returns:
+            None
+
+        Raises:
+            Exception: If note update fails
+        """
+        # Verify the note exists first
+        self.get_note(note_id)
+
+        # Get current time
+        now = self._get_iso_timestamp()
+
+        # Update the note content and modified_at timestamp
+        update_data = {
+            "content": content,
+            "modified_at": now
+        }
+
+        params = {'id': f'eq.{note_id}'}
+
+        try:
+            response = self._make_request('PATCH', 'notes', data=update_data, params=params)
+        except Exception as e:
+            raise Exception(f"Failed to update note - Request failed: {str(e)}")
+
+        # Invalidate relevant caches
+        invalidate_cache(f"note:{note_id}")
+        invalidate_cache("list_notes")
+
+        return None
+
     def get_note(self, note_id: str) -> Dict[str, Any]:
         """Get a note by its ID with caching."""
         cache_key = f"note:{note_id}"

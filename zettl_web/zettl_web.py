@@ -255,6 +255,14 @@ COMMAND_OPTIONS = {
             'force': {'flag': True}
         }
     },
+    'append': {
+        'short_opts': {},
+        'long_opts': {}
+    },
+    'prepend': {
+        'short_opts': {},
+        'long_opts': {}
+    },
 
     # Add similar configs for other commands
 }
@@ -1097,6 +1105,34 @@ def execute_command():
 
                 notes_manager.delete_link(source_id, target_id)
                 result = ZettlFormatter.success(f"Removed link from note #{source_id} to note #{target_id}")
+
+        elif cmd == "append":
+            # Append text to the end of a note
+            if len(remaining_args) < 2:
+                result = ZettlFormatter.error("Please provide note ID and text to append")
+            else:
+                note_id = remaining_args[0]
+                text = remaining_args[1]
+
+                try:
+                    notes_manager.append_to_note(note_id, text)
+                    result = ZettlFormatter.success(f"Appended text to note #{note_id}")
+                except Exception as e:
+                    result = ZettlFormatter.error(f"Error appending to note: {str(e)}")
+
+        elif cmd == "prepend":
+            # Prepend text to the beginning of a note
+            if len(remaining_args) < 2:
+                result = ZettlFormatter.error("Please provide note ID and text to prepend")
+            else:
+                note_id = remaining_args[0]
+                text = remaining_args[1]
+
+                try:
+                    notes_manager.prepend_to_note(note_id, text)
+                    result = ZettlFormatter.success(f"Prepended text to note #{note_id}")
+                except Exception as e:
+                    result = ZettlFormatter.error(f"Error prepending to note: {str(e)}")
 
         elif cmd == "merge":
             # Merge multiple notes into one
