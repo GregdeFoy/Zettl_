@@ -34,4 +34,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD python -c "import requests; exit(0 if requests.get('http://localhost:5000/health').status_code == 200 else 1)"
 
 WORKDIR /app/zettl_web
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--threads", "2", "zettl_web:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "8", "zettl_web:app"]
