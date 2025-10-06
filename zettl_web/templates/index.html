@@ -329,9 +329,170 @@
             #terminal-output {
                 font-size: 14px;
             }
-            
+
             #command-input {
                 font-size: 14px;
+            }
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            animation: fadeIn 0.2s;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background-color: var(--header-bg);
+            border: 2px solid var(--primary-color);
+            border-radius: 8px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            animation: slideIn 0.3s;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #555;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: var(--primary-color);
+            font-size: 18px;
+        }
+
+        .modal-header #modal-note-id {
+            color: var(--cyan);
+        }
+
+        .modal-close-btn {
+            background: none;
+            border: none;
+            color: var(--terminal-text);
+            font-size: 28px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+
+        .modal-close-btn:hover {
+            background-color: var(--button-hover);
+        }
+
+        .modal-body {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        #modal-textarea {
+            width: 100%;
+            height: 400px;
+            background-color: var(--bg-color);
+            color: var(--terminal-text);
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            resize: vertical;
+            outline: none;
+        }
+
+        #modal-textarea:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 5px rgba(144, 238, 144, 0.3);
+        }
+
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #555;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .modal-btn-cancel {
+            background-color: var(--button-bg);
+            color: white;
+        }
+
+        .modal-btn-cancel:hover {
+            background-color: var(--button-hover);
+        }
+
+        .modal-btn-save {
+            background-color: var(--primary-color);
+            color: #000;
+        }
+
+        .modal-btn-save:hover {
+            background-color: #a0ffa0;
+        }
+
+        @media (max-width: 768px) {
+            .modal-content {
+                width: 95%;
+                max-height: 95vh;
+            }
+
+            #modal-textarea {
+                height: 300px;
+            }
+
+            .modal-header h3 {
+                font-size: 16px;
             }
         }
     </style>
@@ -364,6 +525,23 @@
         </div>
     </div>
 
+    <!-- Edit Modal -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Note <span id="modal-note-id"></span></h3>
+                <button id="modal-close" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <textarea id="modal-textarea" placeholder="Edit your note here..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button id="modal-cancel" class="modal-btn modal-btn-cancel">Cancel (Esc)</button>
+                <button id="modal-save" class="modal-btn modal-btn-save">Save (Ctrl+Enter)</button>
+            </div>
+        </div>
+    </div>
+
     <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Get DOM elements
@@ -374,7 +552,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const clearTerminalButton = document.getElementById('clear-terminal');
     const clearInputButton = document.getElementById('clear-input-button');
     const logoutButton = document.getElementById('logout-button');
-    
+
+    // Modal elements
+    const editModal = document.getElementById('edit-modal');
+    const modalNoteId = document.getElementById('modal-note-id');
+    const modalTextarea = document.getElementById('modal-textarea');
+    const modalClose = document.getElementById('modal-close');
+    const modalCancel = document.getElementById('modal-cancel');
+    const modalSave = document.getElementById('modal-save');
+
+    // Modal state
+    let currentEditNoteId = null;
+    let originalContent = '';
+
     // Command history
     let commandHistory = loadHistory();
     let historyIndex = commandHistory.length;
@@ -404,6 +594,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'merge': ['-f', '--force', '-h', '--help'],
         'append': ['-h', '--help'],
         'prepend': ['-h', '--help'],
+        'edit': ['-h', '--help'],
         'help': ['-h', '--help'],
         'nutrition': ['-t', '--today', '-i', '--history', '-d', '--days', '-p', '--past'],
         'nut': ['-t', '--today', '-i', '--history', '-d', '--days', '-p', '--past'],
@@ -423,7 +614,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // Top-level commands for initial buttons
-    const topLevelCommands = ['new', 'append', 'prepend', 'todos', 'rules', 'nut', 'tags', 'search', 'show', 'list', 'link', 'merge', 'related', 'help'];
+    const topLevelCommands = ['new', 'append', 'prepend', 'edit', 'todos', 'rules', 'nut', 'tags', 'search', 'show', 'list', 'link', 'merge', 'related', 'help'];
     
     // Define function for appending output to the terminal
     window.appendOutput = function(content, isHTML = false) {
@@ -639,10 +830,16 @@ document.addEventListener('DOMContentLoaded', function() {
             if (loadingElement) {
                 loadingElement.remove();
             }
-            
+
+            // Check if this is an edit command response
+            if (data.edit_modal) {
+                openEditModal(data.note_id, data.content);
+                return;
+            }
+
             // Append result
             appendOutput(data.result, true);
-            
+
             // Scroll to bottom
             terminalOutput.scrollTop = terminalOutput.scrollHeight;
         })
@@ -890,6 +1087,100 @@ document.addEventListener('DOMContentLoaded', function() {
             return [];
         }
     }
+
+    // Modal functions
+    function openEditModal(noteId, content) {
+        currentEditNoteId = noteId;
+        originalContent = content;
+        modalNoteId.textContent = `#${noteId}`;
+        modalTextarea.value = content;
+        editModal.classList.add('show');
+        modalTextarea.focus();
+    }
+
+    function closeEditModal() {
+        editModal.classList.remove('show');
+        currentEditNoteId = null;
+        originalContent = '';
+        modalTextarea.value = '';
+        commandInput.focus();
+    }
+
+    function saveNote() {
+        const newContent = modalTextarea.value;
+
+        // Check if content changed
+        if (newContent.trim() === originalContent.trim()) {
+            appendOutput('No changes made', true);
+            closeEditModal();
+            return;
+        }
+
+        // Show saving indicator
+        modalSave.disabled = true;
+        modalSave.textContent = 'Saving...';
+
+        // Send update request
+        fetch('/api/update-note', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                note_id: currentEditNoteId,
+                content: newContent
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                appendOutput(`<span class="green">✓ Updated note #${currentEditNoteId}</span>`, true);
+                closeEditModal();
+            } else {
+                appendOutput(`<span class="red">Error: ${data.error || 'Failed to update note'}</span>`, true);
+            }
+        })
+        .catch(error => {
+            appendOutput(`<span class="red">Error: ${error.message || 'Failed to save changes'}</span>`, true);
+        })
+        .finally(() => {
+            modalSave.disabled = false;
+            modalSave.textContent = 'Save (Ctrl+Enter)';
+        });
+    }
+
+    // Modal event listeners
+    modalClose.addEventListener('click', closeEditModal);
+    modalCancel.addEventListener('click', closeEditModal);
+    modalSave.addEventListener('click', saveNote);
+
+    // Click outside modal to close
+    editModal.addEventListener('click', function(e) {
+        if (e.target === editModal) {
+            closeEditModal();
+        }
+    });
+
+    // Keyboard shortcuts for modal
+    modalTextarea.addEventListener('keydown', function(e) {
+        // Ctrl+Enter to save
+        if (e.ctrlKey && e.key === 'Enter') {
+            e.preventDefault();
+            saveNote();
+        }
+        // Escape to cancel
+        else if (e.key === 'Escape') {
+            e.preventDefault();
+            closeEditModal();
+        }
+    });
+
+    // Global Escape key handler
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && editModal.classList.contains('show')) {
+            closeEditModal();
+        }
+    });
 
     function createNutritionBar(value, maxValue, className) {
         const percentage = Math.min(100, (value / maxValue) * 100);

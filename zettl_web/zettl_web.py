@@ -263,6 +263,10 @@ COMMAND_OPTIONS = {
         'short_opts': {},
         'long_opts': {}
     },
+    'edit': {
+        'short_opts': {},
+        'long_opts': {}
+    },
 
     # Add similar configs for other commands
 }
@@ -610,6 +614,31 @@ def index():
     username = user.get('username', 'Unknown')
     logger.debug(f"Rendering index page for user: {username}")
     return render_template('index.html', username=username)
+
+@app.route('/api/update-note', methods=['POST'])
+@jwt_required
+def update_note():
+    """API endpoint to update note content from the edit modal."""
+    data = request.json
+    note_id = data.get('note_id')
+    content = data.get('content')
+
+    if not note_id or content is None:
+        return jsonify({'error': 'Missing note_id or content'}), 400
+
+    try:
+        notes_manager = get_notes_manager()
+        notes_manager.update_note(note_id, content)
+        return jsonify({
+            'success': True,
+            'message': f'Updated note #{note_id}'
+        })
+    except Exception as e:
+        logger.exception(f"Error updating note {note_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/api/command', methods=['POST'])
 @jwt_required
@@ -1133,6 +1162,24 @@ def execute_command():
                     result = ZettlFormatter.success(f"Prepended text to note #{note_id}")
                 except Exception as e:
                     result = ZettlFormatter.error(f"Error prepending to note: {str(e)}")
+
+        elif cmd == "edit":
+            # Edit command - return a special response for the web app to handle
+            if not remaining_args:
+                result = ZettlFormatter.error("Please provide a note ID")
+            else:
+                note_id = remaining_args[0]
+                try:
+                    note = notes_manager.get_note(note_id)
+                    # Return a special marker for the frontend to detect and open modal
+                    return jsonify({
+                        'result': '',
+                        'edit_modal': True,
+                        'note_id': note_id,
+                        'content': note['content']
+                    })
+                except Exception as e:
+                    result = ZettlFormatter.error(f"Error loading note: {str(e)}")
 
         elif cmd == "merge":
             # Merge multiple notes into one
