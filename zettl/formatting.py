@@ -1,5 +1,7 @@
 # formatting.py
 import sys
+from rich.console import Console
+from rich.markdown import Markdown
 
 # Initialize colorama for Windows support
 if sys.platform == 'win32':
@@ -10,6 +12,9 @@ if sys.platform == 'win32':
         # If colorama is not installed, colors won't work on Windows
         # but the program will still function
         pass
+
+# Rich console for markdown rendering
+console = Console()
 
 class Colors:
     """ANSI color codes for terminal output."""
@@ -65,15 +70,32 @@ class ZettlFormatter:
         return f"{Colors.CYAN}{text}{Colors.RESET}"
 
     @staticmethod
-    def format_note_display(note, notes_manager):
-        """Format a full note for display."""
+    def format_note_display(note, notes_manager, render_markdown=True):
+        """Format a full note for display with optional markdown rendering."""
         note_id = note['id']
         created_at = notes_manager.format_timestamp(note['created_at'])
-        
+
         formatted_id = ZettlFormatter.note_id(note_id)
         formatted_time = ZettlFormatter.timestamp(created_at)
-        
+
         header_line = f"{formatted_id} [{formatted_time}]"
         separator = "-" * 40
-        
-        return f"{header_line}\n{separator}\n{note['content']}"
+
+        # Print header and separator
+        print(header_line)
+        print(separator)
+
+        # Render markdown content if enabled
+        if render_markdown:
+            ZettlFormatter.render_markdown(note['content'])
+        else:
+            print(note['content'])
+
+        # Return empty string since we're printing directly
+        return ""
+
+    @staticmethod
+    def render_markdown(content):
+        """Render markdown content using rich."""
+        md = Markdown(content)
+        console.print(md)

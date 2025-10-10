@@ -398,11 +398,18 @@ def extract_options(args, cmd):
     return options, flags, remaining_args
 
 # ANSI color code to HTML span conversion
-def ansi_to_html(text):
+def ansi_to_html(text, preserve_markdown=False):
     """
     Convert ANSI color codes to HTML spans and convert newlines to <br> tags
-    for proper HTML rendering
+    for proper HTML rendering.
+
+    Detects <MARKDOWN>...</MARKDOWN> tags and wraps content for client-side rendering.
     """
+    # Check for markdown markers
+    import re
+    markdown_pattern = r'<MARKDOWN>(.*?)</MARKDOWN>'
+    markdown_sections = re.findall(markdown_pattern, text, re.DOTALL)
+
     # Map ANSI color codes to CSS classes
     ansi_map = {
         '\033[92m': '<span class="green">',    # GREEN
@@ -413,25 +420,65 @@ def ansi_to_html(text):
         '\033[1m': '<span class="bold">',      # BOLD
         '\033[0m': '</span>'                   # RESET
     }
-    
+
     # Replace ANSI codes with HTML spans
     for ansi, html in ansi_map.items():
         text = text.replace(ansi, html)
-    
+
     # Handle nested spans correctly by counting resets
     reset_count = text.count('</span>')
     open_count = sum(text.count(span) for span in ansi_map.values() if span != '</span>')
-    
+
     # Add any missing closing spans
     if open_count > reset_count:
         text += '</span>' * (open_count - reset_count)
-        
-    # Convert newlines to HTML breaks
-    # Double newlines (paragraph breaks) get extra spacing
-    text = text.replace('\n\n', '<br><br style="margin-bottom: 10px">')
-    text = text.replace('\n', '<br>')
-    
+
+    # Process markdown sections
+    if markdown_sections:
+        for md_content in markdown_sections:
+            # Replace the markdown marker with a div that JavaScript will process
+            original = f'<MARKDOWN>{md_content}</MARKDOWN>'
+            replacement = f'<div class="markdown-content">{md_content}</div>'
+            text = text.replace(original, replacement)
+
+    # Convert newlines to HTML breaks (but not in markdown sections)
+    # Split by markdown-content divs to avoid converting newlines inside them
+    parts = text.split('<div class="markdown-content">')
+    for i in range(len(parts)):
+        if '</div>' in parts[i]:
+            # This part contains a markdown div
+            before_div, after_div = parts[i].split('</div>', 1)
+            # Only convert newlines in the after_div part
+            after_div = after_div.replace('\n\n', '<br><br style="margin-bottom: 10px">')
+            after_div = after_div.replace('\n', '<br>')
+            parts[i] = before_div + '</div>' + after_div
+        else:
+            # No markdown div in this part, convert all newlines
+            parts[i] = parts[i].replace('\n\n', '<br><br style="margin-bottom: 10px">')
+            parts[i] = parts[i].replace('\n', '<br>')
+
+    text = '<div class="markdown-content">'.join(parts)
+
     return text
+
+def format_note_content_for_web(note, notes_manager):
+    """Format a note for web display with markdown support."""
+    note_id = note['id']
+    created_at = notes_manager.db.format_timestamp(note['created_at'])
+
+    formatted_id = ZettlFormatter.note_id(note_id)
+    formatted_time = ZettlFormatter.timestamp(created_at)
+
+    header_line = f"{formatted_id} [{formatted_time}]"
+    separator = "-" * 40
+
+    # Return formatted parts separately so we can handle markdown
+    return {
+        'header': ansi_to_html(header_line),
+        'separator': separator,
+        'content': note['content'],  # Keep content as-is for markdown rendering
+        'is_markdown': True
+    }
 
 def show_command_help(cmd):
     """Show detailed help for a specific command."""
@@ -690,7 +737,7 @@ def execute_command():
             for note in notes:
                 note_id = note['id']
                 created_at = notes_manager.db.format_timestamp(note['created_at'])
-                
+
                 if compact:
                     # Very compact mode - just IDs
                     result += f"{ZettlFormatter.note_id(note_id)}\n"
@@ -698,7 +745,7 @@ def execute_command():
                     # Full content mode
                     result += f"{ZettlFormatter.note_id(note_id)} [{ZettlFormatter.timestamp(created_at)}]\n"
                     result += "-" * 40 + "\n"
-                    result += f"{note['content']}\n"
+                    result += f"<MARKDOWN>{note['content']}</MARKDOWN>\n"
                     
                     # Add tags display
                     try:
@@ -767,9 +814,11 @@ def execute_command():
                     note = notes_manager.get_note(note_id)
                     created_at = notes_manager.db.format_timestamp(note['created_at'])
 
+                    # Format header with ANSI colors
                     result = f"{ZettlFormatter.note_id(note_id)} [{ZettlFormatter.timestamp(created_at)}]\n"
                     result += "-" * 40 + "\n"
-                    result += f"{note['content']}\n\n"
+                    # Add content wrapped in markdown marker
+                    result += f"<MARKDOWN>{note['content']}</MARKDOWN>\n\n"
 
                     # Show tags if any
                     try:
@@ -842,7 +891,7 @@ def execute_command():
                         # Full content mode
                         result += f"{ZettlFormatter.note_id(note['id'])}\n"
                         result += "-" * 40 + "\n"
-                        result += f"{note['content']}\n"
+                        result += f"<MARKDOWN>{note['content']}</MARKDOWN>\n"
                         
                         # Add tags display
                         try:
@@ -918,7 +967,7 @@ def execute_command():
                     created_at = notes_manager.db.format_timestamp(source_note['created_at'])
                     result += f"{ZettlFormatter.note_id(note_id)} [{ZettlFormatter.timestamp(created_at)}]\n"
                     result += "-" * 40 + "\n"
-                    result += f"{source_note['content']}\n\n"
+                    result += f"<MARKDOWN>{source_note['content']}</MARKDOWN>\n\n"
                 except Exception as e:
                     result = f"{ZettlFormatter.warning(f'Could not display source note: {str(e)}')}\n"
                 
@@ -935,7 +984,7 @@ def execute_command():
                             note_created_at = notes_manager.db.format_timestamp(note['created_at'])
                             result += f"{ZettlFormatter.note_id(note['id'])} [{ZettlFormatter.timestamp(note_created_at)}]\n"
                             result += "-" * 40 + "\n"
-                            result += f"{note['content']}\n\n"
+                            result += f"<MARKDOWN>{note['content']}</MARKDOWN>\n\n"
                         else:
                             # Preview mode
                             content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
