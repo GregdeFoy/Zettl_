@@ -600,12 +600,8 @@
 </head>
 <body>
     <div id="header">
-        <span>Zettl Web Terminal</span>
-        <div class="actions">
-            <button id="clear-terminal">Clear</button>
-            <button id="logout-button">Logout</button>
-            <span id="username">{{ username }}</span>
-        </div>
+        <span>Zettl</span>
+        <span id="username">{{ username }}</span>
     </div>
 
     <div id="app-container">
@@ -735,7 +731,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // Top-level commands for initial buttons
-    const topLevelCommands = ['new', 'append', 'prepend', 'edit', 'todos', 'rules', 'nut', 'tags', 'search', 'show', 'list', 'link', 'merge', 'related', 'help'];
+    const topLevelCommands = ['new', 'append', 'prepend', 'edit', 'todos', 'rules', 'nut', 'tags', 'search', 'show', 'list', 'link', 'merge', 'related', 'help', 'clear', 'settings', 'logout'];
     
     // Helper function to detect if content is markdown-formatted
     function isMarkdownContent(text) {
@@ -802,10 +798,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add the logo container to the terminal output
     terminalOutput.appendChild(logoContainer);
-    
+
     // Add the welcome text
-    appendOutput("Welcome to Zettl Web Terminal. Type 'help' for commands.");
-    appendOutput("Type 'list' to see your recent notes.");
+    appendOutput("Welcome to Zettl Web Terminal.");
+    appendOutput("Type 'help' for commands. Type 'settings' for settings. Type 'clear' to clear terminal.");
     
     // Function to resize textarea based on content
     function autoResizeTextarea() {
@@ -885,22 +881,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Update shortcut buttons when input changes
     commandInput.addEventListener('input', updateShortcutButtons);
-    
+
     // Handle submit button click
     submitButton.addEventListener('click', function() {
         executeCommand(commandInput.value);
-    });
-
-    // Handle the clear terminal button
-    clearTerminalButton.addEventListener('click', function() {
-        // Clear terminal output but keep logo
-        terminalOutput.innerHTML = '';
-        
-        // Add the logo back
-        terminalOutput.appendChild(logoContainer);
-        
-        // Add the welcome text again
-        appendOutput("Terminal cleared. Type 'help' for commands.");
     });
 
     // Handle the clear input button
@@ -909,25 +893,6 @@ document.addEventListener('DOMContentLoaded', function() {
         commandInput.focus();
         autoResizeTextarea();
         updateShortcutButtons();
-    });
-
-    // Handle logout button
-    logoutButton.addEventListener('click', function() {
-        if (confirm('Are you sure you want to logout?')) {
-            fetch('/api/logout', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(() => {
-                window.location.href = '/login';
-            })
-            .catch(() => {
-                // Even if logout fails, redirect to login
-                window.location.href = '/login';
-            });
-        }
     });
 
     // Handle iOS focus issues
@@ -943,19 +908,55 @@ document.addEventListener('DOMContentLoaded', function() {
     function executeCommand(command) {
         const cmd = command.trim();
         if (!cmd) return;
-        
+
+        // Handle built-in commands locally
+        if (cmd === 'clear') {
+            // Clear terminal output but keep logo
+            terminalOutput.innerHTML = '';
+            terminalOutput.appendChild(logoContainer);
+            appendOutput("Terminal cleared. Type 'help' for commands.");
+
+            // Clear input
+            commandInput.value = '';
+            autoResizeTextarea();
+            updateShortcutButtons();
+            commandInput.focus();
+            return;
+        }
+
+        if (cmd === 'settings') {
+            window.location.href = '/settings';
+            return;
+        }
+
+        if (cmd === 'logout') {
+            if (confirm('Are you sure you want to logout?')) {
+                fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                })
+                .then(() => {
+                    window.location.href = '/login';
+                })
+                .catch(() => {
+                    window.location.href = '/login';
+                });
+            }
+            return;
+        }
+
         // Echo command with prompt
         appendOutput(`zettl> ${cmd}`);
-        
+
         // Add to history if not duplicate of most recent
         if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== cmd) {
             commandHistory.push(cmd);
             saveHistory(commandHistory);
         }
-        
+
         // Reset history index
         historyIndex = commandHistory.length;
-        
+
         // Clear input and resize
         commandInput.value = '';
         autoResizeTextarea();

@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zettl Settings</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --header-bg: #333;
+            --terminal-text: #f0f0f0;
+            --primary-color: #14b8a6;
+            --button-bg: #4a4a4a;
+            --button-hover: #666;
+            --input-bg: #333;
+            --input-border: #555;
+            --success: #90ee90;
+            --error: #ff6347;
+            --warning: #ffff00;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: var(--bg-color);
+            color: var(--terminal-text);
+            min-height: 100vh;
+        }
+
+        #header {
+            background-color: var(--header-bg);
+            color: var(--primary-color);
+            padding: 15px 20px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        #header .actions {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        #header .actions a,
+        #header .actions button {
+            background-color: var(--button-bg);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-family: 'Courier New', monospace;
+        }
+
+        #header .actions a:hover,
+        #header .actions button:hover {
+            background-color: var(--button-hover);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .settings-section {
+            background-color: var(--header-bg);
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .settings-section h2 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .help-text {
+            color: #999;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--terminal-text);
+        }
+
+        .form-group input[type="password"],
+        .form-group input[type="text"] {
+            width: 100%;
+            background-color: var(--input-bg);
+            color: var(--terminal-text);
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background-color: var(--primary-color);
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .btn-secondary {
+            background-color: var(--button-bg);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--button-hover);
+        }
+
+        .btn-danger {
+            background-color: var(--error);
+            color: white;
+        }
+
+        .status-message {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .status-message.success {
+            background-color: rgba(144, 238, 144, 0.2);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .status-message.error {
+            background-color: rgba(255, 99, 71, 0.2);
+            color: var(--error);
+            border: 1px solid var(--error);
+        }
+
+        .tokens-list {
+            margin-top: 20px;
+        }
+
+        .token-item {
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .token-info {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .token-info strong {
+            color: var(--primary-color);
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .token-preview {
+            font-family: 'Courier New', monospace;
+            color: #999;
+            font-size: 12px;
+            display: block;
+            margin: 5px 0;
+        }
+
+        .token-date {
+            color: #999;
+            font-size: 12px;
+            display: block;
+        }
+
+        .new-token-display {
+            background-color: rgba(255, 255, 0, 0.1);
+            border: 2px solid var(--warning);
+            border-radius: 4px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .new-token-display strong {
+            color: var(--warning);
+            display: block;
+            margin-bottom: 15px;
+        }
+
+        .new-token-display code {
+            background-color: var(--bg-color);
+            color: var(--primary-color);
+            padding: 10px;
+            border-radius: 4px;
+            display: block;
+            margin: 10px 0;
+            word-break: break-all;
+            font-size: 13px;
+        }
+
+        .mb-3 {
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 20px auto;
+            }
+
+            .token-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .button-group {
+                width: 100%;
+            }
+
+            .btn {
+                flex: 1;
+            }
+        }
+
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <span><a href="/" style="color: var(--primary-color); text-decoration: none;">← Zettl</a> / Settings</span>
+        <span>{{ username }}</span>
+    </div>
+
+    <div class="container">
+        <h1>Settings</h1>
+
+        <!-- Claude API Key Section -->
+        <div class="settings-section">
+            <h2>Claude API Key</h2>
+            <p class="help-text">Add your Anthropic API key to enable AI features in your notes</p>
+
+            <div class="form-group">
+                <label for="claude-api-key">API Key</label>
+                <input type="password"
+                       id="claude-api-key"
+                       placeholder="sk-ant-..."
+                       autocomplete="off">
+            </div>
+
+            <div class="button-group">
+                <button onclick="saveClaudeKey()" class="btn">Save API Key</button>
+                <button onclick="toggleKeyVisibility()" class="btn btn-secondary">Show/Hide</button>
+            </div>
+
+            <div id="claude-status" class="status-message"></div>
+        </div>
+
+        <!-- CLI Tokens Section -->
+        <div class="settings-section">
+            <h2>CLI Access Tokens</h2>
+            <p class="help-text">Generate tokens to use Zettl from the command line</p>
+
+            <button onclick="generateToken()" class="btn mb-3">Generate New Token</button>
+
+            <div id="new-token-container"></div>
+
+            <div id="tokens-list" class="tokens-list">
+                <p style="color: #999;">Loading tokens...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load settings data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSettings();
+        });
+
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/settings/data');
+                const data = await response.json();
+
+                if (data.success) {
+                    const settings = data.data;
+
+                    // Load Claude API key
+                    if (settings.claude_api_key) {
+                        document.getElementById('claude-api-key').value = settings.claude_api_key;
+                    }
+
+                    // Load CLI tokens
+                    displayTokens(settings.cli_tokens || []);
+                } else {
+                    console.error('Failed to load settings:', data.error);
+                }
+            } catch (e) {
+                console.error('Error loading settings:', e);
+            }
+        }
+
+        function displayTokens(tokens) {
+            const tokensList = document.getElementById('tokens-list');
+
+            if (tokens.length === 0) {
+                tokensList.innerHTML = '<p style="color: #999;">No CLI tokens yet. Generate one to get started!</p>';
+                return;
+            }
+
+            tokensList.innerHTML = '';
+
+            tokens.forEach(token => {
+                const tokenDiv = document.createElement('div');
+                tokenDiv.className = 'token-item';
+
+                const tokenInfo = document.createElement('div');
+                tokenInfo.className = 'token-info';
+
+                const name = document.createElement('strong');
+                name.textContent = token.name || 'Unnamed Token';
+                tokenInfo.appendChild(name);
+
+                const preview = document.createElement('span');
+                preview.className = 'token-preview';
+                preview.textContent = `ID: ${token.id}`;
+                tokenInfo.appendChild(preview);
+
+                const created = document.createElement('span');
+                created.className = 'token-date';
+                created.textContent = `Created: ${new Date(token.created_at).toLocaleDateString()}`;
+                tokenInfo.appendChild(created);
+
+                if (token.last_used) {
+                    const lastUsed = document.createElement('span');
+                    lastUsed.className = 'token-date';
+                    lastUsed.textContent = `Last used: ${new Date(token.last_used).toLocaleString()}`;
+                    tokenInfo.appendChild(lastUsed);
+                }
+
+                tokenDiv.appendChild(tokenInfo);
+
+                const revokeBtn = document.createElement('button');
+                revokeBtn.className = 'btn btn-danger';
+                revokeBtn.textContent = 'Revoke';
+                revokeBtn.onclick = () => revokeToken(token.id);
+                tokenDiv.appendChild(revokeBtn);
+
+                tokensList.appendChild(tokenDiv);
+            });
+        }
+
+        async function saveClaudeKey() {
+            const apiKey = document.getElementById('claude-api-key').value.trim();
+            const statusEl = document.getElementById('claude-status');
+
+            // Show loading state
+            statusEl.style.display = 'block';
+            statusEl.className = 'status-message';
+            statusEl.innerHTML = 'Saving...';
+
+            try {
+                const response = await fetch('/api/settings/claude-key', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({api_key: apiKey})
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    statusEl.className = 'status-message success';
+                    statusEl.innerHTML = '✓ API key saved successfully';
+                } else {
+                    statusEl.className = 'status-message error';
+                    statusEl.innerHTML = '✗ ' + (data.error || 'Failed to save API key');
+                }
+            } catch (e) {
+                statusEl.className = 'status-message error';
+                statusEl.innerHTML = '✗ Error: ' + e.message;
+            }
+
+            // Hide after 5 seconds
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 5000);
+        }
+
+        async function generateToken() {
+            const name = prompt('Enter a name for this token (optional):');
+            if (name === null) return; // User cancelled
+
+            const newTokenContainer = document.getElementById('new-token-container');
+            newTokenContainer.innerHTML = '<p style="color: #999;">Generating token...</p>';
+
+            try {
+                const response = await fetch('/api/cli-token/generate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name: name || 'CLI Token'})
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.token) {
+                    // Show token ONCE with copy button
+                    const tokenDisplay = document.createElement('div');
+                    tokenDisplay.className = 'new-token-display';
+                    tokenDisplay.innerHTML = `
+                        <strong>⚠️ Save this token - it won't be shown again!</strong>
+                        <code id="new-token">${data.token}</code>
+                        <div class="button-group">
+                            <button class="btn" onclick="copyToken('${data.token}')">📋 Copy to Clipboard</button>
+                            <button class="btn btn-secondary" onclick="document.getElementById('new-token-container').innerHTML = ''">Done</button>
+                        </div>
+                        <p style="margin-top: 15px; color: #999;">
+                            To use this token with the CLI, run:<br>
+                            <code style="background-color: var(--bg-color); padding: 5px; display: inline-block; margin-top: 5px;">zettl auth setup</code>
+                        </p>
+                    `;
+
+                    newTokenContainer.innerHTML = '';
+                    newTokenContainer.appendChild(tokenDisplay);
+
+                    // Reload token list
+                    setTimeout(() => {
+                        loadSettings();
+                    }, 1000);
+                } else {
+                    newTokenContainer.innerHTML = `<p style="color: var(--error);">Error: ${data.error || 'Failed to generate token'}</p>`;
+                }
+            } catch (e) {
+                newTokenContainer.innerHTML = `<p style="color: var(--error);">Error: ${e.message}</p>`;
+            }
+        }
+
+        async function revokeToken(tokenId) {
+            if (!confirm('Revoke this token? Any CLI using it will stop working.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/cli-token/${tokenId}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Reload settings to refresh token list
+                    loadSettings();
+                } else {
+                    alert('Error revoking token: ' + (data.error || 'Unknown error'));
+                }
+            } catch (e) {
+                alert('Error revoking token: ' + e.message);
+            }
+        }
+
+        function copyToken(token) {
+            navigator.clipboard.writeText(token).then(() => {
+                alert('Token copied to clipboard!');
+            }).catch(() => {
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = token;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert('Token copied to clipboard!');
+            });
+        }
+
+        function toggleKeyVisibility() {
+            const input = document.getElementById('claude-api-key');
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+    </script>
+</body>
+</html>

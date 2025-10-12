@@ -55,7 +55,7 @@ class ZettlAuth:
             return False
 
     def test_api_key(self, api_key=None):
-        """Test if API key is valid."""
+        """Test if CLI token is valid."""
         if not api_key:
             api_key = self.get_api_key()
 
@@ -63,7 +63,9 @@ class ZettlAuth:
             return False
 
         try:
-            response = requests.post(f'{AUTH_URL}/token-from-key',
+            # Use the new CLI token validation endpoint
+            # AUTH_URL already includes /api/auth, so just add the endpoint
+            response = requests.post(f'{AUTH_URL}/validate-cli-token',
                                    headers={'X-API-Key': api_key},
                                    timeout=5)
             return response.status_code == 200

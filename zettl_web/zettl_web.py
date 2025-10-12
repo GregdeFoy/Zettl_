@@ -123,8 +123,40 @@ def get_notes_manager():
     return Notes(jwt_token=jwt_token)
 
 def get_llm_helper():
-    """Get an LLM helper instance."""
-    return LLMHelper()
+    """Get an LLM helper instance with the current user's JWT token and Claude API key."""
+    # Get JWT token from session
+    jwt_token = session.get('access_token')
+
+    # Fetch Claude API key from auth service (via Docker network)
+    claude_api_key = None
+    try:
+        url = f'{AUTH_URL}/api/auth/settings/claude-key'
+        logger.info(f"Fetching Claude API key from: {url}")
+        response = requests.get(
+            url,
+            headers={'Authorization': f'Bearer {jwt_token}'},
+            timeout=5
+        )
+        logger.info(f"Response status: {response.status_code}")
+        if response.status_code == 200:
+            data = response.json()
+            claude_api_key = data.get('claude_api_key')
+            logger.info(f"Claude API key fetched: {'YES' if claude_api_key else 'NO'}")
+        else:
+            logger.warning(f"Failed to fetch Claude key: {response.status_code} - {response.text}")
+    except Exception as e:
+        logger.error(f"Could not fetch Claude API key: {e}")
+
+    # Create LLMHelper instance
+    llm_helper = LLMHelper(jwt_token=jwt_token)
+
+    # Override the api_key if we successfully fetched it
+    if claude_api_key:
+        llm_helper.api_key = claude_api_key
+    else:
+        logger.warning("No Claude API key available for LLMHelper")
+
+    return llm_helper
 
 # Command parsing utilities
 def parse_command(command_str):
@@ -662,6 +694,162 @@ def index():
     logger.debug(f"Rendering index page for user: {username}")
     return render_template('index.html', username=username)
 
+@app.route('/settings')
+@jwt_required
+def settings_page():
+    """Display the settings page."""
+    user = getattr(request, 'current_user', session.get('user', {}))
+    username = user.get('username', 'Unknown')
+    logger.debug(f"Rendering settings page for user: {username}")
+    return render_template('settings.html', username=username)
+
+@app.route('/api/settings/data', methods=['GET'])
+@jwt_required
+def get_settings_data():
+    """Get current user settings and CLI tokens."""
+    try:
+        user_id = request.current_user.get('id')
+        token = session.get('access_token')
+
+        # Get user settings from auth service
+        response = requests.get(
+            f'{AUTH_URL}/api/auth/settings',
+            headers={'Authorization': f'Bearer {token}'},
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            return jsonify({
+                'success': True,
+                'data': response.json()
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to fetch settings'
+            }), response.status_code
+
+    except Exception as e:
+        logger.error(f"Error fetching settings: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/settings/claude-key', methods=['POST'])
+@jwt_required
+def update_claude_key():
+    """Update Claude API key for the current user."""
+    try:
+        data = request.get_json()
+        api_key = data.get('api_key', '').strip()
+
+        # Basic validation
+        if api_key and not api_key.startswith('sk-ant-'):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid API key format. Claude API keys start with "sk-ant-"'
+            }), 400
+
+        token = session.get('access_token')
+
+        # Send to auth service
+        response = requests.post(
+            f'{AUTH_URL}/api/auth/settings/claude-key',
+            headers={'Authorization': f'Bearer {token}'},
+            json={'api_key': api_key},
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            return jsonify({
+                'success': True,
+                'message': 'Claude API key updated successfully'
+            })
+        else:
+            error_data = response.json() if response.content else {}
+            return jsonify({
+                'success': False,
+                'error': error_data.get('error', 'Failed to update API key')
+            }), response.status_code
+
+    except Exception as e:
+        logger.error(f"Error updating Claude API key: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/cli-token/generate', methods=['POST'])
+@jwt_required
+def generate_cli_token():
+    """Generate a new CLI access token."""
+    try:
+        data = request.get_json() or {}
+        name = data.get('name', 'CLI Token')
+
+        token = session.get('access_token')
+
+        # Generate token via auth service
+        response = requests.post(
+            f'{AUTH_URL}/api/auth/cli-token',
+            headers={'Authorization': f'Bearer {token}'},
+            json={'name': name},
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            return jsonify({
+                'success': True,
+                **response.json()
+            })
+        else:
+            error_data = response.json() if response.content else {}
+            return jsonify({
+                'success': False,
+                'error': error_data.get('error', 'Failed to generate token')
+            }), response.status_code
+
+    except Exception as e:
+        logger.error(f"Error generating CLI token: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/cli-token/<int:token_id>', methods=['DELETE'])
+@jwt_required
+def revoke_cli_token(token_id):
+    """Revoke a CLI access token."""
+    try:
+        token = session.get('access_token')
+
+        # Revoke token via auth service
+        response = requests.delete(
+            f'{AUTH_URL}/api/auth/cli-token/{token_id}',
+            headers={'Authorization': f'Bearer {token}'},
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            return jsonify({
+                'success': True,
+                'message': 'Token revoked successfully'
+            })
+        else:
+            error_data = response.json() if response.content else {}
+            return jsonify({
+                'success': False,
+                'error': error_data.get('error', 'Failed to revoke token')
+            }), response.status_code
+
+    except Exception as e:
+        logger.error(f"Error revoking CLI token: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/update-note', methods=['POST'])
 @jwt_required
 def update_note():
@@ -1045,39 +1233,40 @@ def execute_command():
                     
                     if action == "summarize":
                         summary = llm_helper.summarize_note(note_id)
-                        result += f"{ZettlFormatter.header(f'AI Summary for Note #{note_id}')}\n\n{summary}"
-                        
+                        result += f"{ZettlFormatter.header(f'AI Summary for Note #{note_id}')}\n\n<MARKDOWN>{summary}</MARKDOWN>"
+
                     elif action == "tags":
                         tags = llm_helper.suggest_tags(note_id, count)
                         result += f"{ZettlFormatter.header(f'AI-Suggested Tags for Note #{note_id}')}\n\n"
                         for tag in tags:
                             result += f"{ZettlFormatter.tag(tag)}\n"
-                            
+
                     elif action == "connect":
                         connections = llm_helper.generate_connections(note_id, count)
                         result += f"{ZettlFormatter.header(f'AI-Suggested Connections for Note #{note_id}')}\n\n"
                         if not connections:
                             result += ZettlFormatter.warning("No potential connections found.")
                         else:
+                            markdown_content = ""
                             for conn in connections:
                                 conn_id = conn['note_id']
-                                formatted_id = ZettlFormatter.note_id(conn_id)
-                                result += f"{formatted_id}\n"
-                                result += f"  {conn['explanation']}\n\n"
-                                
+                                markdown_content += f"**Note #{conn_id}**\n\n{conn['explanation']}\n\n"
+                            result += f"<MARKDOWN>{markdown_content}</MARKDOWN>"
+
                     elif action == "expand":
                         expanded_content = llm_helper.expand_note(note_id)
-                        result += f"{ZettlFormatter.header(f'AI-Expanded Version of Note #{note_id}')}\n\n{expanded_content}"
-                        
+                        result += f"{ZettlFormatter.header(f'AI-Expanded Version of Note #{note_id}')}\n\n<MARKDOWN>{expanded_content}</MARKDOWN>"
+
                     elif action == "concepts":
                         concepts = llm_helper.extract_key_concepts(note_id, count)
                         result += f"{ZettlFormatter.header(f'Key Concepts from Note #{note_id}')}\n\n"
                         if not concepts:
                             result += ZettlFormatter.warning("No key concepts identified.")
                         else:
+                            markdown_content = ""
                             for i, concept in enumerate(concepts, 1):
-                                result += f"{i}. {Colors.BOLD}{concept['concept']}{Colors.RESET}\n"
-                                result += f"   {concept['explanation']}\n\n"
+                                markdown_content += f"{i}. **{concept['concept']}**\n\n   {concept['explanation']}\n\n"
+                            result += f"<MARKDOWN>{markdown_content}</MARKDOWN>"
                                 
                     elif action == "questions":
                         questions = llm_helper.generate_question_note(note_id, count)
@@ -1085,31 +1274,38 @@ def execute_command():
                         if not questions:
                             result += ZettlFormatter.warning("No questions generated.")
                         else:
+                            markdown_content = ""
                             for i, question in enumerate(questions, 1):
-                                result += f"{i}. {Colors.BOLD}{question['question']}{Colors.RESET}\n"
-                                result += f"   {question['explanation']}\n\n"
-                                
+                                markdown_content += f"{i}. **{question['question']}**\n\n   {question['explanation']}\n\n"
+                            result += f"<MARKDOWN>{markdown_content}</MARKDOWN>"
+
                     elif action == "critique":
                         critique = llm_helper.critique_note(note_id)
                         result += f"{ZettlFormatter.header(f'AI Critique of Note #{note_id}')}\n\n"
-                        
+
+                        markdown_content = ""
+
                         # Display strengths
                         if critique['strengths']:
-                            result += f"{Colors.BOLD}{Colors.GREEN}Strengths:{Colors.RESET}\n"
+                            markdown_content += "## Strengths\n\n"
                             for strength in critique['strengths']:
-                                result += f"  • {strength}\n"
-                        
+                                markdown_content += f"- {strength}\n"
+                            markdown_content += "\n"
+
                         # Display weaknesses
                         if critique['weaknesses']:
-                            result += f"\n{Colors.BOLD}{Colors.YELLOW}Areas for Improvement:{Colors.RESET}\n"
+                            markdown_content += "## Areas for Improvement\n\n"
                             for weakness in critique['weaknesses']:
-                                result += f"  • {weakness}\n"
-                        
+                                markdown_content += f"- {weakness}\n"
+                            markdown_content += "\n"
+
                         # Display suggestions
                         if critique['suggestions']:
-                            result += f"\n{Colors.BOLD}{Colors.CYAN}Suggestions:{Colors.RESET}\n"
+                            markdown_content += "## Suggestions\n\n"
                             for suggestion in critique['suggestions']:
-                                result += f"  • {suggestion}\n"
+                                markdown_content += f"- {suggestion}\n"
+
+                        result += f"<MARKDOWN>{markdown_content}</MARKDOWN>"
                                 
                         # If no structured feedback was generated
                         if not (critique['strengths'] or critique['weaknesses'] or critique['suggestions']):

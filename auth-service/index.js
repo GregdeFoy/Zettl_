@@ -34,6 +34,7 @@ const pool = new Pool({
 });
 
 // Middleware
+app.set('trust proxy', true); // Trust proxy headers (for Docker/nginx)
 app.use(helmet());
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
@@ -176,22 +177,24 @@ async function verifyToken(req, res, next) {
   }
 }
 
-// Middleware to verify API key
+// Middleware to verify API key (now CLI tokens)
 async function verifyApiKey(req, res, next) {
   try {
     const apiKey = req.headers['x-api-key'];
-    
+
     if (!apiKey) {
       return verifyToken(req, res, next); // Fall back to JWT auth
     }
 
     const keyHash = hashApiKey(apiKey);
-    
+
     const result = await pool.query(
-      `SELECT u.id, u.username, u.role 
-       FROM api_keys ak 
-       JOIN users u ON ak.user_id = u.id 
-       WHERE ak.key_hash = $1 AND (ak.expires_at IS NULL OR ak.expires_at > NOW())`,
+      `SELECT u.id, u.username, u.role
+       FROM cli_tokens ct
+       JOIN users u ON ct.user_id = u.id
+       WHERE ct.token_hash = $1
+         AND ct.is_active = true
+         AND (ct.expires_at IS NULL OR ct.expires_at > NOW())`,
       [keyHash]
     );
 
@@ -201,7 +204,7 @@ async function verifyApiKey(req, res, next) {
 
     // Update last used timestamp
     await pool.query(
-      'UPDATE api_keys SET last_used = CURRENT_TIMESTAMP WHERE key_hash = $1',
+      'UPDATE cli_tokens SET last_used = CURRENT_TIMESTAMP WHERE token_hash = $1',
       [keyHash]
     );
 
@@ -210,7 +213,7 @@ async function verifyApiKey(req, res, next) {
       username: result.rows[0].username,
       role: result.rows[0].role
     };
-    
+
     next();
   } catch (error) {
     console.error('API key verification error:', error);
@@ -416,21 +419,21 @@ app.post('/api/auth/logout', verifyToken, async (req, res) => {
   }
 });
 
-// Generate API key
+// Generate CLI token (legacy endpoint for backward compatibility)
 app.post('/api/auth/api-key', verifyToken, async (req, res) => {
   const { name, permissions, expiresIn } = req.body;
 
   try {
     const apiKey = generateApiKey();
     const keyHash = hashApiKey(apiKey);
-    
-    const expiresAt = expiresIn 
+
+    const expiresAt = expiresIn
       ? new Date(Date.now() + expiresIn * 1000)
       : null;
 
     await pool.query(
-      `INSERT INTO api_keys (user_id, key_hash, name, permissions, expires_at)
-       VALUES ($1, $2, $3, $4, $5)`,
+      `INSERT INTO cli_tokens (user_id, token_hash, name, permissions, expires_at, is_active)
+       VALUES ($1, $2, $3, $4, $5, true)`,
       [req.user.sub, keyHash, name || 'API Key', permissions || [], expiresAt]
     );
 
@@ -440,36 +443,36 @@ app.post('/api/auth/api-key', verifyToken, async (req, res) => {
       expiresAt
     });
   } catch (error) {
-    console.error('API key generation error:', error);
+    console.error('CLI token generation error:', error);
     res.status(500).json({ error: 'Failed to generate API key' });
   }
 });
 
-// List user's API keys
+// List user's CLI tokens (legacy endpoint for backward compatibility)
 app.get('/api/auth/api-keys', verifyToken, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, name, permissions, last_used, expires_at, created_at
-       FROM api_keys
-       WHERE user_id = $1
+       FROM cli_tokens
+       WHERE user_id = $1 AND is_active = true
        ORDER BY created_at DESC`,
       [req.user.sub]
     );
 
     res.json(result.rows);
   } catch (error) {
-    console.error('API keys fetch error:', error);
+    console.error('CLI tokens fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch API keys' });
   }
 });
 
-// Delete an API key
+// Delete a CLI token (legacy endpoint for backward compatibility)
 app.delete('/api/auth/api-keys/:keyId', verifyToken, async (req, res) => {
   const { keyId } = req.params;
 
   try {
     const result = await pool.query(
-      'DELETE FROM api_keys WHERE id = $1 AND user_id = $2 RETURNING id',
+      'UPDATE cli_tokens SET is_active = false WHERE id = $1 AND user_id = $2 RETURNING id',
       [keyId, req.user.sub]
     );
 
@@ -479,12 +482,12 @@ app.delete('/api/auth/api-keys/:keyId', verifyToken, async (req, res) => {
 
     res.json({ message: 'API key deleted successfully' });
   } catch (error) {
-    console.error('API key deletion error:', error);
+    console.error('CLI token deletion error:', error);
     res.status(500).json({ error: 'Failed to delete API key' });
   }
 });
 
-// Convert API key to JWT token (for CLI usage)
+// Convert CLI token to JWT token (for CLI usage)
 app.post('/api/auth/token-from-key', async (req, res) => {
   const apiKey = req.headers['x-api-key'];
 
@@ -497,9 +500,11 @@ app.post('/api/auth/token-from-key', async (req, res) => {
 
     const result = await pool.query(
       `SELECT u.id, u.username, u.role
-       FROM api_keys ak
-       JOIN users u ON ak.user_id = u.id
-       WHERE ak.key_hash = $1 AND (ak.expires_at IS NULL OR ak.expires_at > NOW())`,
+       FROM cli_tokens ct
+       JOIN users u ON ct.user_id = u.id
+       WHERE ct.token_hash = $1
+         AND ct.is_active = true
+         AND (ct.expires_at IS NULL OR ct.expires_at > NOW())`,
       [keyHash]
     );
 
@@ -511,7 +516,7 @@ app.post('/api/auth/token-from-key', async (req, res) => {
 
     // Update last_used timestamp
     await pool.query(
-      'UPDATE api_keys SET last_used = CURRENT_TIMESTAMP WHERE key_hash = $1',
+      'UPDATE cli_tokens SET last_used = CURRENT_TIMESTAMP WHERE token_hash = $1',
       [keyHash]
     );
 
@@ -620,9 +625,9 @@ app.post('/api/auth/validate', async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    
-    res.json({ 
-      valid: true, 
+
+    res.json({
+      valid: true,
       user: {
         id: decoded.sub,
         username: decoded.username,
@@ -631,6 +636,227 @@ app.post('/api/auth/validate', async (req, res) => {
     });
   } catch (error) {
     res.status(401).json({ valid: false, error: 'Invalid token' });
+  }
+});
+
+// Get user settings and CLI tokens
+app.get('/api/auth/settings', verifyToken, async (req, res) => {
+  try {
+    // Get user settings
+    const settingsResult = await pool.query(
+      'SELECT claude_api_key, created_at, updated_at FROM user_settings WHERE user_id = $1',
+      [req.user.sub]
+    );
+
+    // Get CLI tokens (excluding the actual token values)
+    const tokensResult = await pool.query(
+      `SELECT id, name, last_used, created_at, expires_at, is_active
+       FROM cli_tokens
+       WHERE user_id = $1 AND is_active = true
+       ORDER BY created_at DESC`,
+      [req.user.sub]
+    );
+
+    res.json({
+      claude_api_key: settingsResult.rows[0]?.claude_api_key || null,
+      cli_tokens: tokensResult.rows
+    });
+  } catch (error) {
+    console.error('Settings fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+
+// Update Claude API key
+app.post('/api/auth/settings/claude-key', verifyToken, async (req, res) => {
+  const { api_key } = req.body;
+
+  try {
+    // Check if user_settings row exists
+    const existing = await pool.query(
+      'SELECT user_id FROM user_settings WHERE user_id = $1',
+      [req.user.sub]
+    );
+
+    if (existing.rows.length > 0) {
+      // Update existing row
+      await pool.query(
+        'UPDATE user_settings SET claude_api_key = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
+        [api_key || null, req.user.sub]
+      );
+    } else {
+      // Insert new row
+      await pool.query(
+        'INSERT INTO user_settings (user_id, claude_api_key) VALUES ($1, $2)',
+        [req.user.sub, api_key || null]
+      );
+    }
+
+    res.json({ message: 'Claude API key updated successfully' });
+  } catch (error) {
+    console.error('Claude API key update error:', error);
+    res.status(500).json({ error: 'Failed to update API key' });
+  }
+});
+
+// Generate CLI token
+app.post('/api/auth/cli-token', verifyToken, async (req, res) => {
+  const { name, expiresIn } = req.body;
+
+  try {
+    // Generate a CLI token (similar format to API keys)
+    const token = 'zettl_' + crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    const expiresAt = expiresIn
+      ? new Date(Date.now() + expiresIn * 1000)
+      : null;
+
+    // Insert into cli_tokens table
+    const result = await pool.query(
+      `INSERT INTO cli_tokens (user_id, token_hash, name, expires_at, is_active)
+       VALUES ($1, $2, $3, $4, true)
+       RETURNING id, name, created_at, expires_at`,
+      [req.user.sub, tokenHash, name || 'CLI Token', expiresAt]
+    );
+
+    res.json({
+      token, // Only returned once!
+      id: result.rows[0].id,
+      name: result.rows[0].name,
+      created_at: result.rows[0].created_at,
+      expires_at: result.rows[0].expires_at
+    });
+  } catch (error) {
+    console.error('CLI token generation error:', error);
+    res.status(500).json({ error: 'Failed to generate CLI token' });
+  }
+});
+
+// Delete/revoke a CLI token
+app.delete('/api/auth/cli-token/:tokenId', verifyToken, async (req, res) => {
+  const { tokenId } = req.params;
+
+  try {
+    // Soft delete by setting is_active to false
+    const result = await pool.query(
+      'UPDATE cli_tokens SET is_active = false WHERE id = $1 AND user_id = $2 RETURNING id',
+      [tokenId, req.user.sub]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'CLI token not found' });
+    }
+
+    res.json({ message: 'CLI token revoked successfully' });
+  } catch (error) {
+    console.error('CLI token deletion error:', error);
+    res.status(500).json({ error: 'Failed to revoke CLI token' });
+  }
+});
+
+// Validate CLI token and update last_used
+app.post('/api/auth/validate-cli-token', async (req, res) => {
+  const cliToken = req.headers['x-api-key'] || req.body.token;
+
+  if (!cliToken) {
+    return res.status(401).json({ error: 'No CLI token provided' });
+  }
+
+  try {
+    const tokenHash = crypto.createHash('sha256').update(cliToken).digest('hex');
+
+    const result = await pool.query(
+      `SELECT ct.id, ct.user_id, u.username, u.role
+       FROM cli_tokens ct
+       JOIN users u ON ct.user_id = u.id
+       WHERE ct.token_hash = $1
+         AND ct.is_active = true
+         AND (ct.expires_at IS NULL OR ct.expires_at > NOW())`,
+      [tokenHash]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid or expired CLI token' });
+    }
+
+    const tokenData = result.rows[0];
+
+    // Update last_used timestamp
+    await pool.query(
+      'UPDATE cli_tokens SET last_used = CURRENT_TIMESTAMP WHERE id = $1',
+      [tokenData.id]
+    );
+
+    res.json({
+      valid: true,
+      user: {
+        id: tokenData.user_id,
+        username: tokenData.username,
+        role: tokenData.role
+      }
+    });
+  } catch (error) {
+    console.error('CLI token validation error:', error);
+    res.status(500).json({ error: 'Token validation failed' });
+  }
+});
+
+// Get Claude API key (accepts both JWT and CLI token auth)
+app.get('/api/auth/settings/claude-key', async (req, res) => {
+  try {
+    let userId;
+
+    // Check for JWT token first
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded.sub;
+      } catch (err) {
+        return res.status(401).json({ error: 'Invalid JWT token' });
+      }
+    }
+    // Otherwise check for CLI token
+    else {
+      const cliToken = req.headers['x-api-key'];
+      if (!cliToken) {
+        return res.status(401).json({ error: 'No authentication provided' });
+      }
+
+      const tokenHash = crypto.createHash('sha256').update(cliToken).digest('hex');
+
+      // Validate token and get user_id
+      const tokenResult = await pool.query(
+        `SELECT user_id FROM cli_tokens
+         WHERE token_hash = $1
+           AND is_active = true
+           AND (expires_at IS NULL OR expires_at > NOW())`,
+        [tokenHash]
+      );
+
+      if (tokenResult.rows.length === 0) {
+        return res.status(401).json({ error: 'Invalid or expired CLI token' });
+      }
+
+      userId = tokenResult.rows[0].user_id;
+    }
+
+    // Get Claude API key
+    const settingsResult = await pool.query(
+      'SELECT claude_api_key FROM user_settings WHERE user_id = $1',
+      [userId]
+    );
+
+    const claudeApiKey = settingsResult.rows[0]?.claude_api_key || null;
+
+    res.json({
+      claude_api_key: claudeApiKey
+    });
+  } catch (error) {
+    console.error('Claude API key fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch Claude API key' });
   }
 });
 
