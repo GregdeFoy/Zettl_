@@ -13,13 +13,8 @@ class ZettlAuth:
         self.config_dir.mkdir(exist_ok=True)
 
     def get_api_key(self):
-        """Get API key from environment variable or config file."""
-        # First check environment variable
-        api_key = os.getenv('ZETTL_API_KEY')
-        if api_key:
-            return api_key
-
-        # Then check config file
+        """Get API key from config file."""
+        # Check config file
         if self.config_file.exists():
             try:
                 with open(self.config_file, 'r') as f:
@@ -82,7 +77,6 @@ class ZettlAuth:
             click.echo("http://localhost:8080 (or your Zettl web URL)")
             click.echo("")
             click.echo("Then run: zettl auth setup")
-            click.echo("Or set environment variable: export ZETTL_API_KEY=your_key")
             sys.exit(1)
 
         return api_key

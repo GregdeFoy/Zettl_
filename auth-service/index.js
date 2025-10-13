@@ -419,7 +419,7 @@ app.post('/api/auth/logout', verifyToken, async (req, res) => {
   }
 });
 
-// Generate CLI token (legacy endpoint for backward compatibility)
+// Generate CLI token
 app.post('/api/auth/api-key', verifyToken, async (req, res) => {
   const { name, permissions, expiresIn } = req.body;
 
@@ -448,7 +448,7 @@ app.post('/api/auth/api-key', verifyToken, async (req, res) => {
   }
 });
 
-// List user's CLI tokens (legacy endpoint for backward compatibility)
+// List user's CLI tokens
 app.get('/api/auth/api-keys', verifyToken, async (req, res) => {
   try {
     const result = await pool.query(
@@ -466,7 +466,7 @@ app.get('/api/auth/api-keys', verifyToken, async (req, res) => {
   }
 });
 
-// Delete a CLI token (legacy endpoint for backward compatibility)
+// Delete a CLI token
 app.delete('/api/auth/api-keys/:keyId', verifyToken, async (req, res) => {
   const { keyId } = req.params;
 

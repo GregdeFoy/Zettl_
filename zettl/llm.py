@@ -3,7 +3,6 @@ import os
 import re
 from typing import List, Dict, Any, Optional, Union
 from zettl.database import Database
-from zettl.config import CLAUDE_API_KEY
 import urllib3
 urllib3.disable_warnings()
 import logging
@@ -37,7 +36,7 @@ class LLMHelper:
             self.jwt_token = None
             self.db = Database(api_key=self.cli_token)
 
-        # Get Claude API key from settings API, fall back to environment variable
+        # Get Claude API key from settings API
         self.api_key = self._get_claude_api_key()
         self.model = "claude-sonnet-4-5-20250929"  # Using Claude Sonnet 4.5
         self._client = None  # Lazy-loaded client
@@ -53,9 +52,9 @@ class LLMHelper:
 
     def _get_claude_api_key(self):
         """
-        Get Claude API key from user settings API first, then fall back to environment variable.
+        Get Claude API key from user settings API.
         """
-        # First try to get from user settings via API
+        # Try to get from user settings via API
         try:
             from zettl.config import AUTH_URL
             import requests
@@ -81,11 +80,9 @@ class LLMHelper:
                     if data.get('claude_api_key'):
                         return data['claude_api_key']
         except Exception as e:
-            # If fetching from API fails, fall back to environment variable
             logging.debug(f"Could not fetch Claude API key from settings: {e}")
 
-        # Fall back to environment variable
-        return CLAUDE_API_KEY
+        return None
         
     # Then modify the client property
     @property
@@ -147,7 +144,7 @@ class LLMHelper:
         """
         # Check if API key is available
         if not self.api_key:
-            raise Exception("No Claude API key configured. Please set your API key in Settings or via CLAUDE_API_KEY environment variable.")
+            raise Exception("No Claude API key configured. Please set your API key in Settings.")
 
         # Default system message if none provided
         if not system_message:

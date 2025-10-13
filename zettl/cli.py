@@ -30,8 +30,9 @@ def get_graph_manager():
     return NoteGraph()
 
 def get_llm_helper():
-    """Get an LLM helper (doesn't need auth currently)."""
-    return LLMHelper()
+    """Get an authenticated LLM helper."""
+    api_key = zettl_auth.require_auth()
+    return LLMHelper(api_key=api_key)
 
 # Define the function that both commands will use
 def create_new_note(content, tag, link=None):

@@ -430,8 +430,7 @@ class CommandHelp:
 {Colors.BOLD}Notes:{Colors.RESET}
   - API keys are only shown once when generated
   - Copy and save them immediately
-  - Use with CLI: export ZETTL_API_KEY=your_key
-  - Or run: zettl auth setup
+  - Configure with CLI: zettl auth setup
 """,
 
             "workflow": f"""

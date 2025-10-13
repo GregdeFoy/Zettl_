@@ -1871,8 +1871,6 @@ def execute_command():
                             result += f"🔑 Your new API key: {api_key}\n\n"
                             result += "⚠️  IMPORTANT: Copy this key now! You won't be able to see it again.\n\n"
                             result += "To use this key with the CLI:\n"
-                            result += f"  export ZETTL_API_KEY={api_key}\n"
-                            result += "  # OR\n"
                             result += "  zettl auth setup\n"
                         else:
                             result = ZettlFormatter.error("Failed to generate API key")

@@ -58,10 +58,6 @@ class Database:
         self.auth_url = AUTH_URL
         self.jwt_token = jwt_token
         self.api_key = api_key
-        # Keep this for backward compatibility with any code that might access it
-        self._cache = {}
-        self._cache_ttl = {}
-        self._default_ttl = _default_ttl
 
     def invalidate_cache(self, prefix=None):
         """Instance method that calls the module-level function."""
