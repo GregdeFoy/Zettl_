@@ -3,106 +3,121 @@ from zettl.formatting import Colors
 
 class CommandHelp:
     """Centralized help system for Zettl commands."""
-    
+
     @staticmethod
     def get_main_help():
         """Return the main help text."""
         return f"""
 {Colors.GREEN}{Colors.BOLD}zettl v0.1.0{Colors.RESET} - A Zettelkasten-style note-taking tool
 
-{Colors.BOLD}Core Commands:{Colors.RESET}
-  {Colors.YELLOW}{Colors.BOLD}new{Colors.RESET} - Create a new note with the given content
-    {Colors.BLUE}→{Colors.RESET} zettl new "This is a new note about an interesting concept"
-    {Colors.BLUE}→{Colors.RESET} zettl new "Note with tag and link" --tag concept --link 22a4b
+{Colors.BOLD}NOTE MANAGEMENT{Colors.RESET}
+  {Colors.YELLOW}{Colors.BOLD}new{Colors.RESET} / {Colors.YELLOW}{Colors.BOLD}add{Colors.RESET}          Create a new note
+    {Colors.BLUE}→{Colors.RESET} zettl new "Your note content" --tag concept --link 22a4b
 
-  {Colors.YELLOW}{Colors.BOLD}list{Colors.RESET} - List recent notes
-    {Colors.BLUE}→{Colors.RESET} zettl list --limit 5
-    {Colors.BLUE}→{Colors.RESET} zettl list --full  # Shows full content with tags
-
-  {Colors.YELLOW}{Colors.BOLD}show{Colors.RESET} - Display note content
+  {Colors.YELLOW}{Colors.BOLD}show{Colors.RESET}                Display full note content
     {Colors.BLUE}→{Colors.RESET} zettl show 22a4b
 
-  {Colors.YELLOW}{Colors.BOLD}search{Colors.RESET} - Search for notes by text, tag, or date
-    {Colors.BLUE}→{Colors.RESET} zettl search "concept"
-    {Colors.BLUE}→{Colors.RESET} zettl search -t concept --full  # Show full content with tags
-    {Colors.BLUE}→{Colors.RESET} zettl search -d 2025-04-07      # Find notes from a specific date
-    {Colors.BLUE}→{Colors.RESET} zettl search "concept" +t done  # Exclude notes with 'done' tag
+  {Colors.YELLOW}{Colors.BOLD}list{Colors.RESET}                List recent notes
+    {Colors.BLUE}→{Colors.RESET} zettl list --limit 10 --full
 
-{Colors.BOLD}Connection Commands:{Colors.RESET}
-  {Colors.YELLOW}{Colors.BOLD}link{Colors.RESET} - Create link between notes
-    {Colors.BLUE}→{Colors.RESET} zettl link 22a4b 18c3d
+  {Colors.YELLOW}{Colors.BOLD}search{Colors.RESET}              Search by text, tag, or date
+    {Colors.BLUE}→{Colors.RESET} zettl search "concept" -t work +t done --full
 
-  {Colors.YELLOW}{Colors.BOLD}related{Colors.RESET} - Show notes connected to this note
-    {Colors.BLUE}→{Colors.RESET} zettl related 22a4b
-
-  {Colors.YELLOW}{Colors.BOLD}graph{Colors.RESET} - Generate a graph visualization of notes
-    {Colors.BLUE}→{Colors.RESET} zettl graph 22a4b --output graph.json --depth 2
-
-{Colors.BOLD}Organizational Commands:{Colors.RESET}
-  {Colors.YELLOW}{Colors.BOLD}tags{Colors.RESET} - Show or add tags to a note
-    {Colors.BLUE}→{Colors.RESET} zettl tags 22a4b
-    {Colors.BLUE}→{Colors.RESET} zettl tags 22a4b "concept"
-
-    {Colors.YELLOW}{Colors.BOLD}todos{Colors.RESET} - List notes tagged with 'todo'
-    {Colors.BLUE}→{Colors.RESET} zettl todos
-    {Colors.BLUE}→{Colors.RESET} zettl todos --all  # Show all todos (active and completed)
-    {Colors.BLUE}→{Colors.RESET} zettl todos --donetoday  # Show todos completed today
-    {Colors.BLUE}→{Colors.RESET} zettl todos --tag work  # Filter todos by tag
-
-{Colors.BOLD}Management Commands:{Colors.RESET}
-  {Colors.YELLOW}{Colors.BOLD}append{Colors.RESET} - Append text to the end of a note
-    {Colors.BLUE}→{Colors.RESET} zettl append 22a4b "Additional thoughts..."
-
-  {Colors.YELLOW}{Colors.BOLD}prepend{Colors.RESET} - Prepend text to the beginning of a note
-    {Colors.BLUE}→{Colors.RESET} zettl prepend 22a4b "UPDATE: "
-
-  {Colors.YELLOW}{Colors.BOLD}edit{Colors.RESET} - Edit a note in your default text editor
+  {Colors.YELLOW}{Colors.BOLD}edit{Colors.RESET}                Edit note in default text editor
     {Colors.BLUE}→{Colors.RESET} zettl edit 22a4b
 
-  {Colors.YELLOW}{Colors.BOLD}merge{Colors.RESET} - Merge multiple notes into a single note
-    {Colors.BLUE}→{Colors.RESET} zettl merge 22a4b 18c3d 45f6g
-    {Colors.BLUE}→{Colors.RESET} zettl merge 22a4b 18c3d --force  # Skip confirmation
+  {Colors.YELLOW}{Colors.BOLD}append{Colors.RESET}              Add text to end of note
+    {Colors.BLUE}→{Colors.RESET} zettl append 22a4b "Additional content"
 
-  {Colors.YELLOW}{Colors.BOLD}delete{Colors.RESET} - Delete a note and its associated data
-    {Colors.BLUE}→{Colors.RESET} zettl delete 22a4b
+  {Colors.YELLOW}{Colors.BOLD}prepend{Colors.RESET}             Add text to beginning of note
+    {Colors.BLUE}→{Colors.RESET} zettl prepend 22a4b "IMPORTANT: "
+
+  {Colors.YELLOW}{Colors.BOLD}merge{Colors.RESET}               Combine multiple notes into one
+    {Colors.BLUE}→{Colors.RESET} zettl merge 22a4b 18c3d --force
+
+  {Colors.YELLOW}{Colors.BOLD}delete{Colors.RESET}              Delete note and associated data
     {Colors.BLUE}→{Colors.RESET} zettl delete 22a4b --keep-tags
 
-  {Colors.YELLOW}{Colors.BOLD}untag{Colors.RESET} - Remove a tag from a note
-    {Colors.BLUE}→{Colors.RESET} zettl untag 22a4b "concept"
+{Colors.BOLD}CONNECTIONS{Colors.RESET}
+  {Colors.YELLOW}{Colors.BOLD}link{Colors.RESET}                Create link between notes
+    {Colors.BLUE}→{Colors.RESET} zettl link 22a4b 18c3d --context "Related concepts"
 
-  {Colors.YELLOW}{Colors.BOLD}unlink{Colors.RESET} - Remove a link between two notes
+  {Colors.YELLOW}{Colors.BOLD}unlink{Colors.RESET}              Remove link between notes
     {Colors.BLUE}→{Colors.RESET} zettl unlink 22a4b 18c3d
 
-{Colors.BOLD}AI-Powered Commands:{Colors.RESET}
-  {Colors.YELLOW}{Colors.BOLD}llm{Colors.RESET} - Use Claude AI to analyze and enhance notes
+  {Colors.YELLOW}{Colors.BOLD}related{Colors.RESET}             Show connected notes
+    {Colors.BLUE}→{Colors.RESET} zettl related 22a4b --full
+
+  {Colors.YELLOW}{Colors.BOLD}graph{Colors.RESET}               Export graph visualization data
+    {Colors.BLUE}→{Colors.RESET} zettl graph 22a4b --output graph.json --depth 2
+
+{Colors.BOLD}ORGANIZATION{Colors.RESET}
+  {Colors.YELLOW}{Colors.BOLD}tags{Colors.RESET}                List all tags, show/add note tags
+    {Colors.BLUE}→{Colors.RESET} zettl tags                  # List all tags
+    {Colors.BLUE}→{Colors.RESET} zettl tags 22a4b            # Show note's tags
+    {Colors.BLUE}→{Colors.RESET} zettl tags 22a4b "concept"  # Add tag to note
+
+  {Colors.YELLOW}{Colors.BOLD}untag{Colors.RESET}               Remove tag from note
+    {Colors.BLUE}→{Colors.RESET} zettl untag 22a4b "concept"
+
+  {Colors.YELLOW}{Colors.BOLD}todos{Colors.RESET}               Manage tasks (notes tagged 'todo')
+    {Colors.BLUE}→{Colors.RESET} zettl todos --all --tag work --eisenhower
+
+{Colors.BOLD}AI FEATURES{Colors.RESET}
+  {Colors.YELLOW}{Colors.BOLD}llm{Colors.RESET}                 AI-powered note analysis
     {Colors.BLUE}→{Colors.RESET} zettl llm 22a4b --action summarize
-    {Colors.BLUE}→{Colors.RESET} zettl llm 22a4b --action tags
+    {Colors.BLUE}→{Colors.RESET} zettl llm 22a4b --action tags | connect | expand | concepts | questions | critique
 
-{Colors.BOLD}Nutrition Tracking:{Colors.RESET}
-  {Colors.YELLOW}{Colors.BOLD}nutrition{Colors.RESET} (alias: {Colors.YELLOW}nut{Colors.RESET}) - Track and analyze nutrition data
+{Colors.BOLD}SPECIALIZED FEATURES{Colors.RESET}
+  {Colors.YELLOW}{Colors.BOLD}nutrition{Colors.RESET} / {Colors.YELLOW}{Colors.BOLD}nut{Colors.RESET}   Track calories and protein
     {Colors.BLUE}→{Colors.RESET} zettl nut "Breakfast cal: 500 prot: 25"
-    {Colors.BLUE}→{Colors.RESET} zettl nutrition --today
-    {Colors.BLUE}→{Colors.RESET} zettl nutrition --history --days 14
+    {Colors.BLUE}→{Colors.RESET} zettl nutrition --today --history --days 14
 
-{Colors.BOLD}Other Commands:{Colors.RESET}
-  {Colors.YELLOW}{Colors.BOLD}rules{Colors.RESET} - Display a random rule from notes tagged with 'rules'
-    {Colors.BLUE}→{Colors.RESET} zettl rules
-    {Colors.BLUE}→{Colors.RESET} zettl rules --source  # Show source note ID
+  {Colors.YELLOW}{Colors.BOLD}rules{Colors.RESET}               Display random rule from notes
+    {Colors.BLUE}→{Colors.RESET} zettl rules --source
 
-{Colors.BOLD}System Commands:{Colors.RESET}
-  {Colors.YELLOW}{Colors.BOLD}api-key{Colors.RESET} - Manage API keys for CLI access
-    {Colors.BLUE}→{Colors.RESET} api-key                    # List your API keys
-    {Colors.BLUE}→{Colors.RESET} api-key generate           # Generate new API key
-    {Colors.BLUE}→{Colors.RESET} api-key generate "My Key"  # Generate with custom name
+{Colors.BOLD}SYSTEM{Colors.RESET}
+  {Colors.YELLOW}{Colors.BOLD}auth setup{Colors.RESET}          Configure API key authentication
+    {Colors.BLUE}→{Colors.RESET} zettl auth setup
 
-  {Colors.YELLOW}{Colors.BOLD}workflow{Colors.RESET} - Show example Zettl workflow
-    {Colors.BLUE}→{Colors.RESET} zettl workflow
+  {Colors.YELLOW}{Colors.BOLD}auth status{Colors.RESET}         Check authentication status
+    {Colors.BLUE}→{Colors.RESET} zettl auth status
+
+  {Colors.YELLOW}{Colors.BOLD}help{Colors.RESET}                Show this help or command help
+    {Colors.BLUE}→{Colors.RESET} zettl help
+    {Colors.BLUE}→{Colors.RESET} zettl COMMAND --help
+
+{Colors.BOLD}GETTING STARTED{Colors.RESET}
+  1. Set up authentication:     {Colors.CYAN}zettl auth setup{Colors.RESET}
+  2. Create your first note:    {Colors.CYAN}zettl new "My first note" --tag idea{Colors.RESET}
+  3. List your notes:           {Colors.CYAN}zettl list{Colors.RESET}
+  4. Create connections:        {Colors.CYAN}zettl link NOTE_ID1 NOTE_ID2{Colors.RESET}
+  5. Get AI suggestions:        {Colors.CYAN}zettl llm NOTE_ID --action tags{Colors.RESET}
+
+For detailed help on any command: {Colors.CYAN}zettl COMMAND --help{Colors.RESET}
 """
 
     @staticmethod
     def get_command_help(command):
         """Return detailed help for a specific command."""
         help_templates = {
+            "auth": f"""
+{Colors.GREEN}{Colors.BOLD}auth{Colors.RESET} - Authentication management
+
+{Colors.BOLD}Subcommands:{Colors.RESET}
+  {Colors.YELLOW}setup{Colors.RESET}   Configure API key authentication for CLI access
+  {Colors.YELLOW}status{Colors.RESET}  Check current authentication status
+
+{Colors.BOLD}Usage:{Colors.RESET}
+  zettl auth setup    # Set up authentication
+  zettl auth status   # Check authentication status
+
+{Colors.BOLD}Description:{Colors.RESET}
+  The auth command manages your API key authentication. You need to set up
+  authentication before using most zettl commands. Get your API key from
+  the Zettl web interface.
+""",
+
             "new": f"""
 {Colors.GREEN}{Colors.BOLD}new [CONTENT]{Colors.RESET} - Create a new note with the given content
 
@@ -431,17 +446,6 @@ class CommandHelp:
   - API keys are only shown once when generated
   - Copy and save them immediately
   - Configure with CLI: zettl auth setup
-""",
-
-            "workflow": f"""
-{Colors.GREEN}{Colors.BOLD}workflow{Colors.RESET} - Show an example workflow of using zettl
-
-{Colors.BOLD}Usage:{Colors.RESET}
-  zettl workflow
-
-{Colors.BOLD}Description:{Colors.RESET}
-  Displays a detailed step-by-step guide on how to effectively use Zettl
-  for note-taking, connecting ideas, and building a knowledge network.
 """,
 
             "rules": f"""

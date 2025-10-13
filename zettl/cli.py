@@ -62,18 +62,25 @@ def create_new_note(content, tag, link=None):
         click.echo(f"Error creating note: {str(e)}", err=True)
 
 
-@click.group()
+@click.group(context_settings={'help_option_names': ['-h', '--help']})
 @click.version_option(version=APP_VERSION)
 def cli():
     """A Zettelkasten-style note-taking CLI tool."""
     pass
 
-@cli.group()
+@cli.group(context_settings={'help_option_names': ['-h', '--help']})
 def auth():
     """Authentication commands."""
     pass
 
+def show_auth_help_callback(ctx, param, value):
+    """Callback to show auth help and exit."""
+    if value and not ctx.resilient_parsing:
+        click.echo(CommandHelp.get_command_help("auth"))
+        ctx.exit()
+
 @auth.command()
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_auth_help_callback, help='Show detailed help for this command')
 def setup():
     """Set up API key authentication."""
     click.echo("Setting up Zettl CLI authentication...")
@@ -100,6 +107,7 @@ def setup():
         click.echo(ZettlFormatter.error("✗ Invalid API key. Please check and try again."))
 
 @auth.command()
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_auth_help_callback, help='Show detailed help for this command')
 def status():
     """Check authentication status."""
     api_key = zettl_auth.get_api_key()
@@ -111,35 +119,41 @@ def status():
     else:
         click.echo(ZettlFormatter.warning("⚠ Not authenticated. Run 'zettl auth setup'"))
 
+def show_main_help_callback(ctx, param, value):
+    """Callback to show main help and exit."""
+    if value and not ctx.resilient_parsing:
+        click.echo(CommandHelp.get_main_help())
+        ctx.exit()
+
 @cli.command()
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_main_help_callback, help='Show detailed help for this command')
 def commands():
     """Show all available commands with examples."""
+    # The commands command itself shows the main help, so if --help is passed, show the same
     click.echo(CommandHelp.get_main_help())
+
+def show_help_callback(ctx, param, value):
+    """Callback to show help and exit."""
+    if value and not ctx.resilient_parsing:
+        click.echo(CommandHelp.get_command_help(ctx.info_name))
+        ctx.exit()
 
 @cli.command()
 @click.argument('content')
 @click.option('--tag', '-t', multiple=True, help='Tag(s) to add to the new note')
 @click.option('--link', '-l', help='Note ID to link this note to')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def new(content, tag, link, help):
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def new(content, tag, link):
     """Create a new note with the given content and optional tags."""
-    if help:
-        click.echo(CommandHelp.get_command_help("new"))
-        return
-    
     create_new_note(content, tag, link)
 
 @cli.command()
 @click.argument('content')
 @click.option('--tag', '-t', multiple=True, help='Tag(s) to add to the new note')
 @click.option('--link', '-l', help='Note ID to link this note to')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def add(content, tag, link, help):
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def add(content, tag, link):
     """Create a new note with the given content and optional tags. Alias for 'new'."""
-    if help:
-        click.echo(CommandHelp.get_command_help("add"))
-        return
-    
     create_new_note(content, tag, link)
 
 # Update the list command
@@ -147,12 +161,9 @@ def add(content, tag, link, help):
 @click.option('--limit', '-l', default=10, help='Number of notes to display')
 @click.option('--full', '-f', is_flag=True, help='Show full content of notes')
 @click.option('--compact', '-c', is_flag=True, help='Show very compact list (IDs only)')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def list(limit, full, compact, help):
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def list(limit, full, compact):
     """List recent notes with formatting options."""
-    if help:
-        click.echo(CommandHelp.get_command_help("list"))
-        return
 
     try:
         notes = get_notes_manager().list_notes(limit)
@@ -193,13 +204,8 @@ def list(limit, full, compact, help):
 
 @cli.command()
 @click.argument('note_id')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def show(note_id, help):
-
-    if help:
-        click.echo(CommandHelp.get_command_help("list"))
-        return
-
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def show(note_id):
     """Display note content."""
     try:
         note = get_notes_manager().get_note(note_id)
@@ -219,12 +225,8 @@ def show(note_id, help):
 @click.argument('source_id')
 @click.argument('target_id')
 @click.option('--context', '-c', default="", help='Optional context for the link')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def link(source_id, target_id, context, help):
-    if help:
-        click.echo(CommandHelp.get_command_help("link"))
-        return
-
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def link(source_id, target_id, context):
     """Create link between notes."""
     try:
         get_notes_manager().create_link(source_id, target_id, context)
@@ -235,12 +237,8 @@ def link(source_id, target_id, context, help):
 @cli.command()
 @click.argument('note_id', required=False)
 @click.argument('tag', required=False)
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def tags(note_id, tag, help):
-
-    if help:
-        click.echo(CommandHelp.get_command_help("tags"))
-        return
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def tags(note_id, tag):
     """Show or add tags to a note. If no note_id is provided, list all tags."""
     try:
         # If no note_id is provided, list all tags
@@ -275,12 +273,8 @@ def tags(note_id, tag, help):
 @click.option('--exclude-tag', '+t', help='Exclude notes with this tag')
 @click.option('--date', '-d', help='Search for notes created on a specific date (YYYY-MM-DD format)')
 @click.option('--full', '-f', is_flag=True, help='Show full content of matching notes')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def search(query, tag, exclude_tag, date, full, help):
-
-    if help:
-        click.echo(CommandHelp.get_command_help("search"))
-        return
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def search(query, tag, exclude_tag, date, full):
     """Search for notes containing text, with specific tag, or by date."""
     try:
         results = []
@@ -370,11 +364,8 @@ def search(query, tag, exclude_tag, date, full, help):
 @cli.command()
 @click.argument('note_id')
 @click.option('--full', '-f', is_flag=True, help='Show full content of related notes')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def related(note_id, full, help):
-    if help:
-        click.echo(CommandHelp.get_command_help("related"))
-        return
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def related(note_id, full):
     """Show notes connected to this note with improved formatting."""
     try:
         # First, show the source note
@@ -411,13 +402,8 @@ def related(note_id, full, help):
 @click.argument('note_id', required=False)
 @click.option('--output', '-o', default='zettl_graph.json', help='Output file for graph data')
 @click.option('--depth', '-d', default=2, help='How many levels of connections to include')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def graph(note_id, output, depth, help):
-
-    if help:
-        click.echo(CommandHelp.get_command_help("graph"))
-        return
-
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def graph(note_id, output, depth):
     """Generate a graph visualization of notes and their connections."""
     try:
         file_path = get_graph_manager().export_graph(output, note_id, depth)
@@ -428,18 +414,14 @@ def graph(note_id, output, depth, help):
 
 @cli.command()
 @click.argument('note_id')
-@click.option('--action', '-a', 
-              type=click.Choice(['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique']), 
-              default='summarize', 
+@click.option('--action', '-a',
+              type=click.Choice(['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique']),
+              default='summarize',
               help='LLM action to perform')
 @click.option('--count', '-c', default=3, help='Number of results to return for tags/connections/concepts/questions')
 @click.option('--show-source', '-s', is_flag=True, help='Show the source note before analysis')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def llm(note_id, action, count, show_source, help):
-
-    if help:
-        click.echo(CommandHelp.get_command_help("llm"))
-        return
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def llm(note_id, action, count, show_source):
     """Use Claude AI to analyze and enhance notes."""
     try:
         # Show the source note if requested
@@ -667,13 +649,8 @@ def llm(note_id, action, count, show_source, help):
 @click.option('--force', '-f', is_flag=True, help='Skip confirmation prompt')
 @click.option('--keep-links', is_flag=True, help='Keep links to and from this note')
 @click.option('--keep-tags', is_flag=True, help='Keep tags associated with this note')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def delete(note_id, force, keep_links, keep_tags,help):
-
-    if help:
-        click.echo(CommandHelp.get_command_help("delete"))
-        return
-
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def delete(note_id, force, keep_links, keep_tags):
     """Delete a note and its associated data."""
     try:
         # First get the note to show what will be deleted
@@ -737,12 +714,8 @@ def delete(note_id, force, keep_links, keep_tags,help):
 @cli.command()
 @click.argument('note_id')
 @click.argument('tag')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def untag(note_id, tag,help):
-
-    if help:
-        click.echo(CommandHelp.get_command_help("untag"))
-        return
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def untag(note_id, tag):
     """Remove a tag from a note."""
     try:
         get_notes_manager().delete_tag(note_id, tag)
@@ -753,13 +726,8 @@ def untag(note_id, tag,help):
 @cli.command()
 @click.argument('source_id')
 @click.argument('target_id')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def unlink(source_id, target_id,help):
-
-    if help:
-        click.echo(CommandHelp.get_command_help("unlink"))
-        return
-
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def unlink(source_id, target_id):
     """Remove a link between two notes."""
     try:
         get_notes_manager().delete_link(source_id, target_id)
@@ -770,12 +738,8 @@ def unlink(source_id, target_id,help):
 @cli.command()
 @click.argument('note_id', required=False)
 @click.argument('text', required=False)
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def append(note_id, text, help):
-    if help:
-        click.echo(CommandHelp.get_command_help("append"))
-        return
-
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def append(note_id, text):
     """Append text to the end of a note."""
     if not note_id or not text:
         click.echo(ZettlFormatter.error("Error: Missing required arguments NOTE_ID and TEXT"), err=True)
@@ -793,12 +757,8 @@ def append(note_id, text, help):
 @cli.command()
 @click.argument('note_id', required=False)
 @click.argument('text', required=False)
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def prepend(note_id, text, help):
-    if help:
-        click.echo(CommandHelp.get_command_help("prepend"))
-        return
-
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def prepend(note_id, text):
     """Prepend text to the beginning of a note."""
     if not note_id or not text:
         click.echo(ZettlFormatter.error("Error: Missing required arguments NOTE_ID and TEXT"), err=True)
@@ -815,12 +775,8 @@ def prepend(note_id, text, help):
 
 @cli.command()
 @click.argument('note_id', required=False)
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def edit(note_id, help):
-    if help:
-        click.echo(CommandHelp.get_command_help("edit"))
-        return
-
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def edit(note_id):
     """Edit a note using your system's default editor."""
     if not note_id:
         click.echo(ZettlFormatter.error("Error: Missing required argument NOTE_ID"), err=True)
@@ -899,8 +855,8 @@ def edit(note_id, help):
 @cli.command()
 @click.argument('note_ids', nargs=-1, required=False)
 @click.option('--force', '-f', is_flag=True, help='Skip confirmation prompt')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def merge(note_ids, force, help):
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def merge(note_ids, force):
     """Merge multiple notes into a single note.
 
     This command combines the content of multiple notes, preserves all tags
@@ -908,9 +864,6 @@ def merge(note_ids, force, help):
 
     Usage: zettl merge NOTE_ID1 NOTE_ID2 [NOTE_ID3 ...]
     """
-    if help:
-        click.echo(CommandHelp.get_command_help("merge"))
-        return
 
     try:
         # Validate we have at least 2 notes
@@ -973,12 +926,9 @@ def merge(note_ids, force, help):
 @click.option('--cancel', '-c', is_flag=True, help='Show canceled todos')
 @click.option('--tag', '-t', multiple=True, help='Filter todos by one or more additional tags')
 @click.option('--eisenhower', '-e', is_flag=True, help='Display todos in Eisenhower matrix format')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def todos(donetoday, show_all, cancel, tag, eisenhower, help):
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def todos(donetoday, show_all, cancel, tag, eisenhower):
     """List all notes tagged with 'todo' grouped by category."""
-    if help:
-        click.echo(CommandHelp.get_command_help("todos"))
-        return
 
     try:
         # Get the notes manager once and reuse it
@@ -1321,13 +1271,8 @@ def display_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=
 
 @cli.command()
 @click.option('--source', '-s', is_flag=True, help='Show the source note ID')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def rules(source,help):
-
-    if help:
-        click.echo(CommandHelp.get_command_help("rules"))
-        return
-
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def rules(source):
     """Display a random rule from notes tagged with 'rules'."""
     try:
         # Get all notes tagged with 'rules'
@@ -1398,119 +1343,13 @@ def rules(source,help):
 
 
 @cli.command()
-def workflow():
-    """Show an example workflow of using zettl."""
-    # Colors for better readability
-    GREEN = "\033[92m"
-    BLUE = "\033[94m"
-    YELLOW = "\033[93m"
-    CYAN = "\033[96m"
-    BOLD = "\033[1m"
-    RESET = "\033[0m"
-    
-    click.echo(f"\n{BOLD}{GREEN}Example Zettl Workflow{RESET}\n")
-    click.echo("This guide demonstrates a typical Zettl workflow.\n")
-    
-    steps = [
-        {
-            "title": "Create a new note",
-            "command": "zettl new \"The Feynman Technique is a mental model to convey information using concise thoughts and simple language.\"",
-            "explanation": "This creates a new note and returns a unique ID (let's call it 22a4b)."
-        },
-        {
-            "title": "Create another related note",
-            "command": "zettl new \"Spaced repetition is a learning technique that involves increasing intervals of time between subsequent review of previously learned material.\"",
-            "explanation": "This creates another note (let's call it 18c3d)."
-        },
-        {
-            "title": "Create a note with a direct link",
-            "command": "zettl new \"Using spaced repetition with the Feynman Technique enhances recall.\" --tag learning --link 22a4b",
-            "explanation": "This creates a new note with a tag and links it directly to the Feynman Technique note."
-        },
-        {
-            "title": "Link these two notes",
-            "command": "zettl link 22a4b 18c3d",
-            "explanation": "This creates a connection between the Feynman Technique note and the Spaced Repetition note."
-        },
-        {
-            "title": "Add tags to your notes",
-            "command": "zettl tags 22a4b \"learning-technique\"",
-            "explanation": "This adds a tag to the first note for better organization."
-        },
-        {
-            "title": "View note details",
-            "command": "zettl show 22a4b",
-            "explanation": "This displays the full content of the note, along with any tags."
-        },
-        {
-            "title": "Update existing notes",
-            "command": "zettl append 22a4b \"Additional insight: This technique works best when teaching complex topics.\"",
-            "explanation": "This adds new text to the end of your note. You can also use 'prepend' to add text at the beginning, or 'edit' to open the note in your default editor for full editing."
-        },
-        {
-            "title": "List all recent notes with full content",
-            "command": "zettl list --full",
-            "explanation": "This shows all your recent notes with their full content and tags."
-        },
-        {
-            "title": "Find related notes",
-            "command": "zettl related 22a4b",
-            "explanation": "This shows notes connected to the Feynman Technique note."
-        },
-        {
-            "title": "Generate AI suggestions",
-            "command": "zettl llm 22a4b --action tags",
-            "explanation": "This uses Claude AI to suggest relevant tags for your note."
-        },
-        {
-            "title": "Visualize your note network",
-            "command": "zettl graph --output my_notes.json",
-            "explanation": "This exports a graph of your notes and their connections, which you can visualize with various tools."
-        },
-        {
-            "title": "Search your notes with tags",
-            "command": "zettl search \"technique\" --full",
-            "explanation": "This finds all notes containing the word 'technique' and shows full content including tags."
-        },
-        {
-            "title": "Merge related notes",
-            "command": "zettl merge 22a4b 18c3d",
-            "explanation": "This combines two related notes into one, preserving all tags and links from both."
-        },
-        {
-            "title": "Manage todos with filtering",
-            "command": "zettl todos --all --tag learning",
-            "explanation": "This shows all todos (active and completed) that have the 'learning' tag."
-        }
-    ]
-    
-    for i, step in enumerate(steps, 1):
-        click.echo(f"{BOLD}{YELLOW}Step {i}: {step['title']}{RESET}")
-        click.echo(f"  {BLUE}Command:{RESET} {CYAN}{step['command']}{RESET}")
-        click.echo(f"  {BLUE}What it does:{RESET} {step['explanation']}")
-        click.echo("")
-    
-    click.echo(f"{BOLD}{GREEN}Additional Tips:{RESET}")
-    click.echo("• Use the AI capabilities to find connections between notes you might have missed")
-    click.echo("• Keep notes atomic - one idea per note")
-    click.echo("• Focus on creating meaningful connections between notes")
-    click.echo("• Use tags sparingly for high-level categorization")
-    click.echo("• Regularly review and refine your note network")
-
-@cli.command()
 @click.argument('content', required=False)
 @click.option('--today', '-t', is_flag=True, help='Show today\'s nutrition summary')
 @click.option('--history', '-i', is_flag=True, help='Show nutrition history')
 @click.option('--days', '-d', default=7, help='Number of days to show in history')
 @click.option('--past', '-p', help='Date for new entry (YYYY-MM-DD format)')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def nutrition(content, today, history, days, past, help):
-
-    if help:
-        click.echo(CommandHelp.get_command_help("nutrition"))
-        return
-
-
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def nutrition(content, today, history, days, past):
     """Track and analyze nutrition data (calories and protein).
     
     If called with content in quotes, adds a new entry.
@@ -1590,12 +1429,12 @@ def nutrition(content, today, history, days, past, help):
 @click.option('--history', '-i', is_flag=True, help='Show nutrition history')
 @click.option('--days', '-d', default=7, help='Number of days to show in history')
 @click.option('--past', '-p', help='Date for new entry (YYYY-MM-DD format)')
-@click.option('--help', '-h', is_flag=True, help='Show detailed help for this command')
-def nut_cmd(content, today, history, days, past, help):
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def nut_cmd(content, today, history, days, past):
     """Alias for nutrition command."""
     # Call the implementation from the nutrition command
     ctx = click.get_current_context()
-    return ctx.invoke(nutrition, content=content, today=today, history=history, days=days, past=past, help=help)
+    return ctx.invoke(nutrition, content=content, today=today, history=history, days=days, past=past)
 
 if __name__ == '__main__':
     cli()
