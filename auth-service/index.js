@@ -644,7 +644,7 @@ app.get('/api/auth/settings', verifyToken, async (req, res) => {
   try {
     // Get user settings
     const settingsResult = await pool.query(
-      'SELECT claude_api_key, created_at, updated_at FROM user_settings WHERE user_id = $1',
+      'SELECT claude_api_key, hidden_buttons, created_at, updated_at FROM user_settings WHERE user_id = $1',
       [req.user.sub]
     );
 
@@ -659,6 +659,7 @@ app.get('/api/auth/settings', verifyToken, async (req, res) => {
 
     res.json({
       claude_api_key: settingsResult.rows[0]?.claude_api_key || null,
+      hidden_buttons: settingsResult.rows[0]?.hidden_buttons || [],
       cli_tokens: tokensResult.rows
     });
   } catch (error) {
@@ -696,6 +697,43 @@ app.post('/api/auth/settings/claude-key', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Claude API key update error:', error);
     res.status(500).json({ error: 'Failed to update API key' });
+  }
+});
+
+// Update hidden buttons preference
+app.post('/api/auth/settings/hidden-buttons', verifyToken, async (req, res) => {
+  const { hidden_buttons } = req.body;
+
+  // Validate that hidden_buttons is an array
+  if (!Array.isArray(hidden_buttons)) {
+    return res.status(400).json({ error: 'hidden_buttons must be an array' });
+  }
+
+  try {
+    // Check if user_settings row exists
+    const existing = await pool.query(
+      'SELECT user_id FROM user_settings WHERE user_id = $1',
+      [req.user.sub]
+    );
+
+    if (existing.rows.length > 0) {
+      // Update existing row
+      await pool.query(
+        'UPDATE user_settings SET hidden_buttons = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
+        [JSON.stringify(hidden_buttons), req.user.sub]
+      );
+    } else {
+      // Insert new row
+      await pool.query(
+        'INSERT INTO user_settings (user_id, hidden_buttons) VALUES ($1, $2)',
+        [req.user.sub, JSON.stringify(hidden_buttons)]
+      );
+    }
+
+    res.json({ message: 'Button preferences updated successfully' });
+  } catch (error) {
+    console.error('Hidden buttons update error:', error);
+    res.status(500).json({ error: 'Failed to update button preferences' });
   }
 });
 

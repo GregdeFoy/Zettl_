@@ -715,6 +715,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'help': ['-h', '--help'],
         'nutrition': ['-t', '--today', '-i', '--history', '-d', '--days', '-p', '--past'],
         'nut': ['-t', '--today', '-i', '--history', '-d', '--days', '-p', '--past'],
+        'api-key': ['-g', '--generate', '-l', '--list', '-h', '--help'],
     };
 
     // For commands that need auto-quotes
@@ -730,9 +731,45 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    // Top-level commands for initial buttons
-    const topLevelCommands = ['new', 'append', 'prepend', 'edit', 'todos', 'rules', 'nut', 'tags', 'search', 'show', 'list', 'link', 'merge', 'related', 'help', 'clear', 'settings', 'logout'];
-    
+    // Top-level commands for initial buttons (organized by category)
+    const topLevelCommands = [
+        // Note Creation/Editing
+        'new', 'edit', 'append', 'prepend', 'delete',
+        // Viewing
+        'show', 'list', 'search',
+        // Organization
+        'tags', 'untag', 'link', 'unlink', 'related', 'graph', 'merge',
+        // AI
+        'llm',
+        // Special Features
+        'todos', 'rules', 'nut',
+        // System
+        'api-key', 'help', 'clear', 'settings', 'logout'
+    ];
+
+    // Hidden buttons (loaded from settings)
+    let hiddenButtons = [];
+
+    // Function to get visible top-level commands
+    function getVisibleCommands() {
+        return topLevelCommands.filter(cmd => !hiddenButtons.includes(cmd));
+    }
+
+    // Load button preferences from settings
+    async function loadButtonPreferences() {
+        try {
+            const response = await fetch('/api/settings/data');
+            const data = await response.json();
+            if (data.success && data.data.hidden_buttons) {
+                hiddenButtons = data.data.hidden_buttons;
+                // Update buttons after loading preferences
+                updateShortcutButtons();
+            }
+        } catch (e) {
+            console.error('Error loading button preferences:', e);
+        }
+    }
+
     // Helper function to detect if content is markdown-formatted
     function isMarkdownContent(text) {
         // Check for common markdown patterns
@@ -818,9 +855,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Auto-resize the textarea whenever input changes
     commandInput.addEventListener('input', autoResizeTextarea);
     
+    // Load button preferences from settings
+    loadButtonPreferences();
+
     // Initialize buttons
     updateShortcutButtons();
-    
+
     // Focus the input field
     setTimeout(() => {
         commandInput.focus();
@@ -1168,12 +1208,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (currentCmd === 'llm' && cmdParts.length === 2 && !lastOption) {
                 // This means they've typed "llm noteId" but no options yet
                 // Add direct action buttons
-                
+
                 // First add a separator
                 const separator = document.createElement('div');
                 separator.className = 'button-separator';
                 shortcutButtons.appendChild(separator);
-                
+
                 // Add shortcut buttons for common LLM actions
                 ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'].forEach(action => {
                     const button = document.createElement('button');
@@ -1185,16 +1225,48 @@ document.addEventListener('DOMContentLoaded', function() {
                         commandInput.value = `llm ${noteId} -a ${action}`;
                         commandInput.focus();
                         autoResizeTextarea();
-                        
+
                         // Put cursor at the end
                         commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
                     });
                     shortcutButtons.appendChild(button);
                 });
             }
+
+            // Add quick action buttons for api-key
+            if (currentCmd === 'api-key' && cmdParts.length === 1) {
+                // First add a separator
+                const separator = document.createElement('div');
+                separator.className = 'button-separator';
+                shortcutButtons.appendChild(separator);
+
+                // Add list button
+                const listBtn = document.createElement('button');
+                listBtn.textContent = 'list';
+                listBtn.style.backgroundColor = '#3a7a50';
+                listBtn.addEventListener('click', function() {
+                    commandInput.value = 'api-key --list';
+                    commandInput.focus();
+                    autoResizeTextarea();
+                    commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
+                });
+                shortcutButtons.appendChild(listBtn);
+
+                // Add generate button
+                const genBtn = document.createElement('button');
+                genBtn.textContent = 'generate';
+                genBtn.style.backgroundColor = '#3a7a50';
+                genBtn.addEventListener('click', function() {
+                    commandInput.value = 'api-key --generate';
+                    commandInput.focus();
+                    autoResizeTextarea();
+                    commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
+                });
+                shortcutButtons.appendChild(genBtn);
+            }
         } else {
-            // Show top-level commands
-            topLevelCommands.forEach(cmd => {
+            // Show top-level commands (filtered by user preferences)
+            getVisibleCommands().forEach(cmd => {
                 const button = document.createElement('button');
                 button.textContent = cmd;
                 button.dataset.cmd = cmd;
@@ -1203,10 +1275,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     commandInput.value = commandText;
                     commandInput.focus();
                     autoResizeTextarea();
-                    
+
                     // Update buttons immediately to reflect new command
                     updateShortcutButtons();
-                    
+
                     // If this is a command needing quotes, add them and position cursor
                     if (autoQuoteCommands.includes(cmd)) {
                         // Auto-add quotes and position cursor between them

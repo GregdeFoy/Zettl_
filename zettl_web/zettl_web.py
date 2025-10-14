@@ -279,6 +279,16 @@ COMMAND_OPTIONS = {
             'past': {}
         }
     },
+    'api-key': {
+        'short_opts': {
+            'g': {'name': 'generate', 'flag': True},
+            'l': {'name': 'list', 'flag': True}
+        },
+        'long_opts': {
+            'generate': {'flag': True},
+            'list': {'flag': True}
+        }
+    },
     'merge': {
         'short_opts': {
             'f': {'name': 'force', 'flag': True}
@@ -775,6 +785,50 @@ def update_claude_key():
 
     except Exception as e:
         logger.error(f"Error updating Claude API key: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/settings/hidden-buttons', methods=['POST'])
+@jwt_required
+def update_hidden_buttons():
+    """Update hidden buttons preference for the current user."""
+    try:
+        data = request.get_json()
+        hidden_buttons = data.get('hidden_buttons', [])
+
+        # Basic validation - ensure it's a list
+        if not isinstance(hidden_buttons, list):
+            return jsonify({
+                'success': False,
+                'error': 'hidden_buttons must be an array'
+            }), 400
+
+        token = session.get('access_token')
+
+        # Send to auth service
+        response = requests.post(
+            f'{AUTH_URL}/api/auth/settings/hidden-buttons',
+            headers={'Authorization': f'Bearer {token}'},
+            json={'hidden_buttons': hidden_buttons},
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            return jsonify({
+                'success': True,
+                'message': 'Button preferences updated successfully'
+            })
+        else:
+            error_data = response.json() if response.content else {}
+            return jsonify({
+                'success': False,
+                'error': error_data.get('error', 'Failed to update button preferences')
+            }), response.status_code
+
+    except Exception as e:
+        logger.error(f"Error updating hidden buttons: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -1827,8 +1881,35 @@ def execute_command():
             result = CommandHelp.get_main_help()
 
         elif cmd == "api-key" or cmd == "apikey":
-            # Handle API key operations
-            if not remaining_args:
+            # Handle API key operations with flag-based interface
+            generate = 'generate' in options or 'g' in flags
+            list_keys = 'list' in options or 'l' in flags
+
+            if generate:
+                # Generate new API key
+                try:
+                    token = session.get('access_token')
+                    if not token:
+                        result = ZettlFormatter.error("Not authenticated. Please login first.")
+                    else:
+                        # Get optional key name from remaining args
+                        key_name = remaining_args[0] if remaining_args else "Web Interface Key"
+
+                        response = requests.post(f'{AUTH_URL}/api/auth/api-key',
+                                               headers={'Authorization': f'Bearer {token}'},
+                                               json={'name': key_name})
+                        if response.status_code == 200:
+                            api_key = response.json()['apiKey']
+                            result = "🎉 API Key Generated Successfully!\n\n"
+                            result += f"🔑 Your new API key: {api_key}\n\n"
+                            result += "⚠️  IMPORTANT: Copy this key now! You won't be able to see it again.\n\n"
+                            result += "To use this key with the CLI:\n"
+                            result += "  zettl auth setup\n"
+                        else:
+                            result = ZettlFormatter.error("Failed to generate API key")
+                except Exception as e:
+                    result = ZettlFormatter.error(f"Error generating API key: {str(e)}")
+            elif list_keys:
                 # List existing API keys
                 try:
                     token = session.get('access_token')
@@ -1849,35 +1930,13 @@ def execute_command():
                                     result += f"  Created: {created}\n"
                                     result += f"  Last used: {last_used}\n\n"
                             else:
-                                result = "No API keys found. Use 'api-key generate' to create one."
+                                result = "No API keys found. Use 'api-key --generate' to create one."
                         else:
                             result = ZettlFormatter.error("Failed to list API keys")
                 except Exception as e:
                     result = ZettlFormatter.error(f"Error listing API keys: {str(e)}")
-            elif remaining_args[0] == "generate" or remaining_args[0] == "create":
-                # Generate new API key
-                try:
-                    token = session.get('access_token')
-                    if not token:
-                        result = ZettlFormatter.error("Not authenticated. Please login first.")
-                    else:
-                        key_name = remaining_args[1] if len(remaining_args) > 1 else "Web Interface Key"
-                        response = requests.post(f'{AUTH_URL}/api/auth/api-key',
-                                               headers={'Authorization': f'Bearer {token}'},
-                                               json={'name': key_name})
-                        if response.status_code == 200:
-                            api_key = response.json()['apiKey']
-                            result = "🎉 API Key Generated Successfully!\n\n"
-                            result += f"🔑 Your new API key: {api_key}\n\n"
-                            result += "⚠️  IMPORTANT: Copy this key now! You won't be able to see it again.\n\n"
-                            result += "To use this key with the CLI:\n"
-                            result += "  zettl auth setup\n"
-                        else:
-                            result = ZettlFormatter.error("Failed to generate API key")
-                except Exception as e:
-                    result = ZettlFormatter.error(f"Error generating API key: {str(e)}")
             else:
-                result = ZettlFormatter.error("Usage: api-key [list|generate [name]]")
+                result = ZettlFormatter.error("Usage: api-key --list | api-key --generate [name]")
 
         elif cmd == "nutrition" or cmd == "nut":
             # Handle nutrition commands with the new structure

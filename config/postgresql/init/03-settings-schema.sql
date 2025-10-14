@@ -4,6 +4,7 @@
 CREATE TABLE IF NOT EXISTS user_settings (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     claude_api_key TEXT,
+    hidden_buttons JSONB DEFAULT '[]',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -79,3 +80,15 @@ CREATE TRIGGER update_user_settings_updated_at
     BEFORE UPDATE ON user_settings
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Add hidden_buttons column to existing user_settings tables
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT FROM information_schema.columns
+        WHERE table_name = 'user_settings'
+        AND column_name = 'hidden_buttons'
+    ) THEN
+        ALTER TABLE user_settings ADD COLUMN hidden_buttons JSONB DEFAULT '[]';
+    END IF;
+END $$;

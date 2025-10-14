@@ -319,6 +319,23 @@
                 <p style="color: #999;">Loading tokens...</p>
             </div>
         </div>
+
+        <!-- Button Visibility Section -->
+        <div class="settings-section">
+            <h2>Button Visibility</h2>
+            <p class="help-text">Choose which command buttons to show in the main interface</p>
+
+            <div id="button-visibility-container" style="margin-top: 20px;">
+                <!-- Buttons will be populated by JavaScript with categories -->
+            </div>
+
+            <div class="button-group" style="margin-top: 20px;">
+                <button onclick="saveButtonPreferences()" class="btn">Save Preferences</button>
+                <button onclick="resetButtonPreferences()" class="btn btn-secondary">Show All</button>
+            </div>
+
+            <div id="button-status" class="status-message"></div>
+        </div>
     </div>
 
     <script>
@@ -326,6 +343,23 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadSettings();
         });
+
+        // Available buttons list (matches topLevelCommands in index.html)
+        const availableButtons = [
+            // Note Creation/Editing
+            'new', 'edit', 'append', 'prepend', 'delete',
+            // Viewing
+            'show', 'list', 'search',
+            // Organization
+            'tags', 'untag', 'link', 'unlink', 'related', 'graph', 'merge',
+            // AI
+            'llm',
+            // Special Features
+            'todos', 'rules', 'nut',
+            // System
+            'api-key', 'help', 'clear', 'settings', 'logout'
+        ];
+        let hiddenButtons = [];
 
         async function loadSettings() {
             try {
@@ -342,12 +376,123 @@
 
                     // Load CLI tokens
                     displayTokens(settings.cli_tokens || []);
+
+                    // Load hidden buttons
+                    hiddenButtons = settings.hidden_buttons || [];
+                    displayButtonVisibility();
                 } else {
                     console.error('Failed to load settings:', data.error);
                 }
             } catch (e) {
                 console.error('Error loading settings:', e);
             }
+        }
+
+        function displayButtonVisibility() {
+            const container = document.getElementById('button-visibility-container');
+            container.innerHTML = '';
+            container.style.cssText = 'display: block;'; // Change to block for categories
+
+            const categories = {
+                'Note Creation/Editing': ['new', 'edit', 'append', 'prepend', 'delete'],
+                'Viewing': ['show', 'list', 'search'],
+                'Organization': ['tags', 'untag', 'link', 'unlink', 'related', 'graph', 'merge'],
+                'AI': ['llm'],
+                'Special Features': ['todos', 'rules', 'nut'],
+                'System': ['api-key', 'help', 'clear', 'settings', 'logout']
+            };
+
+            Object.entries(categories).forEach(([categoryName, buttons]) => {
+                // Create category header
+                const categoryHeader = document.createElement('h3');
+                categoryHeader.textContent = categoryName;
+                categoryHeader.style.cssText = 'color: var(--primary-color); margin-top: 20px; margin-bottom: 10px; font-size: 16px;';
+                container.appendChild(categoryHeader);
+
+                // Create grid for this category's buttons
+                const categoryGrid = document.createElement('div');
+                categoryGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 15px;';
+
+                buttons.forEach(buttonName => {
+                    const isHidden = hiddenButtons.includes(buttonName);
+
+                    const checkboxWrapper = document.createElement('div');
+                    checkboxWrapper.style.cssText = 'display: flex; align-items: center; padding: 5px;';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = `btn-${buttonName}`;
+                    checkbox.checked = !isHidden; // Checked means visible
+                    checkbox.style.cssText = 'margin-right: 8px; cursor: pointer; width: 16px; height: 16px;';
+
+                    const label = document.createElement('label');
+                    label.htmlFor = `btn-${buttonName}`;
+                    label.textContent = buttonName;
+                    label.style.cssText = 'cursor: pointer; user-select: none;';
+
+                    checkboxWrapper.appendChild(checkbox);
+                    checkboxWrapper.appendChild(label);
+                    categoryGrid.appendChild(checkboxWrapper);
+                });
+
+                container.appendChild(categoryGrid);
+            });
+        }
+
+        async function saveButtonPreferences() {
+            const statusEl = document.getElementById('button-status');
+
+            // Collect hidden buttons (unchecked checkboxes)
+            const newHiddenButtons = [];
+            availableButtons.forEach(buttonName => {
+                const checkbox = document.getElementById(`btn-${buttonName}`);
+                if (!checkbox.checked) {
+                    newHiddenButtons.push(buttonName);
+                }
+            });
+
+            // Show loading state
+            statusEl.style.display = 'block';
+            statusEl.className = 'status-message';
+            statusEl.innerHTML = 'Saving...';
+
+            try {
+                const response = await fetch('/api/settings/hidden-buttons', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({hidden_buttons: newHiddenButtons})
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    hiddenButtons = newHiddenButtons;
+                    statusEl.className = 'status-message success';
+                    statusEl.innerHTML = '✓ Button preferences saved successfully';
+                } else {
+                    statusEl.className = 'status-message error';
+                    statusEl.innerHTML = '✗ ' + (data.error || 'Failed to save preferences');
+                }
+            } catch (e) {
+                statusEl.className = 'status-message error';
+                statusEl.innerHTML = '✗ Error: ' + e.message;
+            }
+
+            // Hide after 5 seconds
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 5000);
+        }
+
+        async function resetButtonPreferences() {
+            // Check all checkboxes
+            availableButtons.forEach(buttonName => {
+                const checkbox = document.getElementById(`btn-${buttonName}`);
+                checkbox.checked = true;
+            });
+
+            // Save empty array (show all)
+            await saveButtonPreferences();
         }
 
         function displayTokens(tokens) {
