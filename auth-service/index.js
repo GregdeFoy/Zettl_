@@ -9,6 +9,7 @@ const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { encrypt, decrypt } = require('./encryption');
 
 // Load environment and secrets
 const app = express();
@@ -657,8 +658,22 @@ app.get('/api/auth/settings', verifyToken, async (req, res) => {
       [req.user.sub]
     );
 
+    // Decrypt the Claude API key if it exists
+    const encryptedKey = settingsResult.rows[0]?.claude_api_key;
+    let decryptedKey = null;
+
+    if (encryptedKey) {
+      try {
+        decryptedKey = decrypt(encryptedKey);
+      } catch (decryptError) {
+        console.error('Failed to decrypt Claude API key:', decryptError);
+        // Return null if decryption fails (key might be corrupted or using old format)
+        decryptedKey = null;
+      }
+    }
+
     res.json({
-      claude_api_key: settingsResult.rows[0]?.claude_api_key || null,
+      claude_api_key: decryptedKey,
       hidden_buttons: settingsResult.rows[0]?.hidden_buttons || [],
       cli_tokens: tokensResult.rows
     });
@@ -673,6 +688,9 @@ app.post('/api/auth/settings/claude-key', verifyToken, async (req, res) => {
   const { api_key } = req.body;
 
   try {
+    // Encrypt the API key before storing
+    const encryptedKey = api_key ? encrypt(api_key) : null;
+
     // Check if user_settings row exists
     const existing = await pool.query(
       'SELECT user_id FROM user_settings WHERE user_id = $1',
@@ -683,13 +701,13 @@ app.post('/api/auth/settings/claude-key', verifyToken, async (req, res) => {
       // Update existing row
       await pool.query(
         'UPDATE user_settings SET claude_api_key = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
-        [api_key || null, req.user.sub]
+        [encryptedKey, req.user.sub]
       );
     } else {
       // Insert new row
       await pool.query(
         'INSERT INTO user_settings (user_id, claude_api_key) VALUES ($1, $2)',
-        [req.user.sub, api_key || null]
+        [req.user.sub, encryptedKey]
       );
     }
 
@@ -887,10 +905,22 @@ app.get('/api/auth/settings/claude-key', async (req, res) => {
       [userId]
     );
 
-    const claudeApiKey = settingsResult.rows[0]?.claude_api_key || null;
+    const encryptedKey = settingsResult.rows[0]?.claude_api_key || null;
+
+    // Decrypt the API key if it exists
+    let decryptedKey = null;
+    if (encryptedKey) {
+      try {
+        decryptedKey = decrypt(encryptedKey);
+      } catch (decryptError) {
+        console.error('Failed to decrypt Claude API key:', decryptError);
+        // Return null if decryption fails (key might be corrupted or using old format)
+        decryptedKey = null;
+      }
+    }
 
     res.json({
-      claude_api_key: claudeApiKey
+      claude_api_key: decryptedKey
     });
   } catch (error) {
     console.error('Claude API key fetch error:', error);

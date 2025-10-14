@@ -17,7 +17,7 @@ RUN npm ci --only=production
 RUN apk del python3 make g++
 
 # Copy application code
-COPY index.js ./
+COPY index.js encryption.js ./
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \

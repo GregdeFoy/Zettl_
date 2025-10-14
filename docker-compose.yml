@@ -46,6 +46,7 @@ services:
       - DB_NAME=${DB_NAME:-zettl}
       - REDIS_PASSWORD_FILE=/run/secrets/redis_password
       - JWT_SECRET_FILE=/run/secrets/jwt_secret
+      - ENCRYPTION_KEY_FILE=/run/secrets/encryption_key
       - JWT_EXPIRES_IN=24h
       - JWT_REFRESH_EXPIRES_IN=7d
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:8080,https://zettlnotes.app}
