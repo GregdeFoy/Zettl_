@@ -3,99 +3,112 @@ import sys
 from rich.console import Console
 from rich.markdown import Markdown
 
-# Initialize colorama for Windows support
-if sys.platform == 'win32':
-    try:
-        import colorama
-        colorama.init()
-    except ImportError:
-        # If colorama is not installed, colors won't work on Windows
-        # but the program will still function
-        pass
-
-# Rich console for markdown rendering
+# Rich console for CLI markdown rendering
 console = Console()
 
-class Colors:
-    """ANSI color codes for terminal output."""
-    GREEN = "\033[92m"
-    BLUE = "\033[94m"
-    YELLOW = "\033[93m"
-    RED = "\033[91m"
-    CYAN = "\033[96m"
-    BOLD = "\033[1m"
-    RESET = "\033[0m"
-
 class ZettlFormatter:
-    """Utility class for formatting Zettl output in the terminal."""
-    
-    @staticmethod
-    def header(text):
+    """Context-aware formatter for both CLI (rich markup) and Web (HTML)."""
+
+    # Mode: 'cli' for terminal, 'web' for HTML
+    _mode = 'cli'
+
+    @classmethod
+    def set_mode(cls, mode):
+        """Set formatter mode: 'cli' or 'web'"""
+        cls._mode = mode
+
+    @classmethod
+    def header(cls, text):
         """Format a header."""
-        return f"{Colors.BOLD}{Colors.GREEN}{text}{Colors.RESET}"
-    
-    @staticmethod
-    def note_id(note_id):
+        if cls._mode == 'web':
+            return f"**<span class='header'>{text}</span>**"
+        else:
+            # CLI: use rich markup
+            return f"[bold green]{text}[/bold green]"
+
+    @classmethod
+    def note_id(cls, note_id):
         """Format a note ID."""
-        return f"{Colors.CYAN}#{note_id}{Colors.RESET}"
-    
-    @staticmethod
-    def timestamp(date_str):
+        if cls._mode == 'web':
+            return f"<span class='note-id'>#{note_id}</span>"
+        else:
+            return f"[cyan]#{note_id}[/cyan]"
+
+    @classmethod
+    def timestamp(cls, date_str):
         """Format a timestamp."""
-        return f"{Colors.BLUE}{date_str}{Colors.RESET}"
-    
-    @staticmethod
-    def tag(tag_text):
+        if cls._mode == 'web':
+            return f"<span class='timestamp'>{date_str}</span>"
+        else:
+            return f"[blue]{date_str}[/blue]"
+
+    @classmethod
+    def tag(cls, tag_text):
         """Format a tag."""
-        return f"{Colors.YELLOW}#{tag_text}{Colors.RESET}"
-    
-    @staticmethod
-    def error(text):
+        if cls._mode == 'web':
+            return f"<span class='tag'>#{tag_text}</span>"
+        else:
+            return f"[yellow]#{tag_text}[/yellow]"
+
+    @classmethod
+    def error(cls, text):
         """Format an error message."""
-        return f"{Colors.RED}Error: {text}{Colors.RESET}"
-    
-    @staticmethod
-    def warning(text):
+        if cls._mode == 'web':
+            return f"<span class='error'>**Error:** {text}</span>"
+        else:
+            return f"[bold red]Error:[/bold red] {text}"
+
+    @classmethod
+    def warning(cls, text):
         """Format a warning message."""
-        return f"{Colors.YELLOW}Warning: {text}{Colors.RESET}"
-    
-    @staticmethod
-    def success(text):
+        if cls._mode == 'web':
+            return f"<span class='warning'>**Warning:** {text}</span>"
+        else:
+            return f"[bold yellow]Warning:[/bold yellow] {text}"
+
+    @classmethod
+    def success(cls, text):
         """Format a success message."""
-        return f"{Colors.GREEN}{text}{Colors.RESET}"
+        if cls._mode == 'web':
+            return f"<span class='success'>{text}</span>"
+        else:
+            return f"[green]{text}[/green]"
 
-    @staticmethod
-    def info(text):
+    @classmethod
+    def info(cls, text):
         """Format an info message."""
-        return f"{Colors.CYAN}{text}{Colors.RESET}"
+        if cls._mode == 'web':
+            return f"<span class='info'>{text}</span>"
+        else:
+            return f"[cyan]{text}[/cyan]"
 
-    @staticmethod
-    def format_note_display(note, notes_manager, render_markdown=True):
-        """Format a full note for display with optional markdown rendering."""
+    @classmethod
+    def format_note_display(cls, note, notes_manager, render_markdown=True):
+        """Format a full note for display."""
         note_id = note['id']
         created_at = notes_manager.format_timestamp(note['created_at'])
 
-        formatted_id = ZettlFormatter.note_id(note_id)
-        formatted_time = ZettlFormatter.timestamp(created_at)
+        formatted_id = cls.note_id(note_id)
+        formatted_time = cls.timestamp(created_at)
 
         header_line = f"{formatted_id} [{formatted_time}]"
         separator = "-" * 40
 
         # Print header and separator
-        print(header_line)
-        print(separator)
+        console.print(header_line)
+        console.print(separator)
 
         # Render markdown content if enabled
         if render_markdown:
-            ZettlFormatter.render_markdown(note['content'])
+            cls.render_markdown(note['content'])
         else:
-            print(note['content'])
+            console.print(note['content'])
 
         # Return empty string since we're printing directly
         return ""
 
-    @staticmethod
-    def render_markdown(content):
-        """Render markdown content using rich."""
+    @classmethod
+    def render_markdown(cls, content):
+        """Render markdown content using rich (CLI only)."""
         md = Markdown(content)
         console.print(md)

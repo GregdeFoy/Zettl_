@@ -128,13 +128,48 @@
             opacity: 0.8;
         }
 
-        /* Colors for terminal output */
-        #terminal-output .green { color: var(--green); }
-        #terminal-output .blue { color: var(--blue); }
-        #terminal-output .yellow { color: var(--yellow); }
-        #terminal-output .red { color: var(--red); }
-        #terminal-output .cyan { color: var(--cyan); }
-        #terminal-output .bold { font-weight: bold; }
+        /* Semantic classes for formatted output */
+        #terminal-output .header,
+        .markdown-content .header {
+            color: var(--green);
+            font-weight: bold;
+        }
+
+        #terminal-output .note-id,
+        .markdown-content .note-id {
+            color: var(--cyan);
+            font-weight: normal;
+        }
+
+        #terminal-output .timestamp,
+        .markdown-content .timestamp {
+            color: var(--blue);
+        }
+
+        #terminal-output .tag,
+        .markdown-content .tag {
+            color: var(--yellow);
+        }
+
+        #terminal-output .error,
+        .markdown-content .error {
+            color: var(--red);
+        }
+
+        #terminal-output .warning,
+        .markdown-content .warning {
+            color: var(--yellow);
+        }
+
+        #terminal-output .success,
+        .markdown-content .success {
+            color: var(--green);
+        }
+
+        #terminal-output .info,
+        .markdown-content .info {
+            color: var(--cyan);
+        }
 
         #input-area {
             flex: 0 0 auto;
@@ -770,19 +805,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Helper function to detect if content is markdown-formatted
-    function isMarkdownContent(text) {
-        // Check for common markdown patterns
-        return text.match(/^#{1,6}\s/m) ||      // Headers
-               text.match(/\*\*.*\*\*/m) ||      // Bold
-               text.match(/\*.*\*/m) ||          // Italic
-               text.match(/^\s*[-*+]\s/m) ||     // Lists
-               text.match(/^\s*\d+\.\s/m) ||     // Numbered lists
-               text.match(/\[.*\]\(.*\)/m) ||    // Links
-               text.match(/```/m) ||             // Code blocks
-               text.match(/`[^`]+`/m);           // Inline code
-    }
-
     // Helper function to render markdown
     function renderMarkdown(content) {
         try {
@@ -794,19 +816,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Define function for appending output to the terminal
-    window.appendOutput = function(content, isHTML = false, renderMd = true) {
+    // Everything is treated as HTML that may contain markdown-content divs
+    window.appendOutput = function(content, isHTML = true) {
         const line = document.createElement('div');
         line.className = 'output-line';
 
         if (isHTML) {
             line.innerHTML = content;
         } else {
-            // Check if content looks like markdown
-            if (renderMd && isMarkdownContent(content)) {
-                line.innerHTML = renderMarkdown(content);
-            } else {
-                line.textContent = content;
-            }
+            line.textContent = content;
         }
 
         terminalOutput.appendChild(line);
@@ -819,7 +837,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         terminalOutput.scrollTop = terminalOutput.scrollHeight;
-
     };
     
     // Create a container for the logo to handle overflow better

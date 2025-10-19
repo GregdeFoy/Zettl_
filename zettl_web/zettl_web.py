@@ -61,9 +61,12 @@ print(f"JWT secret configured: {'Yes' if JWT_SECRET else 'No'}")
 from zettl.notes import Notes
 from zettl.database import Database
 from zettl.llm import LLMHelper
-from zettl.formatting import ZettlFormatter, Colors
+from zettl.formatting import ZettlFormatter
 from zettl.nutrition import NutritionTracker
 from zettl.help import CommandHelp
+
+# Set formatter to web mode for HTML output
+ZettlFormatter.set_mode('web')
 
 logger.debug("Successfully imported Zettl components")
 
@@ -439,69 +442,14 @@ def extract_options(args, cmd):
             
     return options, flags, remaining_args
 
-# ANSI color code to HTML span conversion
-def ansi_to_html(text, preserve_markdown=False):
+# Simplified HTML processing for markdown content
+def process_for_web(text):
     """
-    Convert ANSI color codes to HTML spans and convert newlines to <br> tags
-    for proper HTML rendering.
-
-    Detects <MARKDOWN>...</MARKDOWN> tags and wraps content for client-side rendering.
+    Process text for web display - everything is treated as markdown.
+    No ANSI codes, no special markers needed.
     """
-    # Check for markdown markers
-    import re
-    markdown_pattern = r'<MARKDOWN>(.*?)</MARKDOWN>'
-    markdown_sections = re.findall(markdown_pattern, text, re.DOTALL)
-
-    # Map ANSI color codes to CSS classes
-    ansi_map = {
-        '\033[92m': '<span class="green">',    # GREEN
-        '\033[94m': '<span class="blue">',     # BLUE
-        '\033[93m': '<span class="yellow">',   # YELLOW
-        '\033[91m': '<span class="red">',      # RED
-        '\033[96m': '<span class="cyan">',     # CYAN
-        '\033[1m': '<span class="bold">',      # BOLD
-        '\033[0m': '</span>'                   # RESET
-    }
-
-    # Replace ANSI codes with HTML spans
-    for ansi, html in ansi_map.items():
-        text = text.replace(ansi, html)
-
-    # Handle nested spans correctly by counting resets
-    reset_count = text.count('</span>')
-    open_count = sum(text.count(span) for span in ansi_map.values() if span != '</span>')
-
-    # Add any missing closing spans
-    if open_count > reset_count:
-        text += '</span>' * (open_count - reset_count)
-
-    # Process markdown sections
-    if markdown_sections:
-        for md_content in markdown_sections:
-            # Replace the markdown marker with a div that JavaScript will process
-            original = f'<MARKDOWN>{md_content}</MARKDOWN>'
-            replacement = f'<div class="markdown-content">{md_content}</div>'
-            text = text.replace(original, replacement)
-
-    # Convert newlines to HTML breaks (but not in markdown sections)
-    # Split by markdown-content divs to avoid converting newlines inside them
-    parts = text.split('<div class="markdown-content">')
-    for i in range(len(parts)):
-        if '</div>' in parts[i]:
-            # This part contains a markdown div
-            before_div, after_div = parts[i].split('</div>', 1)
-            # Only convert newlines in the after_div part
-            after_div = after_div.replace('\n\n', '<br><br style="margin-bottom: 10px">')
-            after_div = after_div.replace('\n', '<br>')
-            parts[i] = before_div + '</div>' + after_div
-        else:
-            # No markdown div in this part, convert all newlines
-            parts[i] = parts[i].replace('\n\n', '<br><br style="margin-bottom: 10px">')
-            parts[i] = parts[i].replace('\n', '<br>')
-
-    text = '<div class="markdown-content">'.join(parts)
-
-    return text
+    # Wrap everything in a markdown-content div for consistent rendering
+    return f'<div class="markdown-content">{text}</div>'
 
 def format_note_content_for_web(note, notes_manager):
     """Format a note for web display with markdown support."""
@@ -514,18 +462,18 @@ def format_note_content_for_web(note, notes_manager):
     header_line = f"{formatted_id} [{formatted_time}]"
     separator = "-" * 40
 
-    # Return formatted parts separately so we can handle markdown
+    # Return formatted parts - everything is markdown now
     return {
-        'header': ansi_to_html(header_line),
+        'header': header_line,
         'separator': separator,
-        'content': note['content'],  # Keep content as-is for markdown rendering
+        'content': note['content'],
         'is_markdown': True
     }
 
 def show_command_help(cmd):
     """Show detailed help for a specific command."""
     help_text = CommandHelp.get_command_help(cmd)
-    return jsonify({'result': ansi_to_html(help_text)})
+    return jsonify({'result': process_for_web(help_text)})
 
 
 # Routes
@@ -945,7 +893,7 @@ def execute_command():
     except Exception as e:
         logger.error(f"Failed to initialize Zettl components: {e}")
         error_msg = ZettlFormatter.error("Unable to connect to the database. Please check your authentication and try again.")
-        return jsonify({'result': ansi_to_html(error_msg)})
+        return jsonify({'result': process_for_web(error_msg)})
 
     # Parse the command with better handling for options and quotes
     cmd, args = parse_command(command)
@@ -987,8 +935,8 @@ def execute_command():
                     # Full content mode
                     result += f"{ZettlFormatter.note_id(note_id)} [{ZettlFormatter.timestamp(created_at)}]\n"
                     result += "-" * 40 + "\n"
-                    result += f"<MARKDOWN>{note['content']}</MARKDOWN>\n"
-                    
+                    result += f"{note['content']}\n"
+
                     # Add tags display
                     try:
                         tags = notes_manager.get_tags(note_id)
@@ -996,7 +944,7 @@ def execute_command():
                             result += f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}\n"
                     except Exception:
                         pass
-                    
+
                     result += "\n"  # Extra line between notes
                 else:
                     # Default mode - ID, timestamp, and preview
@@ -1056,11 +1004,11 @@ def execute_command():
                     note = notes_manager.get_note(note_id)
                     created_at = notes_manager.db.format_timestamp(note['created_at'])
 
-                    # Format header with ANSI colors
+                    # Format header
                     result = f"{ZettlFormatter.note_id(note_id)} [{ZettlFormatter.timestamp(created_at)}]\n"
                     result += "-" * 40 + "\n"
-                    # Add content wrapped in markdown marker
-                    result += f"<MARKDOWN>{note['content']}</MARKDOWN>\n\n"
+                    # Add content
+                    result += f"{note['content']}\n\n"
 
                     # Show tags if any
                     try:
@@ -1133,8 +1081,8 @@ def execute_command():
                         # Full content mode
                         result += f"{ZettlFormatter.note_id(note['id'])}\n"
                         result += "-" * 40 + "\n"
-                        result += f"<MARKDOWN>{note['content']}</MARKDOWN>\n"
-                        
+                        result += f"{note['content']}\n"
+
                         # Add tags display
                         try:
                             tags = notes_manager.get_tags(note['id'])
@@ -1142,16 +1090,16 @@ def execute_command():
                                 result += f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}\n"
                         except Exception:
                             pass
-                        
+
                         result += "\n"  # Extra line between notes
                     else:
                         # Preview mode
                         content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
                         if query:
-                            # Highlight the query in the preview
+                            # Highlight the query in the preview with markdown bold
                             pattern = re.compile(re.escape(query), re.IGNORECASE)
-                            content_preview = pattern.sub(f"{Colors.YELLOW}\\g<0>{Colors.RESET}", content_preview)
-                        
+                            content_preview = pattern.sub(r"**\g<0>**", content_preview)
+
                         result += f"{ZettlFormatter.note_id(note['id'])}: {content_preview}\n"
                     
         elif cmd == "tags":
@@ -1209,24 +1157,24 @@ def execute_command():
                     created_at = notes_manager.db.format_timestamp(source_note['created_at'])
                     result += f"{ZettlFormatter.note_id(note_id)} [{ZettlFormatter.timestamp(created_at)}]\n"
                     result += "-" * 40 + "\n"
-                    result += f"<MARKDOWN>{source_note['content']}</MARKDOWN>\n\n"
+                    result += f"{source_note['content']}\n\n"
                 except Exception as e:
                     result = f"{ZettlFormatter.warning(f'Could not display source note: {str(e)}')}\n"
-                
+
                 # Now show related notes
                 related_notes = notes_manager.get_related_notes(note_id)
                 if not related_notes:
                     result += ZettlFormatter.warning(f"No notes connected to note #{note_id}")
                 else:
                     result += f"{ZettlFormatter.header(f'Connected Notes ({len(related_notes)} total)')}\n\n"
-                    
+
                     for note in related_notes:
                         if full:
                             # Full content mode
                             note_created_at = notes_manager.db.format_timestamp(note['created_at'])
                             result += f"{ZettlFormatter.note_id(note['id'])} [{ZettlFormatter.timestamp(note_created_at)}]\n"
                             result += "-" * 40 + "\n"
-                            result += f"<MARKDOWN>{note['content']}</MARKDOWN>\n\n"
+                            result += f"{note['content']}\n\n"
                         else:
                             # Preview mode
                             content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
@@ -1275,7 +1223,7 @@ def execute_command():
                         debug_info += "Anthropic package: Not installed\n"
                         
                     result = debug_info
-                    return jsonify({'result': ansi_to_html(result)})
+                    return jsonify({'result': process_for_web(result)})
                     
                 try:
                     # Check if the note exists first
@@ -1287,7 +1235,7 @@ def execute_command():
                     
                     if action == "summarize":
                         summary = llm_helper.summarize_note(note_id)
-                        result += f"{ZettlFormatter.header(f'AI Summary for Note #{note_id}')}\n\n<MARKDOWN>{summary}</MARKDOWN>"
+                        result += f"{ZettlFormatter.header(f'AI Summary for Note #{note_id}')}\n\n{summary}"
 
                     elif action == "tags":
                         tags = llm_helper.suggest_tags(note_id, count)
@@ -1301,15 +1249,13 @@ def execute_command():
                         if not connections:
                             result += ZettlFormatter.warning("No potential connections found.")
                         else:
-                            markdown_content = ""
                             for conn in connections:
                                 conn_id = conn['note_id']
-                                markdown_content += f"**Note #{conn_id}**\n\n{conn['explanation']}\n\n"
-                            result += f"<MARKDOWN>{markdown_content}</MARKDOWN>"
+                                result += f"**Note #{conn_id}**\n\n{conn['explanation']}\n\n"
 
                     elif action == "expand":
                         expanded_content = llm_helper.expand_note(note_id)
-                        result += f"{ZettlFormatter.header(f'AI-Expanded Version of Note #{note_id}')}\n\n<MARKDOWN>{expanded_content}</MARKDOWN>"
+                        result += f"{ZettlFormatter.header(f'AI-Expanded Version of Note #{note_id}')}\n\n{expanded_content}"
 
                     elif action == "concepts":
                         concepts = llm_helper.extract_key_concepts(note_id, count)
@@ -1317,50 +1263,42 @@ def execute_command():
                         if not concepts:
                             result += ZettlFormatter.warning("No key concepts identified.")
                         else:
-                            markdown_content = ""
                             for i, concept in enumerate(concepts, 1):
-                                markdown_content += f"{i}. **{concept['concept']}**\n\n   {concept['explanation']}\n\n"
-                            result += f"<MARKDOWN>{markdown_content}</MARKDOWN>"
-                                
+                                result += f"{i}. **{concept['concept']}**\n\n   {concept['explanation']}\n\n"
+
                     elif action == "questions":
                         questions = llm_helper.generate_question_note(note_id, count)
                         result += f"{ZettlFormatter.header(f'Thought-Provoking Questions from Note #{note_id}')}\n\n"
                         if not questions:
                             result += ZettlFormatter.warning("No questions generated.")
                         else:
-                            markdown_content = ""
                             for i, question in enumerate(questions, 1):
-                                markdown_content += f"{i}. **{question['question']}**\n\n   {question['explanation']}\n\n"
-                            result += f"<MARKDOWN>{markdown_content}</MARKDOWN>"
+                                result += f"{i}. **{question['question']}**\n\n   {question['explanation']}\n\n"
 
                     elif action == "critique":
                         critique = llm_helper.critique_note(note_id)
                         result += f"{ZettlFormatter.header(f'AI Critique of Note #{note_id}')}\n\n"
 
-                        markdown_content = ""
-
                         # Display strengths
                         if critique['strengths']:
-                            markdown_content += "## Strengths\n\n"
+                            result += "## Strengths\n\n"
                             for strength in critique['strengths']:
-                                markdown_content += f"- {strength}\n"
-                            markdown_content += "\n"
+                                result += f"- {strength}\n"
+                            result += "\n"
 
                         # Display weaknesses
                         if critique['weaknesses']:
-                            markdown_content += "## Areas for Improvement\n\n"
+                            result += "## Areas for Improvement\n\n"
                             for weakness in critique['weaknesses']:
-                                markdown_content += f"- {weakness}\n"
-                            markdown_content += "\n"
+                                result += f"- {weakness}\n"
+                            result += "\n"
 
                         # Display suggestions
                         if critique['suggestions']:
-                            markdown_content += "## Suggestions\n\n"
+                            result += "## Suggestions\n\n"
                             for suggestion in critique['suggestions']:
-                                markdown_content += f"- {suggestion}\n"
+                                result += f"- {suggestion}\n"
 
-                        result += f"<MARKDOWN>{markdown_content}</MARKDOWN>"
-                                
                         # If no structured feedback was generated
                         if not (critique['strengths'] or critique['weaknesses'] or critique['suggestions']):
                             result += ZettlFormatter.warning("Could not generate structured feedback for this note.")
@@ -1406,7 +1344,7 @@ def execute_command():
                     result = f"Deleting note #{note_id}: {content_preview}\n"
                 except Exception as e:
                     result = f"{ZettlFormatter.warning(f'Note not found: {str(e)}')}\n"
-                    return jsonify({'result': ansi_to_html(result)})
+                    return jsonify({'result': process_for_web(result)})
                 
                 # Delete the note
                 notes_manager.delete_note(note_id, cascade=cascade)
@@ -1675,7 +1613,7 @@ def execute_command():
                             if not todo_notes:
                                 filter_str = "', '".join(filter_tags)
                                 result = ZettlFormatter.warning(f"No todos found with all tags: '{filter_str}'.")
-                                return jsonify({'result': ansi_to_html(result)})
+                                return jsonify({'result': process_for_web(result)})
                         
                         # Group notes by their tags (categories)
                         active_todos_by_category = {}
@@ -1780,12 +1718,12 @@ def execute_command():
                         result = ""
                         
                         # Display todos by category
-                        if (not active_todos_by_category and not uncategorized_active and 
+                        if (not active_todos_by_category and not uncategorized_active and
                             (not done or (not done_todos_by_category and not uncategorized_done)) and
                             (not donetoday or (not donetoday_todos_by_category and not uncategorized_donetoday)) and
                             (not cancel or (not canceled_todos_by_category and not uncategorized_canceled))):
                             result = ZettlFormatter.warning("No todos match your criteria.")
-                            return jsonify({'result': ansi_to_html(result)})
+                            return jsonify({'result': process_for_web(result)})
                                     
                         def display_todos_group(category_dict, uncategorized_list, header_text):
                             output = ""
@@ -2013,9 +1951,9 @@ def execute_command():
             result = f"Unknown command: {cmd}. Try 'help' for available commands."
             
         logger.debug(f"Command result: {result[:100]}...")
-        
-        # Convert ANSI color codes to HTML
-        result = ansi_to_html(result)
+
+        # Process result for web display
+        result = process_for_web(result)
         return jsonify({'result': result})
         
     except Exception as e:
@@ -2032,7 +1970,7 @@ def execute_command():
         else:
             error_msg = ZettlFormatter.error(f"Command execution failed: {str(e)}")
 
-        return jsonify({'result': ansi_to_html(error_msg)})
+        return jsonify({'result': process_for_web(error_msg)})
 
 
 def format_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=False, include_cancel=False, filter_tags=None):
@@ -2122,7 +2060,6 @@ def format_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=F
     # Helper to format a single note for HTML
     def format_note_html(note):
         formatted_id = ZettlFormatter.note_id(note['id'])
-        formatted_id = ansi_to_html(formatted_id)  # Convert ANSI colors to HTML
         content_lines = note['content'].split('\n')
         return f"<div style='margin: 5px 0'>{formatted_id}: {content_lines[0]}</div>"
     
@@ -2193,17 +2130,17 @@ def format_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=F
     
     # Display additional categories if requested
     if uncategorized:
-        output += f"<div style='margin: 20px 0 10px 0; padding-top: 20px; border-top: 1px solid #444;'>{ansi_to_html(ZettlFormatter.warning(f'Uncategorized Todos ({len(uncategorized)})'))}:</div>"
+        output += f"<div style='margin: 20px 0 10px 0; padding-top: 20px; border-top: 1px solid #444;'>{ZettlFormatter.warning(f'Uncategorized Todos ({len(uncategorized)})')}:</div>"
         for note in uncategorized:
             output += format_note_html(note)
-    
+
     if include_done and done_todos:
-        output += f"<div style='margin: 20px 0 10px 0; padding-top: 20px; border-top: 1px solid #444;'>{ansi_to_html(ZettlFormatter.header(f'Completed Todos ({len(done_todos)})'))}:</div>"
+        output += f"<div style='margin: 20px 0 10px 0; padding-top: 20px; border-top: 1px solid #444;'>{ZettlFormatter.header(f'Completed Todos ({len(done_todos)})')}:</div>"
         for note in done_todos:
             output += format_note_html(note)
-    
+
     if include_cancel and canceled_todos:
-        output += f"<div style='margin: 20px 0 10px 0; padding-top: 20px; border-top: 1px solid #444;'>{ansi_to_html(ZettlFormatter.header(f'Canceled Todos ({len(canceled_todos)})'))}:</div>"
+        output += f"<div style='margin: 20px 0 10px 0; padding-top: 20px; border-top: 1px solid #444;'>{ZettlFormatter.header(f'Canceled Todos ({len(canceled_todos)})')}:</div>"
         for note in canceled_todos:
             output += format_note_html(note)
     
