@@ -21,7 +21,8 @@ class ZettlFormatter:
     def header(cls, text):
         """Format a header."""
         if cls._mode == 'web':
-            return f"**<span class='header'>{text}</span>**"
+            # Web: use markdown bold
+            return f"**{text}**"
         else:
             # CLI: use rich markup
             return f"[bold green]{text}[/bold green]"
@@ -30,7 +31,8 @@ class ZettlFormatter:
     def note_id(cls, note_id):
         """Format a note ID."""
         if cls._mode == 'web':
-            return f"<span class='note-id'>#{note_id}</span>"
+            # Web: use backticks for monospace + emphasis
+            return f"`#{note_id}`"
         else:
             return f"[cyan]#{note_id}[/cyan]"
 
@@ -38,7 +40,8 @@ class ZettlFormatter:
     def timestamp(cls, date_str):
         """Format a timestamp."""
         if cls._mode == 'web':
-            return f"<span class='timestamp'>{date_str}</span>"
+            # Web: use italics for timestamps
+            return f"*{date_str}*"
         else:
             return f"[blue]{date_str}[/blue]"
 
@@ -46,7 +49,8 @@ class ZettlFormatter:
     def tag(cls, tag_text):
         """Format a tag."""
         if cls._mode == 'web':
-            return f"<span class='tag'>#{tag_text}</span>"
+            # Web: use backticks for tags
+            return f"`#{tag_text}`"
         else:
             return f"[yellow]#{tag_text}[/yellow]"
 
@@ -54,7 +58,8 @@ class ZettlFormatter:
     def error(cls, text):
         """Format an error message."""
         if cls._mode == 'web':
-            return f"<span class='error'>**Error:** {text}</span>"
+            # Web: use bold for errors
+            return f"**Error:** {text}"
         else:
             return f"[bold red]Error:[/bold red] {text}"
 
@@ -62,7 +67,8 @@ class ZettlFormatter:
     def warning(cls, text):
         """Format a warning message."""
         if cls._mode == 'web':
-            return f"<span class='warning'>**Warning:** {text}</span>"
+            # Web: use bold for warnings
+            return f"**Warning:** {text}"
         else:
             return f"[bold yellow]Warning:[/bold yellow] {text}"
 
@@ -70,7 +76,8 @@ class ZettlFormatter:
     def success(cls, text):
         """Format a success message."""
         if cls._mode == 'web':
-            return f"<span class='success'>{text}</span>"
+            # Web: plain text, markdown doesn't have success styling
+            return text
         else:
             return f"[green]{text}[/green]"
 
@@ -78,7 +85,8 @@ class ZettlFormatter:
     def info(cls, text):
         """Format an info message."""
         if cls._mode == 'web':
-            return f"<span class='info'>{text}</span>"
+            # Web: plain text
+            return text
         else:
             return f"[cyan]{text}[/cyan]"
 

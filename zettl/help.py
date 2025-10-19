@@ -1,12 +1,44 @@
 # help.py
+import re
 
 class CommandHelp:
     """Centralized help system for Zettl commands."""
 
-    @staticmethod
-    def get_main_help():
+    # Mode: 'cli' for terminal rich markup, 'web' for markdown
+    _mode = 'cli'
+
+    @classmethod
+    def set_mode(cls, mode):
+        """Set help mode: 'cli' or 'web'"""
+        cls._mode = mode
+
+    @classmethod
+    def _convert_to_markdown(cls, text):
+        """Convert rich markup to markdown."""
+        # [bold green]text[/bold green] -> **text**
+        # [bold]text[/bold] -> **text**
+        # [blue]text[/blue] -> *text* (use italic for colored text)
+        # [cyan]text[/cyan] -> `text` (use code for cyan)
+        # [bold yellow]text[/bold yellow] -> **text**
+
+        # Replace bold with color markers -> just bold
+        text = re.sub(r'\[bold [^\]]+\]([^\[]+)\[/bold [^\]]+\]', r'**\1**', text)
+        # Replace plain bold
+        text = re.sub(r'\[bold\]([^\[]+)\[/bold\]', r'**\1**', text)
+        # Replace colored text with italics
+        text = re.sub(r'\[blue\]([^\[]+)\[/blue\]', r'*\1*', text)
+        # Replace cyan with inline code
+        text = re.sub(r'\[cyan\]([^\[]+)\[/cyan\]', r'`\1`', text)
+        # Replace yellow (keep plain for markdown)
+        text = re.sub(r'\[yellow\]([^\[]+)\[/yellow\]', r'\1', text)
+        text = re.sub(r'\[bold yellow\]([^\[]+)\[/bold yellow\]', r'**\1**', text)
+
+        return text
+
+    @classmethod
+    def get_main_help(cls):
         """Return the main help text."""
-        return f"""
+        help_text = f"""
 [bold green]zettl v0.1.0[/bold] - A Zettelkasten-style note-taking tool
 
 [bold]NOTE MANAGEMENT[/bold]
@@ -96,8 +128,12 @@ class CommandHelp:
 For detailed help on any command: [cyan]zettl COMMAND --help[/cyan]
 """
 
-    @staticmethod
-    def get_command_help(command):
+        if cls._mode == 'web':
+            return cls._convert_to_markdown(help_text)
+        return help_text
+
+    @classmethod
+    def get_command_help(cls, command):
         """Return detailed help for a specific command."""
         help_templates = {
             "auth": f"""
@@ -520,4 +556,8 @@ For detailed help on any command: [cyan]zettl COMMAND --help[/cyan]
 """
         }
         
-        return help_templates.get(command, f"No detailed help available for '{command}'. Try 'help' for a list of all commands.")
+        help_text = help_templates.get(command, f"No detailed help available for '{command}'. Try 'help' for a list of all commands.")
+
+        if cls._mode == 'web':
+            return cls._convert_to_markdown(help_text)
+        return help_text

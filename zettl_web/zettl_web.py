@@ -65,8 +65,9 @@ from zettl.formatting import ZettlFormatter
 from zettl.nutrition import NutritionTracker
 from zettl.help import CommandHelp
 
-# Set formatter to web mode for HTML output
+# Set formatter and help to web mode for markdown output
 ZettlFormatter.set_mode('web')
+CommandHelp.set_mode('web')
 
 logger.debug("Successfully imported Zettl components")
 
@@ -445,10 +446,15 @@ def extract_options(args, cmd):
 # Simplified HTML processing for markdown content
 def process_for_web(text):
     """
-    Process text for web display - everything is treated as markdown.
+    Process text for web display - everything is treated as markdown unless it's already HTML.
     No ANSI codes, no special markers needed.
     """
-    # Wrap everything in a markdown-content div for consistent rendering
+    # If the text already contains HTML tags (like from Eisenhower matrix), don't wrap it in markdown-content
+    # This allows raw HTML to pass through for complex layouts like tables
+    if '<div' in text or '<table' in text or '<span' in text:
+        return text
+
+    # Otherwise, wrap in markdown-content div for markdown rendering
     return f'<div class="markdown-content">{text}</div>'
 
 def format_note_content_for_web(note, notes_manager):
@@ -1747,27 +1753,19 @@ def execute_command():
                                     
                                     for note in notes:
                                         formatted_id = ZettlFormatter.note_id(note['id'])
-                                        
-                                        # Format with indentation
-                                        content_lines = note['content'].split('\n')
-                                        output += f"  {formatted_id}: {content_lines[0]}\n"
-                                        if len(content_lines) > 1:
-                                            for line in content_lines[1:]:
-                                                output += f"      {line}\n"
-                                        output += "\n"  # Add an empty line between notes
+
+                                        # Format note ID on its own line, then content (for proper markdown rendering)
+                                        output += f"  {formatted_id}:\n"
+                                        output += f"{note['content']}\n\n"
                                 
                             if uncategorized_list:
                                 output += "Uncategorized\n\n"
                                 for note in uncategorized_list:
                                     formatted_id = ZettlFormatter.note_id(note['id'])
-                                    
-                                    # Format with indentation
-                                    content_lines = note['content'].split('\n')
-                                    output += f"  {formatted_id}: {content_lines[0]}\n"
-                                    if len(content_lines) > 1:
-                                        for line in content_lines[1:]:
-                                            output += f"      {line}\n"
-                                    output += "\n"  # Add an empty line between notes
+
+                                    # Format note ID on its own line, then content (for proper markdown rendering)
+                                    output += f"  {formatted_id}:\n"
+                                    output += f"{note['content']}\n\n"
                             
                             return output
                     
