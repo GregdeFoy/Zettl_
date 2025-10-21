@@ -100,6 +100,7 @@ services:
       - FLASK_ENV=production
       - POSTGREST_URL=http://postgrest:3000
       - AUTH_URL=http://auth-service:3001
+      - MCP_URL=http://mcp-server:3002
       - SECRET_KEY_FILE=/run/secrets/flask_secret
     volumes:
       - ./secrets:/run/secrets:ro
@@ -110,6 +111,36 @@ services:
         condition: service_started
       auth-service:
         condition: service_healthy
+      mcp-server:
+        condition: service_healthy
+
+  # MCP Server for AI Chat
+  mcp-server:
+    build:
+      context: .
+      dockerfile: zettl_mcp/Dockerfile
+    container_name: zettl-mcp
+    restart: unless-stopped
+    environment:
+      - MCP_PORT=3002
+      - POSTGREST_URL=http://postgrest:3000
+      - AUTH_URL=http://auth-service:3001
+      - JWT_SECRET_FILE=/run/secrets/jwt_secret
+    volumes:
+      - ./secrets:/run/secrets:ro
+    networks:
+      - zettl-network
+    depends_on:
+      postgrest:
+        condition: service_started
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; exit(0 if requests.get('http://localhost:3002/health').status_code == 200 else 1)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
 
   # Nginx Reverse Proxy
   nginx:

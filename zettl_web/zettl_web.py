@@ -29,6 +29,10 @@ print(f"File exists: {os.path.exists(dotenv_path)}")
 load_dotenv(dotenv_path)
 
 # Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # Initialize Flask app
@@ -497,6 +501,11 @@ def login_page():
             session.clear()
 
     return render_template('login.html')
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for Docker healthcheck"""
+    return jsonify({'status': 'healthy'}), 200
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -2145,6 +2154,417 @@ def format_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=F
     return output
 
 
+
+
+# ============================================================================
+# Chat API Endpoints
+# ============================================================================
+
+@app.route('/api/chat/conversations', methods=['GET'])
+@jwt_required
+def list_conversations():
+    """List all conversations for the current user"""
+    try:
+        from zettl.chat.manager import ChatManager
+
+        chat_manager = ChatManager(jwt_token=session['access_token'])
+        conversations = chat_manager.list_conversations(limit=50)
+
+        return jsonify({
+            'success': True,
+            'conversations': conversations
+        })
+    except Exception as e:
+        logger.error(f"Error listing conversations: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/chat/conversations', methods=['POST'])
+@jwt_required
+def create_conversation():
+    """Create a new chat conversation"""
+    try:
+        from zettl.chat.manager import ChatManager
+
+        data = request.json
+        title = data.get('title')
+        context_note_ids = data.get('context_note_ids', [])
+
+        logger.info(f"Creating conversation with title='{title}', context_note_ids={context_note_ids}")
+
+        chat_manager = ChatManager(jwt_token=session['access_token'])
+        conversation_id = chat_manager.create_conversation(
+            title=title,
+            context_note_ids=context_note_ids
+        )
+
+        logger.info(f"Successfully created conversation: {conversation_id}")
+
+        return jsonify({
+            'success': True,
+            'conversation_id': conversation_id
+        })
+    except Exception as e:
+        logger.error(f"Error creating conversation: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/chat/conversations/<conversation_id>/messages', methods=['GET'])
+@jwt_required
+def get_conversation_messages(conversation_id):
+    """Get all messages in a conversation"""
+    try:
+        from zettl.chat.manager import ChatManager
+
+        chat_manager = ChatManager(jwt_token=session['access_token'])
+        messages = chat_manager.get_conversation_messages(conversation_id)
+
+        return jsonify({
+            'success': True,
+            'messages': messages
+        })
+    except Exception as e:
+        logger.error(f"Error getting messages: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/chat/message', methods=['POST'])
+@jwt_required
+def send_chat_message():
+    """Send a message and get AI response using MCP tools"""
+    import sys
+    print("=== CHAT MESSAGE REQUEST RECEIVED ===", file=sys.stderr, flush=True)
+    logger.info("=== CHAT MESSAGE REQUEST RECEIVED ===")
+    try:
+        from zettl.chat.manager import ChatManager
+        from anthropic import Anthropic
+
+        data = request.json
+        logger.info(f"Request data: conversation_id={data.get('conversation_id')}, message={data.get('message')[:50] if data.get('message') else None}...")
+        conversation_id = data.get('conversation_id')
+        user_message = data.get('message')
+        context_note_ids = data.get('context_note_ids', [])
+
+        if not conversation_id or not user_message:
+            return jsonify({
+                'success': False,
+                'error': 'conversation_id and message are required'
+            }), 400
+
+        # Initialize chat manager
+        chat_manager = ChatManager(jwt_token=session['access_token'])
+
+        # Save user message
+        chat_manager.add_message(
+            conversation_id=conversation_id,
+            role='user',
+            content=user_message
+        )
+
+        # Get conversation history
+        messages = chat_manager.get_conversation_messages(conversation_id)
+
+        # Build context from visible notes
+        notes_manager = get_notes_manager()
+        context_str = ""
+        if context_note_ids:
+            context_parts = []
+            for note_id in context_note_ids:
+                try:
+                    note = notes_manager.db.get_note(note_id)
+                    context_parts.append(f"Note {note_id}:\n{note['content']}\n")
+                except:
+                    pass
+            if context_parts:
+                context_str = "Currently visible notes:\n\n" + "\n".join(context_parts)
+
+        # Get MCP server URL
+        mcp_url = os.getenv('MCP_URL', 'http://mcp-server:3002')
+
+        # Get available tools from MCP server
+        try:
+            tools_response = requests.get(f'{mcp_url}/tools', timeout=5)
+            tool_definitions = tools_response.json()['tools']
+        except Exception as e:
+            logger.error(f"Failed to get tools from MCP server: {e}")
+            return jsonify({
+                'success': False,
+                'error': 'MCP server unavailable'
+            }), 503
+
+        # Get LLM helper (for Claude API key)
+        llm_helper = get_llm_helper()
+        if not llm_helper or not llm_helper.api_key:
+            return jsonify({
+                'success': False,
+                'error': 'Claude API key not configured'
+            }), 500
+
+        # Initialize Anthropic client
+        client = Anthropic(api_key=llm_helper.api_key)
+
+        # Build message history for Claude
+        claude_messages = []
+        for msg in messages:
+            claude_messages.append({
+                'role': msg['role'],
+                'content': msg['content']
+            })
+
+        # Build system prompt with context
+        system_prompt = """You are a helpful assistant for Zettl, a Zettelkasten note-taking system.
+You have access to tools that can READ notes (search, get, list) and WRITE notes (create, append, add tags, create links).
+
+IMPORTANT TOOL USE WORKFLOW:
+1. When the user asks about their notes, you MUST use the available tools to retrieve the actual data.
+2. Do NOT say you will search - actually call the search_notes or other tools immediately.
+3. After you receive tool results, you MUST provide a complete answer to the user's original question using the retrieved data.
+4. NEVER just acknowledge receiving tool results - always synthesize the data into a helpful response that answers the user's question.
+5. If the tool returns empty results, explain that no matching notes were found and suggest alternatives.
+
+TOOL USAGE EXAMPLES:
+
+Example 1 - Search and summarize:
+User: "Show me my notes about Blackbird"
+→ Use: search_notes(query="Blackbird")
+→ Then: Summarize the findings in a formatted list
+
+Example 2 - Create a note:
+User: "Create a note: Meeting with team about Q1 goals"
+→ Use: create_note(content="Meeting with team about Q1 goals", tags=["meeting", "todo"])
+→ Then: Confirm creation with note ID
+
+Example 3 - Get specific note with details:
+User: "Show me the full content of note #abc123"
+→ Use: get_note(note_id="abc123")
+→ Then: Display full content with tags and links
+
+Example 4 - Filter by tag:
+User: "What are my todo items?"
+→ Use: get_notes_by_tag(tag="todo")
+→ Then: List all todos in a formatted way
+
+Example 5 - Add context to existing note:
+User: "Add to note #abc123: Completed the database migration"
+→ Use: append_to_note(note_id="abc123", content="Completed the database migration")
+→ Then: Confirm the update
+
+Example 6 - Create connection:
+User: "Link note #abc123 to note #def456 because they're related"
+→ Use: create_link_between_notes(source_id="abc123", target_id="def456", context="related topics")
+→ Then: Confirm link creation
+
+Example 7 - Add tags for organization:
+User: "Tag note #abc123 with project and urgent"
+→ Use: add_tags_to_note(note_id="abc123", tags=["project", "urgent"])
+→ Then: Confirm tags added
+
+TOOL SELECTION TIPS:
+- For broad queries → use search_notes or list_recent_notes
+- For specific tags → use get_notes_by_tag
+- For exact note lookup → use get_note
+- For creating quick notes → use create_note
+- For adding to existing → use append_to_note
+- For organization → use add_tags_to_note or create_link_between_notes
+- Don't use get_notes_by_tag multiple times for slight variations (blackbird, blackbirdrates, blackbirdlens) - use search_notes instead
+
+FORMATTING GUIDELINES - Use markdown formatting following Zettl's conventions:
+- Use **bold** for headers and important information
+- Format note IDs as `#123` (backticks for monospace)
+- Format tags as `#tagname` (backticks for monospace)
+- Use *italics* for timestamps and dates
+- Use horizontal rules (---) to separate sections
+- Use code blocks with ``` for multi-line code or data
+- Use bullet lists (- or *) for multiple items
+- When showing note previews, limit to ~50 chars + "..."
+- When displaying full notes, use this structure:
+  `#<note_id>` [*timestamp*]
+  ---
+  <note content>
+  Tags: `#tag1` `#tag2`
+
+Example response format:
+**Found 3 notes:**
+
+`#42` [*2024-01-15*]
+This is a sample note about...
+
+`#87` [*2024-01-20*]
+Another note discussing...
+
+Keep responses concise and well-structured. Always use markdown for better readability."""
+
+        if context_str:
+            system_prompt += f"\n\n{context_str}"
+
+        # Call Claude with tool use
+        logger.info(f"Calling Claude with {len(tool_definitions)} tools")
+        logger.info(f"System prompt: {system_prompt[:200]}...")
+        logger.info(f"Message count: {len(claude_messages)}")
+
+        # Tool use loop - continue until Claude provides a final text response
+        tool_execution_details = []  # Track tool details for frontend display
+        tool_results = []  # Initialize to empty list for cases where no tools are used
+        max_tool_rounds = 10  # Prevent infinite loops (increased for complex queries)
+
+        for round_num in range(max_tool_rounds):
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4096,
+                system=system_prompt,
+                messages=claude_messages,
+                tools=[{
+                    'name': tool['name'],
+                    'description': tool['description'],
+                    'input_schema': tool['inputSchema']
+                } for tool in tool_definitions]
+            )
+
+            logger.info(f"Claude response (round {round_num + 1}) stop_reason: {response.stop_reason}")
+            logger.info(f"Claude response content blocks: {len(response.content)}")
+
+            # If no more tool use, we're done
+            if response.stop_reason != "tool_use":
+                break
+
+            # Handle tool use by calling MCP server
+            tool_results = []
+            logger.info("Processing tool use requests...")
+            for content_block in response.content:
+                logger.info(f"Content block type: {content_block.type}")
+                if content_block.type == "tool_use":
+                    tool_name = content_block.name
+                    tool_input = content_block.input
+                    tool_use_id = content_block.id
+
+                    logger.info(f"Calling tool: {tool_name} with input: {tool_input}")
+
+                    # Call MCP server to execute the tool using JWT token
+                    try:
+                        tool_response = requests.post(
+                            f'{mcp_url}/tool/{tool_name}',
+                            headers={'Authorization': f'Bearer {session["access_token"]}'},
+                            json=tool_input,
+                            timeout=10
+                        )
+
+                        logger.info(f"MCP server response status: {tool_response.status_code}")
+                        logger.info(f"MCP server response body: {tool_response.text}")
+
+                        if tool_response.status_code == 200:
+                            result = tool_response.json()['result']
+                            logger.info(f"Tool result: {result}")
+                            tool_results.append({
+                                'type': 'tool_result',
+                                'tool_use_id': tool_use_id,
+                                'content': json.dumps(result)
+                            })
+                            # Track tool execution for frontend
+                            tool_execution_details.append({
+                                'name': tool_name,
+                                'input': tool_input,
+                                'success': True
+                            })
+                        else:
+                            logger.error(f"Tool call failed with status {tool_response.status_code}")
+                            tool_results.append({
+                                'type': 'tool_result',
+                                'tool_use_id': tool_use_id,
+                                'content': json.dumps({'error': f'HTTP {tool_response.status_code}: {tool_response.text}'})
+                            })
+                            # Track failed tool execution
+                            tool_execution_details.append({
+                                'name': tool_name,
+                                'input': tool_input,
+                                'success': False,
+                                'error': f'HTTP {tool_response.status_code}'
+                            })
+                    except Exception as e:
+                        logger.error(f"Error calling MCP tool {tool_name}: {e}")
+                        import traceback
+                        logger.error(traceback.format_exc())
+                        tool_results.append({
+                            'type': 'tool_result',
+                            'tool_use_id': tool_use_id,
+                            'content': json.dumps({'error': str(e)})
+                        })
+                        # Track failed tool execution
+                        tool_execution_details.append({
+                            'name': tool_name,
+                            'input': tool_input,
+                            'success': False,
+                            'error': str(e)
+                        })
+
+            # Add tool results to conversation and continue loop
+            logger.info(f"Sending {len(tool_results)} tool results back to Claude")
+            claude_messages.append({
+                'role': 'assistant',
+                'content': response.content
+            })
+            claude_messages.append({
+                'role': 'user',
+                'content': tool_results
+            })
+
+        # If we hit max rounds while still wanting to use tools, force a final response
+        if response.stop_reason == "tool_use":
+            logger.warning(f"Hit max tool rounds ({max_tool_rounds}) - requesting final response")
+            claude_messages.append({
+                'role': 'user',
+                'content': 'Please provide your final answer based on all the data you\'ve gathered. Summarize the key findings in a clear, well-formatted response.'
+            })
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4096,
+                system=system_prompt,
+                messages=claude_messages
+                # Note: No tools parameter - force text-only response
+            )
+            logger.info(f"Final forced response stop_reason: {response.stop_reason}")
+
+        # Extract assistant's response
+        assistant_message = ""
+        for content_block in response.content:
+            if hasattr(content_block, 'text'):
+                assistant_message += content_block.text
+
+        logger.info(f"Assistant message length: {len(assistant_message)}")
+
+        # Save assistant message
+        chat_manager.add_message(
+            conversation_id=conversation_id,
+            role='assistant',
+            content=assistant_message,
+            tool_calls=tool_results if tool_results else None
+        )
+
+        return jsonify({
+            'success': True,
+            'message': assistant_message,
+            'tool_calls': len(tool_results),
+            'tool_details': tool_execution_details
+        })
+
+    except Exception as e:
+        logger.error(f"Error sending chat message: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 if __name__ == '__main__':

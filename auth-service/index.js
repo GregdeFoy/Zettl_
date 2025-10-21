@@ -133,10 +133,11 @@ function hashApiKey(apiKey) {
 
 function generateTokens(userId, username, role) {
   const accessToken = jwt.sign(
-    { 
-      sub: userId, 
-      username, 
-      role,
+    {
+      sub: userId,
+      username,
+      role: 'authenticated',  // PostgREST role for RLS policies
+      app_role: role,          // Original application role (user, admin, etc)
       iat: Math.floor(Date.now() / 1000)
     },
     JWT_SECRET,

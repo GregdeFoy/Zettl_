@@ -21,6 +21,8 @@ setup(
         'rich',  # For enhanced terminal formatting
         'tqdm',  # For progress bars
         'anthropic',  # Claude API client
+        'mcp',  # Model Context Protocol SDK
+        'PyJWT',  # JWT token handling
     ] + platform_deps,
     entry_points='''
         [console_scripts]

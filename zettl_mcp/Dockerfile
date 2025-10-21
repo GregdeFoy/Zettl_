@@ -16,22 +16,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Install the zettl package in development mode
 RUN pip install --no-cache-dir -e .
 
-# Copy web app requirements and install
-COPY zettl_web/requirements.txt ./web_requirements.txt
-RUN pip install --no-cache-dir -r web_requirements.txt
-
 # Set correct working directory and ensure the module can be found
 ENV PYTHONPATH="/app:$PYTHONPATH"
+ENV PYTHONUNBUFFERED=1
 
 # Create non-root user
-RUN useradd -m -u 1000 zettl && chown -R zettl:zettl /app
-USER zettl
+RUN useradd -m -u 1000 mcp && chown -R mcp:mcp /app
+USER mcp
 
-EXPOSE 5000
+EXPOSE 3002
 
-# Health check endpoint
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD python -c "import requests; exit(0 if requests.get('http://localhost:5000/health').status_code == 200 else 1)"
+  CMD python -c "import requests; exit(0 if requests.get('http://localhost:3002/health').status_code == 200 else 1)"
 
-WORKDIR /app/zettl_web
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "8", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "info", "zettl_web:app"]
+WORKDIR /app
+CMD ["python", "-m", "zettl.mcp.http_server"]

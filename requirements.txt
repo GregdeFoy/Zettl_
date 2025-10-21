@@ -9,6 +9,10 @@ urllib3>=1.26.0
 
 # AI/LLM
 anthropic>=0.3.0
+mcp>=0.1.0
+
+# JWT authentication
+PyJWT>=2.8.0
 
 # Terminal interface
 tqdm>=4.64.0

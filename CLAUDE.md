@@ -19,6 +19,7 @@
 - **Module structure:** Each file should have a single responsibility
 
 ## Database
-- Supabase is used for data storage (check config.py for credentials)
-- Use prepared statements for all database queries
+- PostgreSQL database accessed via PostgREST API (see docker-compose.yml for architecture)
+- Custom authentication service handles JWT tokens and API keys
+- All database operations go through PostgREST HTTP API (see database.py)
 - Ensure proper error handling for database operations
