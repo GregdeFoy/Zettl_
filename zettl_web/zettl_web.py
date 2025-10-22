@@ -2415,6 +2415,7 @@ Keep responses concise and well-structured. Always use markdown for better reada
 
         # Tool use loop - continue until Claude provides a final text response
         tool_execution_details = []  # Track tool details for frontend display
+        tool_results_data = []  # Track raw tool results data for main screen display
         tool_results = []  # Initialize to empty list for cases where no tools are used
         max_tool_rounds = 10  # Prevent infinite loops (increased for complex queries)
 
@@ -2476,12 +2477,20 @@ Keep responses concise and well-structured. Always use markdown for better reada
                                 'input': tool_input,
                                 'success': True
                             })
+                            # Track raw tool result data for main screen display
+                            tool_results_data.append({
+                                'name': tool_name,
+                                'input': tool_input,
+                                'result': result,
+                                'success': True
+                            })
                         else:
                             logger.error(f"Tool call failed with status {tool_response.status_code}")
+                            error_msg = f'HTTP {tool_response.status_code}: {tool_response.text}'
                             tool_results.append({
                                 'type': 'tool_result',
                                 'tool_use_id': tool_use_id,
-                                'content': json.dumps({'error': f'HTTP {tool_response.status_code}: {tool_response.text}'})
+                                'content': json.dumps({'error': error_msg})
                             })
                             # Track failed tool execution
                             tool_execution_details.append({
@@ -2490,21 +2499,36 @@ Keep responses concise and well-structured. Always use markdown for better reada
                                 'success': False,
                                 'error': f'HTTP {tool_response.status_code}'
                             })
+                            # Track raw tool result data for main screen display
+                            tool_results_data.append({
+                                'name': tool_name,
+                                'input': tool_input,
+                                'result': {'error': error_msg},
+                                'success': False
+                            })
                     except Exception as e:
                         logger.error(f"Error calling MCP tool {tool_name}: {e}")
                         import traceback
                         logger.error(traceback.format_exc())
+                        error_msg = str(e)
                         tool_results.append({
                             'type': 'tool_result',
                             'tool_use_id': tool_use_id,
-                            'content': json.dumps({'error': str(e)})
+                            'content': json.dumps({'error': error_msg})
                         })
                         # Track failed tool execution
                         tool_execution_details.append({
                             'name': tool_name,
                             'input': tool_input,
                             'success': False,
-                            'error': str(e)
+                            'error': error_msg
+                        })
+                        # Track raw tool result data for main screen display
+                        tool_results_data.append({
+                            'name': tool_name,
+                            'input': tool_input,
+                            'result': {'error': error_msg},
+                            'success': False
                         })
 
             # Add tool results to conversation and continue loop
@@ -2554,7 +2578,8 @@ Keep responses concise and well-structured. Always use markdown for better reada
             'success': True,
             'message': assistant_message,
             'tool_calls': len(tool_results),
-            'tool_details': tool_execution_details
+            'tool_details': tool_execution_details,
+            'tool_results_data': tool_results_data
         })
 
     except Exception as e:

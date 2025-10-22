@@ -810,6 +810,82 @@
             color: var(--terminal-text);
         }
 
+        /* Markdown styling in assistant messages */
+        .chat-message.assistant h1,
+        .chat-message.assistant h2,
+        .chat-message.assistant h3,
+        .chat-message.assistant h4 {
+            color: #4a9eff;
+            margin: 8px 0 4px 0;
+            font-weight: bold;
+        }
+
+        .chat-message.assistant h1 { font-size: 1.3em; }
+        .chat-message.assistant h2 { font-size: 1.2em; }
+        .chat-message.assistant h3 { font-size: 1.1em; }
+        .chat-message.assistant h4 { font-size: 1.05em; }
+
+        .chat-message.assistant p {
+            margin: 8px 0;
+        }
+
+        .chat-message.assistant code {
+            background: rgba(0, 0, 0, 0.3);
+            color: #4a9eff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .chat-message.assistant pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+
+        .chat-message.assistant pre code {
+            background: none;
+            padding: 0;
+            color: #e0e0e0;
+        }
+
+        .chat-message.assistant ul,
+        .chat-message.assistant ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        .chat-message.assistant li {
+            margin: 4px 0;
+        }
+
+        .chat-message.assistant strong {
+            color: #90ee90;
+            font-weight: bold;
+        }
+
+        .chat-message.assistant em {
+            color: #add8e6;
+            font-style: italic;
+        }
+
+        .chat-message.assistant hr {
+            border: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            margin: 12px 0;
+        }
+
+        .chat-message.assistant blockquote {
+            border-left: 3px solid #4a9eff;
+            padding-left: 12px;
+            margin: 8px 0;
+            color: #888;
+            font-style: italic;
+        }
+
         .chat-message.loading {
             background-color: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.2);
@@ -1083,6 +1159,109 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Markdown parsing error:', e);
             return content;
         }
+    }
+
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Helper function to format tool results intelligently
+    function formatToolResult(result) {
+        // Check if it's an error
+        if (result.error) {
+            return `<div style="color: #ff6b6b; padding: 8px; background: rgba(255, 107, 107, 0.1); border-radius: 4px;">
+                <strong>Error:</strong> ${escapeHtml(result.error)}
+            </div>`;
+        }
+
+        // Check if it's a success message (from write operations)
+        if (result.success && result.message) {
+            return `<div style="color: #4ade80; padding: 8px; background: rgba(74, 222, 128, 0.1); border-radius: 4px;">
+                <strong>✓ Success:</strong> ${escapeHtml(result.message)}
+                ${result.note_id ? `<br><span style="color: #888; font-size: 0.9em;">Note ID: <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px;">${escapeHtml(result.note_id)}</code></span>` : ''}
+            </div>`;
+        }
+
+        // Check if it's a list of notes
+        if (Array.isArray(result) && result.length > 0 && result[0].id && result[0].content) {
+            let html = `<div style="color: #888; margin-bottom: 8px;">Found ${result.length} note${result.length !== 1 ? 's' : ''}:</div>`;
+
+            result.forEach(note => {
+                html += '<div style="margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,0.2); border-left: 2px solid #4a9eff; border-radius: 3px;">';
+
+                // Note header with ID and timestamp
+                html += '<div style="margin-bottom: 6px;">';
+                html += `<code style="color: #4a9eff; background: rgba(74, 158, 255, 0.1); padding: 2px 6px; border-radius: 3px; font-weight: bold;">#${escapeHtml(note.id)}</code>`;
+                if (note.created_at) {
+                    html += ` <span style="color: #888; font-size: 0.85em; font-style: italic;">[${escapeHtml(note.created_at)}]</span>`;
+                }
+                html += '</div>';
+
+                // Note content
+                html += `<div style="color: #e0e0e0; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(note.content)}</div>`;
+
+                // Tags if present
+                if (note.tags && note.tags.length > 0) {
+                    html += '<div style="margin-top: 6px; font-size: 0.85em;">';
+                    html += '<span style="color: #888;">Tags:</span> ';
+                    note.tags.forEach(tag => {
+                        html += `<code style="background: rgba(74, 158, 255, 0.15); color: #4a9eff; padding: 2px 6px; border-radius: 3px; margin-right: 4px;">#${escapeHtml(tag)}</code>`;
+                    });
+                    html += '</div>';
+                }
+
+                // Linked notes if present
+                if (note.linked_notes && note.linked_notes.length > 0) {
+                    html += '<div style="margin-top: 6px; font-size: 0.85em; color: #888;">';
+                    html += `Links to: ${note.linked_notes.map(id => `<code style="background: rgba(0,0,0,0.3); padding: 2px 4px; border-radius: 3px;">#${escapeHtml(id)}</code>`).join(', ')}`;
+                    html += '</div>';
+                }
+
+                html += '</div>';
+            });
+
+            return html;
+        }
+
+        // Check if it's a single note object
+        if (result.id && result.content) {
+            let html = '<div style="padding: 10px; background: rgba(0,0,0,0.2); border-left: 2px solid #4a9eff; border-radius: 3px;">';
+
+            // Note header
+            html += '<div style="margin-bottom: 6px;">';
+            html += `<code style="color: #4a9eff; background: rgba(74, 158, 255, 0.1); padding: 2px 6px; border-radius: 3px; font-weight: bold;">#${escapeHtml(result.id)}</code>`;
+            if (result.created_at) {
+                html += ` <span style="color: #888; font-size: 0.85em; font-style: italic;">[${escapeHtml(result.created_at)}]</span>`;
+            }
+            html += '</div>';
+
+            // Content
+            html += `<div style="color: #e0e0e0; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(result.content)}</div>`;
+
+            // Tags
+            if (result.tags && result.tags.length > 0) {
+                html += '<div style="margin-top: 6px; font-size: 0.85em;">';
+                html += '<span style="color: #888;">Tags:</span> ';
+                result.tags.forEach(tag => {
+                    html += `<code style="background: rgba(74, 158, 255, 0.15); color: #4a9eff; padding: 2px 6px; border-radius: 3px; margin-right: 4px;">#${escapeHtml(tag)}</code>`;
+                });
+                html += '</div>';
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        // Check if it's an empty array
+        if (Array.isArray(result) && result.length === 0) {
+            return '<div style="color: #888; font-style: italic; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px;">No results found</div>';
+        }
+
+        // For other data types, show formatted JSON
+        return `<pre style="margin: 0; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 4px; overflow-x: auto; color: #e0e0e0; line-height: 1.4;">${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
     }
 
     // Define function for appending output to the terminal
@@ -1868,7 +2047,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const messageDiv = document.createElement('div');
         messageDiv.className = `chat-message ${role}`;
-        messageDiv.textContent = content;
+
+        // For assistant messages, render markdown; for user messages, use plain text
+        if (role === 'assistant') {
+            messageDiv.innerHTML = renderMarkdown(content);
+        } else {
+            messageDiv.textContent = content;
+        }
+
         chatMessages.appendChild(messageDiv);
 
         // Scroll to bottom
@@ -1886,9 +2072,8 @@ document.addEventListener('DOMContentLoaded', function() {
         sendChatBtn.disabled = true;
         chatInput.disabled = true;
 
-        // Add user message to UI (both chat panel and main screen)
+        // Add user message to chat panel only
         addChatMessage('user', message);
-        window.appendOutput(`<div style="color: #4a9eff; font-weight: bold; margin-top: 12px;">💬 You:</div><div style="margin-left: 20px;">${message}</div>`, true);
         chatInput.value = '';
 
         // Show loading indicator
@@ -1921,33 +2106,41 @@ document.addEventListener('DOMContentLoaded', function() {
             if (mainLoading) mainLoading.remove();
 
             if (data.success) {
-                // Add assistant response to chat panel
+                // Add assistant response to chat panel only
                 addChatMessage('assistant', data.message);
 
-                // Also display on main screen
-                let mainScreenContent = '';
+                // Display formatted tool results on main screen
+                if (data.tool_results_data && data.tool_results_data.length > 0) {
+                    let mainScreenContent = '';
 
-                // Add tool execution details if any
-                if (data.tool_details && data.tool_details.length > 0) {
-                    mainScreenContent += '<div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">';
-                    mainScreenContent += '<strong>🔧 Tools used:</strong> ';
-                    const toolNames = data.tool_details.map(t => {
-                        if (t.success) {
-                            return `<span style="color: #4a9eff;">${t.name}</span>`;
-                        } else {
-                            return `<span style="color: #ff6b6b;">${t.name} (failed)</span>`;
+                    // Display each tool execution result
+                    data.tool_results_data.forEach((toolResult, index) => {
+                        mainScreenContent += '<div style="margin-bottom: 16px; padding: 12px; background: rgba(74, 158, 255, 0.05); border-left: 3px solid #4a9eff; border-radius: 4px;">';
+
+                        // Tool header
+                        mainScreenContent += '<div style="color: #4a9eff; font-weight: bold; margin-bottom: 10px; font-size: 0.95em;">';
+                        mainScreenContent += `🔧 ${toolResult.name}`;
+                        if (!toolResult.success) {
+                            mainScreenContent += ' <span style="color: #ff6b6b;">(failed)</span>';
                         }
+                        mainScreenContent += '</div>';
+
+                        // Tool input (show concisely)
+                        if (toolResult.input && Object.keys(toolResult.input).length > 0) {
+                            mainScreenContent += '<div style="color: #888; font-size: 0.8em; margin-bottom: 10px;">';
+                            const inputStr = Object.entries(toolResult.input).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ');
+                            mainScreenContent += `<span style="opacity: 0.7;">Input:</span> ${escapeHtml(inputStr)}`;
+                            mainScreenContent += '</div>';
+                        }
+
+                        // Tool result (formatted intelligently)
+                        mainScreenContent += formatToolResult(toolResult.result);
+
+                        mainScreenContent += '</div>';
                     });
-                    mainScreenContent += toolNames.join(', ');
-                    mainScreenContent += '</div>';
+
+                    window.appendOutput(mainScreenContent, true);
                 }
-
-                // Add the assistant's message with markdown rendering
-                mainScreenContent += '<div class="markdown-content">';
-                mainScreenContent += renderMarkdown(data.message);
-                mainScreenContent += '</div>';
-
-                window.appendOutput(mainScreenContent, true);
             } else {
                 addChatMessage('assistant', `Error: ${data.error}`);
                 window.appendOutput(`<div style="color: #ff6b6b;">Error: ${data.error}</div>`, true);
