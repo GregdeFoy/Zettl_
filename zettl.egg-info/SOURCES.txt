@@ -19,3 +19,11 @@ zettl.egg-info/dependency_links.txt
 zettl.egg-info/entry_points.txt
 zettl.egg-info/requires.txt
 zettl.egg-info/top_level.txt
+zettl/chat/__init__.py
+zettl/chat/manager.py
+zettl/mcp/__init__.py
+zettl/mcp/auth.py
+zettl/mcp/http_server.py
+zettl/mcp/run_server.py
+zettl/mcp/server.py
+zettl/mcp/tools.py

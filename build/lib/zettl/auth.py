@@ -13,13 +13,8 @@ class ZettlAuth:
         self.config_dir.mkdir(exist_ok=True)
 
     def get_api_key(self):
-        """Get API key from environment variable or config file."""
-        # First check environment variable
-        api_key = os.getenv('ZETTL_API_KEY')
-        if api_key:
-            return api_key
-
-        # Then check config file
+        """Get API key from config file."""
+        # Check config file
         if self.config_file.exists():
             try:
                 with open(self.config_file, 'r') as f:
@@ -55,7 +50,7 @@ class ZettlAuth:
             return False
 
     def test_api_key(self, api_key=None):
-        """Test if API key is valid."""
+        """Test if CLI token is valid."""
         if not api_key:
             api_key = self.get_api_key()
 
@@ -63,7 +58,9 @@ class ZettlAuth:
             return False
 
         try:
-            response = requests.post(f'{AUTH_URL}/token-from-key',
+            # Use the new CLI token validation endpoint
+            # AUTH_URL already includes /api/auth, so just add the endpoint
+            response = requests.post(f'{AUTH_URL}/validate-cli-token',
                                    headers={'X-API-Key': api_key},
                                    timeout=5)
             return response.status_code == 200
@@ -80,7 +77,6 @@ class ZettlAuth:
             click.echo("http://localhost:8080 (or your Zettl web URL)")
             click.echo("")
             click.echo("Then run: zettl auth setup")
-            click.echo("Or set environment variable: export ZETTL_API_KEY=your_key")
             sys.exit(1)
 
         return api_key

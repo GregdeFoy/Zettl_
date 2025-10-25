@@ -3,3 +3,8 @@ secrets/
 secrets/*
 backups/
 build/
+venv/
+nginx/
+migrations/
+build/
+

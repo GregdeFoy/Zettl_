@@ -58,10 +58,6 @@ class Database:
         self.auth_url = AUTH_URL
         self.jwt_token = jwt_token
         self.api_key = api_key
-        # Keep this for backward compatibility with any code that might access it
-        self._cache = {}
-        self._cache_ttl = {}
-        self._default_ttl = _default_ttl
 
     def invalidate_cache(self, prefix=None):
         """Instance method that calls the module-level function."""
@@ -88,21 +84,58 @@ class Database:
 
     def format_timestamp(self, date_str: str) -> str:
         """Format a timestamp for display."""
+        # Handle None/null values
+        if date_str is None or date_str == 'null' or date_str == '':
+            import logging
+            logging.getLogger(__name__).warning("Received null/empty timestamp")
+            return "Unknown date"
+
         try:
-            # Handle ISO format with microseconds
-            if '.' in date_str:
-                main_part, microseconds = date_str.split('.')
-                # Make sure microseconds have exactly 6 digits
+            # PostgreSQL returns timestamps like: "2025-10-22 11:04:48.23+00"
+            # We need to handle: microseconds + timezone offset
+
+            # Extract timezone offset if present (+00, -05, +05:30, etc.)
+            timezone = ''
+            temp_str = date_str
+
+            # Check for timezone indicators
+            for tz_marker in ['+', '-']:
+                if tz_marker in temp_str.split('.')[-1] if '.' in temp_str else temp_str:
+                    # Find the timezone part
+                    parts = temp_str.rsplit(tz_marker, 1)
+                    temp_str = parts[0]
+                    timezone = tz_marker + parts[1]
+                    break
+
+            # Check for 'Z' timezone
+            if temp_str.endswith('Z'):
+                timezone = 'Z'
+                temp_str = temp_str[:-1]
+
+            # Now handle microseconds
+            if '.' in temp_str:
+                main_part, microseconds = temp_str.split('.')
+                # Pad microseconds to 6 digits
                 microseconds = microseconds.ljust(6, '0')[:6]
-                if 'Z' in microseconds:
-                    microseconds = microseconds.replace('Z', '')
-                    date_str = f"{main_part}.{microseconds}Z"
+                temp_str = f"{main_part}.{microseconds}"
+
+            # Reconstruct with timezone
+            if timezone:
+                # Normalize timezone format for fromisoformat
+                if timezone == 'Z':
+                    temp_str = temp_str + '+00:00'
+                elif ':' not in timezone and len(timezone) == 3:  # e.g., +00
+                    temp_str = temp_str + timezone + ':00'
                 else:
-                    date_str = f"{main_part}.{microseconds}"
-            created_at = datetime.fromisoformat(date_str.replace('Z', '+00:00')).strftime('%Y-%m-%d %H:%M')
+                    temp_str = temp_str + timezone
+
+            # Parse and format
+            created_at = datetime.fromisoformat(temp_str).strftime('%Y-%m-%d %H:%M')
             return created_at
-        except Exception:
-            # Fallback if date parsing fails
+        except Exception as e:
+            # Fallback if date parsing fails - log the actual value for debugging
+            import logging
+            logging.getLogger(__name__).error(f"Failed to parse timestamp '{date_str}': {e}")
             return "Unknown date"
 
     def generate_id(self) -> str:
@@ -204,6 +237,45 @@ class Database:
         invalidate_cache("list_notes")
 
         return note_id
+
+    def update_note(self, note_id: str, content: str) -> None:
+        """
+        Update the content of an existing note.
+
+        Args:
+            note_id: ID of the note to update
+            content: New content for the note
+
+        Returns:
+            None
+
+        Raises:
+            Exception: If note update fails
+        """
+        # Verify the note exists first
+        self.get_note(note_id)
+
+        # Get current time
+        now = self._get_iso_timestamp()
+
+        # Update the note content and modified_at timestamp
+        update_data = {
+            "content": content,
+            "modified_at": now
+        }
+
+        params = {'id': f'eq.{note_id}'}
+
+        try:
+            response = self._make_request('PATCH', 'notes', data=update_data, params=params)
+        except Exception as e:
+            raise Exception(f"Failed to update note - Request failed: {str(e)}")
+
+        # Invalidate relevant caches
+        invalidate_cache(f"note:{note_id}")
+        invalidate_cache("list_notes")
+
+        return None
 
     def get_note(self, note_id: str) -> Dict[str, Any]:
         """Get a note by its ID with caching."""

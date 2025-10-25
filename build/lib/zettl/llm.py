@@ -3,7 +3,6 @@ import os
 import re
 from typing import List, Dict, Any, Optional, Union
 from zettl.database import Database
-from zettl.config import CLAUDE_API_KEY
 import urllib3
 urllib3.disable_warnings()
 import logging
@@ -12,11 +11,78 @@ IS_PYTHONANYWHERE = 'pythonanywhere' in platform.node().lower()
 
 
 class LLMHelper:
-    def __init__(self):
-        self.db = Database()
-        self.api_key = CLAUDE_API_KEY
-        self.model = "claude-3-7-sonnet-20250219"  # Using the latest model
+    def __init__(self, jwt_token=None, api_key=None):
+        """
+        Initialize LLM Helper.
+
+        Args:
+            jwt_token: JWT token for web app authentication
+            api_key: CLI token for CLI authentication
+        """
+        # Determine authentication method
+        if jwt_token:
+            # Web app: use JWT token
+            self.jwt_token = jwt_token
+            self.cli_token = None
+            self.db = Database(jwt_token=jwt_token)
+        elif api_key:
+            # CLI with explicit token: use API key
+            self.jwt_token = None
+            self.cli_token = api_key
+            self.db = Database(api_key=api_key)
+        else:
+            # CLI without explicit token: try to get from config
+            self.cli_token = self._get_cli_token()
+            self.jwt_token = None
+            self.db = Database(api_key=self.cli_token)
+
+        # Get Claude API key from settings API
+        self.api_key = self._get_claude_api_key()
+        self.model = "claude-sonnet-4-5-20250929"  # Using Claude Sonnet 4.5
         self._client = None  # Lazy-loaded client
+
+    def _get_cli_token(self):
+        """Get the CLI token for authenticating with the API."""
+        try:
+            from zettl.auth import auth
+            return auth.get_api_key()
+        except Exception as e:
+            logging.debug(f"Could not get CLI token: {e}")
+            return None
+
+    def _get_claude_api_key(self):
+        """
+        Get Claude API key from user settings API.
+        """
+        # Try to get from user settings via API
+        try:
+            from zettl.config import AUTH_URL
+            import requests
+
+            headers = {}
+            if self.jwt_token:
+                # Web app: use JWT token
+                headers['Authorization'] = f'Bearer {self.jwt_token}'
+            elif self.cli_token:
+                # CLI: use API key
+                headers['X-API-Key'] = self.cli_token
+
+            if headers:
+                # AUTH_URL already includes /api/auth, so just add the endpoint
+                response = requests.get(
+                    f'{AUTH_URL}/settings/claude-key',
+                    headers=headers,
+                    timeout=5
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('claude_api_key'):
+                        return data['claude_api_key']
+        except Exception as e:
+            logging.debug(f"Could not fetch Claude API key from settings: {e}")
+
+        return None
         
     # Then modify the client property
     @property
@@ -76,13 +142,14 @@ class LLMHelper:
         Raises:
             Exception: If the API call fails or returns an invalid response
         """
-        print(f"API key is {'SET' if self.api_key else 'NOT SET'}")
-        print(f"First few chars of API key: {self.api_key[:5]}..." if self.api_key else "No API key")
+        # Check if API key is available
+        if not self.api_key:
+            raise Exception("No Claude API key configured. Please set your API key in Settings.")
 
         # Default system message if none provided
         if not system_message:
             system_message = "You are a helpful assistant for a Zettelkasten note-taking system."
-            
+
         try:
             # Call the API
             response = self.client.messages.create(
@@ -91,8 +158,9 @@ class LLMHelper:
                 system=system_message,
                 messages=[
                     {"role": "user", "content": prompt}
-                ]
-            ,timeout=60)
+                ],
+                timeout=60
+            )
             
             # Extract text from response
             text_blocks = []
@@ -122,27 +190,29 @@ class LLMHelper:
     def summarize_note(self, note_id: str) -> str:
         """
         Summarize a single note's content focusing on its key ideas.
-        
+
         Args:
             note_id: ID of the note to summarize
-            
+
         Returns:
             A concise summary of the note's ideas
         """
         try:
             note = self.db.get_note(note_id)
-            
+
             system_message = """You are skilled at distilling complex ideas.
     Your task is to provide a clear, concise summary that captures the essence of the text.
-    Focus on identifying the key points while preserving the core meaning."""
-            
+    Focus on identifying the key points while preserving the core meaning.
+    Format your response in clean, readable markdown."""
+
             prompt = f"""Please summarize the following text concisely:
 
     {note['content']}
 
-    Provide a summary that captures the essence of these ideas in 2-3 sentences."""
-            
-            return self._call_llm_api(prompt, system_message, max_tokens=300)
+    Provide a summary that captures the essence of these ideas in 2-3 paragraphs.
+    Use markdown formatting for emphasis where appropriate (bold for key terms, etc.)."""
+
+            return self._call_llm_api(prompt, system_message, max_tokens=500)
             
         except Exception as e:
             return f"Error summarizing note: {str(e)}"
@@ -173,9 +243,10 @@ class LLMHelper:
                 
             system_message = """You are an expert at finding meaningful conceptual connections between ideas.
     Your task is to identify substantive relationships between the main ideas in different texts.
-    Focus on identifying connections based on conceptual relationships, complementary ideas, 
-    contradictions, applications, or shared themes."""
-            
+    Focus on identifying connections based on conceptual relationships, complementary ideas,
+    contradictions, applications, or shared themes.
+    Format your explanations in clear, concise markdown."""
+
             # Prepare prompt with the target note
             prompt = f"""I need to find meaningful connections between the ideas in these texts.
 
@@ -409,8 +480,9 @@ class LLMHelper:
             
             system_message = """You are skilled at identifying and explaining key concepts.
     Your task is to identify the most important concepts in this text and provide a clear explanation for each.
-    Focus on extracting the core ideas that are most central to understanding the text."""
-            
+    Focus on extracting the core ideas that are most central to understanding the text.
+    Use markdown formatting in your explanations for emphasis and clarity."""
+
             prompt = f"""Please identify the {count} most important concepts in this text:
 
     {note['content']}
@@ -418,14 +490,15 @@ class LLMHelper:
     For each concept:
     1. Start with "Concept: " followed by a short, clear name for the concept (3-5 words maximum)
     2. On the next line, start with "Explanation: " followed by a 1-2 sentence explanation that captures its significance
+    3. Use markdown formatting (bold, italics, etc.) in the explanations where appropriate
 
     Format your response precisely as follows:
 
     Concept: [First concept name]
-    Explanation: [Your explanation of the first concept]
+    Explanation: [Your explanation with **markdown** formatting]
 
     Concept: [Second concept name]
-    Explanation: [Your explanation of the second concept]
+    Explanation: [Your explanation with **markdown** formatting]
 
     Follow this exact format for all {count} concepts, with each concept-explanation pair separated by a blank line."""
             
@@ -562,8 +635,9 @@ class LLMHelper:
             
             system_message = """You are skilled at generating insightful questions.
     Your task is to generate thought-provoking questions that explore and extend the ideas in the text.
-    Focus on questions that encourage critical thinking, deeper analysis, or novel applications."""
-            
+    Focus on questions that encourage critical thinking, deeper analysis, or novel applications.
+    Use markdown formatting in your explanations for clarity and emphasis."""
+
             prompt = f"""Based on the following text, generate exactly {count} thought-provoking questions:
 
     {note['content']}
@@ -572,18 +646,19 @@ class LLMHelper:
     1. Start with 'Question: ' followed by your clear, focused question
     2. Then on a new line, start with 'Explanation: ' followed by why this question is interesting or important
     3. Make sure each question explores different aspects of the ideas in the text
-    4. Use this exact format for each of the {count} questions, with a blank line between each question-explanation pair
+    4. Use markdown formatting (bold, italics, etc.) in the explanations where appropriate
+    5. Use this exact format for each of the {count} questions, with a blank line between each question-explanation pair
 
     Format your response precisely as follows:
 
     Question: [Your first question here]
-    Explanation: [Your explanation here]
+    Explanation: [Your explanation here with **markdown** formatting]
 
     Question: [Your second question here]
-    Explanation: [Your explanation here]
+    Explanation: [Your explanation here with **markdown** formatting]
 
     Question: [Your third question here]
-    Explanation: [Your explanation here]
+    Explanation: [Your explanation here with **markdown** formatting]
 
     Follow this format exactly, with the labels 'Question:' and 'Explanation:' at the start of their respective lines."""
             
@@ -699,20 +774,21 @@ class LLMHelper:
     def expand_note(self, note_id: str) -> str:
         """
         Expand the ideas in a note with additional details and insights.
-        
+
         Args:
             note_id: ID of the note to expand
-            
+
         Returns:
             Expanded version of the ideas in the note
         """
         try:
             note = self.db.get_note(note_id)
-            
+
             system_message = """You are an expert at developing and enriching ideas.
     Your task is to thoughtfully expand on the concepts presented with additional context, examples, and insights.
-    Focus on deepening understanding and exploring implications of these ideas."""
-            
+    Focus on deepening understanding and exploring implications of these ideas.
+    Use markdown formatting to structure your response clearly."""
+
             prompt = f"""Please expand thoughtfully on the following text:
 
     {note['content']}
@@ -721,9 +797,15 @@ class LLMHelper:
     1. Elaborate on the core ideas with additional context and nuance
     2. Provide relevant examples, applications, or case studies
     3. Explore implications, extensions, or consequences of these ideas
-    4. Add depth and richness while maintaining clarity and coherence"""
-            
-            return self._call_llm_api(prompt, system_message, max_tokens=1500)
+    4. Add depth and richness while maintaining clarity and coherence
+
+    Format your response in markdown with:
+    - Headings (##) for major sections
+    - Bold for key terms
+    - Bullet points for lists
+    - Paragraphs for readability"""
+
+            return self._call_llm_api(prompt, system_message, max_tokens=2000)
             
         except Exception as e:
             return f"Error expanding note: {str(e)}"
@@ -731,20 +813,21 @@ class LLMHelper:
     def critique_note(self, note_id: str) -> Dict[str, Any]:
         """
         Provide constructive critique on the ideas in a note.
-        
+
         Args:
             note_id: ID of the note to critique
-            
+
         Returns:
             Dictionary with strengths, weaknesses, and suggestions
         """
         try:
             note = self.db.get_note(note_id)
-            
+
             system_message = """You are a thoughtful critic.
     Your task is to provide constructive critique of the ideas presented in this text.
-    Focus on the quality of thinking, clarity of expression, and strength of arguments or insights."""
-            
+    Focus on the quality of thinking, clarity of expression, and strength of arguments or insights.
+    Format your response in clear, structured markdown."""
+
             prompt = f"""Please provide a constructive critique of the following text:
 
     {note['content']}
@@ -756,14 +839,20 @@ class LLMHelper:
     4. Evidence and support for claims
     5. Potential counterarguments or limitations
 
-    Format your response with these clearly labeled sections:
-    - Strengths: [List the strongest aspects of the ideas]
-    - Areas for Improvement: [List areas that could be improved]
-    - Suggestions: [Provide specific actionable suggestions]
+    Format your response in markdown with these clearly labeled sections:
 
-    Use this exact format with these three section headings."""
-            
-            response = self._call_llm_api(prompt, system_message, max_tokens=800)
+    **Strengths:**
+    - [List the strongest aspects of the ideas as bullet points]
+
+    **Areas for Improvement:**
+    - [List areas that could be improved as bullet points]
+
+    **Suggestions:**
+    - [Provide specific actionable suggestions as bullet points]
+
+    Use markdown formatting (bold, italics, etc.) for emphasis."""
+
+            response = self._call_llm_api(prompt, system_message, max_tokens=1000)
             
             # Process the response into structured feedback
             lines = response.strip().split('\n')

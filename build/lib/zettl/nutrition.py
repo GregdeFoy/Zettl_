@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import sys
 from zettl.notes import Notes
-from zettl.formatting import ZettlFormatter, Colors
+from zettl.formatting import ZettlFormatter
 
 class NutritionTracker:
     def __init__(self):
@@ -261,8 +261,8 @@ class NutritionTracker:
         header_text = f"Today's Nutrition Summary ({len(entries)} entries)"
         header = ZettlFormatter.header(header_text)
         result = f"{header}\n"
-        result += f"Total Calories: {Colors.GREEN}{total_calories:.1f}{Colors.RESET}\n"
-        result += f"Total Protein: {Colors.BLUE}{total_protein:.1f}g{Colors.RESET}\n"
+        result += f"Total Calories: [green]{total_calories:.1f}[/green]\n"
+        result += f"Total Protein: [blue]{total_protein:.1f}g[/blue]\n"
         
         if entries:
             result += "\nEntries:\n"
@@ -319,8 +319,8 @@ class NutritionTracker:
                     # Add description if present
                     description = f" - {content}" if content else ""
                     
-                    result += f"[{time_str}] {ZettlFormatter.note_id(note_id)} Cal: {Colors.GREEN}{cal:.1f}{Colors.RESET}, "
-                    result += f"Prot: {Colors.BLUE}{prot:.1f}g{Colors.RESET}{description}\n"
+                    result += f"[{time_str}] {ZettlFormatter.note_id(note_id)} Cal: [green]{cal:.1f}[/green], "
+                    result += f"Prot: [blue]{prot:.1f}g[/blue]{description}\n"
                 except Exception as e:
                     # Skip entries with formatting issues
                     import sys
@@ -351,8 +351,8 @@ class NutritionTracker:
         avg_calories = total_calories / total_days if total_days > 0 else 0
         avg_protein = total_protein / total_days if total_days > 0 else 0
         
-        result += f"Average Daily Calories: {Colors.GREEN}{avg_calories:.1f}{Colors.RESET}\n"
-        result += f"Average Daily Protein: {Colors.BLUE}{avg_protein:.1f}g{Colors.RESET}\n\n"
+        result += f"Average Daily Calories: [green]{avg_calories:.1f}[/green]\n"
+        result += f"Average Daily Protein: [blue]{avg_protein:.1f}g[/blue]\n\n"
         
         # Show daily breakdown
         result += "Daily Breakdown:\n"
@@ -377,10 +377,10 @@ class NutritionTracker:
                 
             # Format the calorie part with padding
             cal_part = f"{date_str}: Cal: "
-            cal_value_part = f"{Colors.GREEN}{cal_value:.1f}{Colors.RESET}"
-            
+            cal_value_part = f"[green]{cal_value:.1f}[/green]"
+
             # Create the calorie bar
-            cal_bar = f"{Colors.GREEN}{'█' * cal_bar_len}{Colors.RESET}"
+            cal_bar = f"[green]{'█' * cal_bar_len}[/green]"
             
             # Add the calorie padding AFTER the value before the bar
             cal_with_padding = cal_value_part + " " * cal_padding
@@ -397,16 +397,16 @@ class NutritionTracker:
             
             # Create protein part
             prot_label = "Prot: "
-            prot_value_part = f"{Colors.BLUE}{prot_value:.1f}g{Colors.RESET}"
-            
+            prot_value_part = f"[blue]{prot_value:.1f}g[/blue]"
+
             # Add padding for protein < 100g
             if prot_value < 100:
                 prot_value_padding = 1  # One extra space for values < 100g
             else:
                 prot_value_padding = 0
-                
+
             # Create protein bar
-            prot_bar = f"{Colors.BLUE}{'█' * prot_bar_len}{Colors.RESET}"
+            prot_bar = f"[blue]{'█' * prot_bar_len}[/blue]"
             
             # Build the final line with all components and proper spacing
             line = cal_part + cal_with_padding + cal_bar
