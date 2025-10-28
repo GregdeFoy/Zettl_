@@ -16,7 +16,6 @@ from zettl.formatting import ZettlFormatter, console
 from rich.markdown import Markdown
 import re
 import random
-from zettl.nutrition import NutritionTracker
 from zettl.help import CommandHelp
 from zettl.auth import auth as zettl_auth
 
@@ -1358,100 +1357,6 @@ def rules(source):
     except Exception as e:
         console.print(ZettlFormatter.error(str(e)))
 
-
-@cli.command()
-@click.argument('content', required=False)
-@click.option('--today', '-t', is_flag=True, help='Show today\'s nutrition summary')
-@click.option('--history', '-i', is_flag=True, help='Show nutrition history')
-@click.option('--days', '-d', default=7, help='Number of days to show in history')
-@click.option('--past', '-p', help='Date for new entry (YYYY-MM-DD format)')
-@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def nutrition(content, today, history, days, past):
-    """Track and analyze nutrition data (calories and protein).
-    
-    If called with content in quotes, adds a new entry.
-    With --today/-t, shows today's summary.
-    With --history/-i, shows history for the specified days.
-    """
-    tracker = NutritionTracker()
-    
-    # Determine what action to take based on provided options
-    if today:
-        # Show today's summary
-        try:
-            summary = tracker.format_today_summary()
-            console.print(summary)
-        except Exception as e:
-            console.print(ZettlFormatter.error(str(e)), err=True)
-    elif history:
-        # Show history
-        try:
-            history_output = tracker.format_history(days=days)
-            console.print(history_output)
-        except Exception as e:
-            console.print(ZettlFormatter.error(str(e)), err=True)
-    elif content:
-        # Add new entry (default behavior when content is provided)
-        try:
-            data = tracker.parse_nutrition_data(content)
-            if not data:
-                console.print(ZettlFormatter.error("Invalid nutrition data format. Use 'cal: XXX prot: YYY'"))
-                return
-                
-            # Get current calories/protein values
-            calories = data.get('calories', 0)
-            protein = data.get('protein', 0)
-            
-            # Create the note, with optional past date
-            note_id = tracker.add_entry(content, past_date=past)
-            
-            # Determine what day to show in the message
-            date_label = f"for {past}" if past else ""
-            click.echo(f"Added nutrition entry #{note_id} {date_label}")
-            
-            # Show today's totals if no past date was specified
-            if not past:
-                try:
-                    today_entries = tracker.get_today_entries()
-                    
-                    total_calories = sum(entry['nutrition_data'].get('calories', 0) for entry in today_entries)
-                    total_protein = sum(entry['nutrition_data'].get('protein', 0) for entry in today_entries)
-                    
-                    click.echo(f"\nToday's totals so far:")
-                    click.echo(f"Calories: {total_calories:.1f}")
-                    click.echo(f"Protein: {total_protein:.1f}g")
-                except Exception as e:
-                    click.echo(f"\nEntry added with:")
-                    click.echo(f"Calories: {calories:.1f}")
-                    click.echo(f"Protein: {protein:.1f}g")
-            else:
-                # Just show the entry's values
-                click.echo(f"\nEntry added with:")
-                click.echo(f"Calories: {calories:.1f}")
-                click.echo(f"Protein: {protein:.1f}g")
-        except Exception as e:
-            console.print(ZettlFormatter.error(str(e)), err=True)
-    else:
-        # If no options specified, show today's summary as default behavior
-        try:
-            summary = tracker.format_today_summary()
-            console.print(summary)
-        except Exception as e:
-            console.print(ZettlFormatter.error(str(e)), err=True)
-
-# Add alias 'nut' for nutrition command
-@cli.command('nut')
-@click.argument('content', required=False)
-@click.option('--today', '-t', is_flag=True, help='Show today\'s nutrition summary')
-@click.option('--history', '-i', is_flag=True, help='Show nutrition history')
-@click.option('--days', '-d', default=7, help='Number of days to show in history')
-@click.option('--past', '-p', help='Date for new entry (YYYY-MM-DD format)')
-@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def nut_cmd(content, today, history, days, past):
-    """Alias for nutrition command."""
-    # Call the implementation from the nutrition command
-    ctx = click.get_current_context()
-    return ctx.invoke(nutrition, content=content, today=today, history=history, days=days, past=past)
 
 if __name__ == '__main__':
     cli()

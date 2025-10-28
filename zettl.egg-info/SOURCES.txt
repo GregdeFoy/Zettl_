@@ -12,7 +12,6 @@ zettl/graph.py
 zettl/help.py
 zettl/llm.py
 zettl/notes.py
-zettl/nutrition.py
 zettl.egg-info/PKG-INFO
 zettl.egg-info/SOURCES.txt
 zettl.egg-info/dependency_links.txt

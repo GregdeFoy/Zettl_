@@ -17,7 +17,6 @@ from datetime import datetime, timezone
 # Add the parent directory to the Python path to find the zettl module
 sys.path.insert(0, '/app')
 
-from zettl.nutrition import NutritionTracker
 from zettl.help import CommandHelp
 
 # Load environment variables from parent directory
@@ -66,7 +65,6 @@ from zettl.notes import Notes
 from zettl.database import Database
 from zettl.llm import LLMHelper
 from zettl.formatting import ZettlFormatter
-from zettl.nutrition import NutritionTracker
 from zettl.help import CommandHelp
 
 # Set formatter and help to web mode for markdown output
@@ -265,26 +263,6 @@ COMMAND_OPTIONS = {
         },
         'long_opts': {
             'source': {'flag': True}
-        }
-    },
-    'nutrition': {
-        'short_opts': {
-            'd': {'name': 'days', 'type': int},
-            'p': {'name': 'past'}
-        },
-        'long_opts': {
-            'days': {'type': int},
-            'past': {}
-        }
-    },
-    'nut': {
-        'short_opts': {
-            'd': {'name': 'days', 'type': int},
-            'p': {'name': 'past'}
-        },
-        'long_opts': {
-            'days': {'type': int},
-            'past': {}
         }
     },
     'api-key': {
@@ -1882,77 +1860,6 @@ def execute_command():
                     result = ZettlFormatter.error(f"Error listing API keys: {str(e)}")
             else:
                 result = ZettlFormatter.error("Usage: api-key --list | api-key --generate [name]")
-
-        elif cmd == "nutrition" or cmd == "nut":
-            # Handle nutrition commands with the new structure
-            tracker = NutritionTracker()
-            
-            # Check for flags/options
-            today = 't' in flags or 'today' in flags
-            history = 'i' in flags or 'history' in flags
-            days = int(options.get('days', options.get('d', 7)))  # Default to 7 days
-            past = options.get('past', options.get('p', None))  # Date for past entries
-            
-            # Determine what action to take based on provided options
-            if today:
-                # Show today's summary
-                try:
-                    result = tracker.format_today_summary()
-                except Exception as e:
-                    result = ZettlFormatter.error(str(e))
-            elif history:
-                # Show history
-                try:
-                    result = tracker.format_history(days=days)
-                except Exception as e:
-                    result = ZettlFormatter.error(str(e))
-            elif remaining_args:
-                # Add new entry (default behavior when content is provided)
-                content = remaining_args[0]
-                try:
-                    data = tracker.parse_nutrition_data(content)
-                    if not data:
-                        result = ZettlFormatter.error("Invalid nutrition data format. Use 'cal: XXX prot: YYY'")
-                    else:
-                        # Get current calories/protein values
-                        calories = data.get('calories', 0)
-                        protein = data.get('protein', 0)
-                        
-                        # Create the note with optional past date
-                        note_id = tracker.add_entry(content, past_date=past)
-                        
-                        # Determine what day to show in the message
-                        date_label = f"for {past}" if past else ""
-                        result = f"Added nutrition entry #{note_id} {date_label}\n\n"
-                        
-                        # Show today's totals if no past date was specified
-                        if not past:
-                            try:
-                                today_entries = tracker.get_today_entries()
-                                
-                                total_calories = sum(entry['nutrition_data'].get('calories', 0) for entry in today_entries)
-                                total_protein = sum(entry['nutrition_data'].get('protein', 0) for entry in today_entries)
-                                
-                                result += f"Today's totals so far:\n"
-                                result += f"Calories: {total_calories:.1f}\n"
-                                result += f"Protein: {total_protein:.1f}g"
-                            except Exception as e:
-                                result += f"\nEntry added with:\n"
-                                result += f"Calories: {calories:.1f}\n"
-                                result += f"Protein: {protein:.1f}g"
-                        else:
-                            # Just show the entry's values for past entries
-                            result += f"\nEntry added with:\n"
-                            result += f"Calories: {calories:.1f}\n"
-                            result += f"Protein: {protein:.1f}g"
-                except Exception as e:
-                    result = ZettlFormatter.error(str(e))
-            else:
-                # If no options specified, show today's summary as default behavior
-                try:
-                    result = tracker.format_today_summary()
-                except Exception as e:
-                    result = ZettlFormatter.error(str(e))         
 
         else:
             result = f"Unknown command: {cmd}. Try 'help' for available commands."

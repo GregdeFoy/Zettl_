@@ -100,10 +100,6 @@ class CommandHelp:
     [blue]→[/blue] zettl llm 22a4b --action tags | connect | expand | concepts | questions | critique
 
 [bold]SPECIALIZED FEATURES[/bold]
-  [bold yellow]nutrition[/bold yellow] / [bold yellow]nut[/bold yellow]   Track calories and protein
-    [blue]→[/blue] zettl nut "Breakfast cal: 500 prot: 25"
-    [blue]→[/blue] zettl nutrition --today --history --days 14
-
   [bold yellow]rules[/bold yellow]               Display random rule from notes
     [blue]→[/blue] zettl rules --source
 
@@ -495,52 +491,6 @@ For detailed help on any command: [cyan]zettl COMMAND --help[/cyan]
 [bold]Examples:[/bold]
   [blue]zettl rules[/blue]
   [blue]zettl rules --source[/blue]  # Show the source note ID
-""",
-
-            "nutrition": f"""
-[bold green]nutrition[/bold] - Track and analyze nutrition data (calories and protein)
-
-[bold]Usage:[/bold]
-  zettl nutrition "Food description cal: XXX prot: YYY"  # Add new entry
-  zettl nutrition --today                                # Show today's summary
-  zettl nutrition --history                              # Show nutrition history
-
-[bold]Options:[/bold]
-  [yellow]-t, --today[/yellow]       Show today's nutrition summary
-  [yellow]-i, --history[/yellow]     Show nutrition history
-  [yellow]-d, --days NUMBER[/yellow] Number of days to show in history (default: 7)
-  [yellow]-p, --past DATE[/yellow]   Add an entry for a past date (YYYY-MM-DD format)
-
-[bold]Examples:[/bold]
-  [blue]zettl nutrition "Breakfast cal: 500 prot: 25"[/blue]
-  [blue]zettl nutrition "Dinner cal: 800 prot: 40" --past 2025-04-05[/blue]
-  [blue]zettl nutrition --today[/blue]
-  [blue]zettl nutrition --history --days 14[/blue]
-  
-[bold]Shorthand:[/bold]
-  You can use the alias 'nut' instead of 'nutrition'
-  [blue]zettl nut "Lunch cal: 700 prot: 35"[/blue]
-""",
-
-            "nut": f"""
-[bold green]nut[/bold] - Track and analyze nutrition data (alias for 'nutrition')
-
-[bold]Usage:[/bold]
-  zettl nut "Food description cal: XXX prot: YYY"  # Add new entry
-  zettl nut --today                                # Show today's summary
-  zettl nut --history                              # Show nutrition history
-
-[bold]Options:[/bold]
-  [yellow]-t, --today[/yellow]       Show today's nutrition summary
-  [yellow]-i, --history[/yellow]     Show nutrition history
-  [yellow]-d, --days NUMBER[/yellow] Number of days to show in history (default: 7)
-  [yellow]-p, --past DATE[/yellow]   Add an entry for a past date (YYYY-MM-DD format)
-
-[bold]Examples:[/bold]
-  [blue]zettl nut "Breakfast cal: 500 prot: 25"[/blue]
-  [blue]zettl nut "Dinner cal: 800 prot: 40" --past 2025-04-05[/blue]
-  [blue]zettl nut --today[/blue]
-  [blue]zettl nut --history --days 14[/blue]
 """,
 
             "help": f"""
