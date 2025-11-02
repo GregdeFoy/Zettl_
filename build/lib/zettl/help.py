@@ -39,11 +39,23 @@ class CommandHelp:
     def get_main_help(cls):
         """Return the main help text."""
         help_text = f"""
-[bold green]zettl v0.1.0[/bold] - A Zettelkasten-style note-taking tool
+[bold green]zettl v0.1.0[/bold green] - A Zettelkasten-style note-taking tool
 
 [bold]NOTE MANAGEMENT[/bold]
   [bold yellow]new[/bold yellow] / [bold yellow]add[/bold yellow]          Create a new note
     [blue]→[/blue] zettl new "Your note content" --tag concept --link 22a4b
+
+  [bold yellow]t[/bold yellow] / [bold yellow]task[/bold yellow]            Create a new task (auto-tagged 'task', 'todo')
+    [blue]→[/blue] zettl t "Call dentist" @project-health --id task-001
+
+  [bold yellow]i[/bold yellow] / [bold yellow]idea[/bold yellow]            Create a new idea (auto-tagged 'idea')
+    [blue]→[/blue] zettl i "Add caching layer" @dev-project
+
+  [bold yellow]n[/bold yellow] / [bold yellow]note[/bold yellow]            Create a new note (auto-tagged 'note')
+    [blue]→[/blue] zettl n "Meeting notes" @work-project
+
+  [bold yellow]p[/bold yellow] / [bold yellow]project[/bold yellow]         Create a new project (auto-tagged 'project')
+    [blue]→[/blue] zettl p "Learn Rust" --id learn-rust
 
   [bold yellow]show[/bold yellow]                Display full note content
     [blue]→[/blue] zettl show 22a4b
@@ -116,10 +128,12 @@ class CommandHelp:
 
 [bold]GETTING STARTED[/bold]
   1. Set up authentication:     [cyan]zettl auth setup[/cyan]
-  2. Create your first note:    [cyan]zettl new "My first note" --tag idea[/cyan]
-  3. List your notes:           [cyan]zettl list[/cyan]
-  4. Create connections:        [cyan]zettl link NOTE_ID1 NOTE_ID2[/cyan]
-  5. Get AI suggestions:        [cyan]zettl llm NOTE_ID --action tags[/cyan]
+  2. Create a project:          [cyan]zettl p "My Project" --id my-project[/cyan]
+  3. Add tasks to project:      [cyan]zettl t "First task" @my-project[/cyan]
+  4. Capture ideas:            [cyan]zettl i "Great idea!" @my-project[/cyan]
+  5. List your notes:          [cyan]zettl list[/cyan]
+  6. View todos:               [cyan]zettl todos[/cyan]
+  7. Get AI suggestions:       [cyan]zettl llm NOTE_ID --action tags[/cyan]
 
 For detailed help on any command: [cyan]zettl COMMAND --help[/cyan]
 """
@@ -181,6 +195,109 @@ For detailed help on any command: [cyan]zettl COMMAND --help[/cyan]
   [blue]zettl add "Note with tag" -t important[/blue]
   [blue]zettl add "Note with multiple tags" -t concept -t research[/blue]
   [blue]zettl add "Linked note" --link 22a4b[/blue]
+""",
+
+            "task": f"""
+[bold green]task [CONTENT][/bold green] - Create a new task (automatically tagged with 'task' and 'todo')
+
+[bold]Usage:[/bold]
+  zettl task "Your task description"
+  zettl t "Your task description"  # Shortcut
+
+[bold]Options:[/bold]
+  [yellow]-t, --tag TAG[/yellow]       Add additional tags to the task
+  [yellow]-l, --link NOTE_ID[/yellow]  Create a link to another note
+  [yellow]--id CUSTOM_ID[/yellow]      Use a custom ID instead of auto-generated one
+  [yellow]@PROJECT_ID[/yellow]         Link to a project (use @ notation in content)
+
+[bold]Examples:[/bold]
+  [blue]zettl t "Review pull request"[/blue]
+  [blue]zettl task "Call dentist" @health-project[/blue]
+  [blue]zettl t "Fix bug #123" @dev --id bug-123[/blue]
+  [blue]zettl task "Write tests" @backend @frontend -t urgent[/blue]
+""",
+
+            "t": f"""
+[bold green]t [CONTENT][/bold green] - Shortcut for 'task' command
+
+See 'zettl task --help' for full documentation.
+""",
+
+            "idea": f"""
+[bold green]idea [CONTENT][/bold green] - Create a new idea (automatically tagged with 'idea')
+
+[bold]Usage:[/bold]
+  zettl idea "Your idea description"
+  zettl i "Your idea description"  # Shortcut
+
+[bold]Options:[/bold]
+  [yellow]-t, --tag TAG[/yellow]       Add additional tags to the idea
+  [yellow]-l, --link NOTE_ID[/yellow]  Create a link to another note
+  [yellow]--id CUSTOM_ID[/yellow]      Use a custom ID instead of auto-generated one
+  [yellow]@PROJECT_ID[/yellow]         Link to a project (use @ notation in content)
+
+[bold]Examples:[/bold]
+  [blue]zettl i "Add caching layer for better performance"[/blue]
+  [blue]zettl idea "Redesign UI" @frontend-project[/blue]
+  [blue]zettl i "Try new algorithm" @research --id algo-001[/blue]
+""",
+
+            "i": f"""
+[bold green]i [CONTENT][/bold green] - Shortcut for 'idea' command
+
+See 'zettl idea --help' for full documentation.
+""",
+
+            "note": f"""
+[bold green]note [CONTENT][/bold green] - Create a new note (automatically tagged with 'note')
+
+[bold]Usage:[/bold]
+  zettl note "Your note content"
+  zettl n "Your note content"  # Shortcut
+
+[bold]Options:[/bold]
+  [yellow]-t, --tag TAG[/yellow]       Add additional tags to the note
+  [yellow]-l, --link NOTE_ID[/yellow]  Create a link to another note
+  [yellow]--id CUSTOM_ID[/yellow]      Use a custom ID instead of auto-generated one
+  [yellow]@PROJECT_ID[/yellow]         Link to a project (use @ notation in content)
+
+[bold]Examples:[/bold]
+  [blue]zettl n "Meeting notes from standup"[/blue]
+  [blue]zettl note "Architecture decisions" @dev-project[/blue]
+  [blue]zettl n "Research findings" @research --id research-001[/blue]
+""",
+
+            "n": f"""
+[bold green]n [CONTENT][/bold green] - Shortcut for 'note' command
+
+See 'zettl note --help' for full documentation.
+""",
+
+            "project": f"""
+[bold green]project [CONTENT][/bold green] - Create a new project (automatically tagged with 'project')
+
+[bold]Usage:[/bold]
+  zettl project "Project name/description"
+  zettl p "Project name/description"  # Shortcut
+
+[bold]Options:[/bold]
+  [yellow]-t, --tag TAG[/yellow]       Add additional tags to the project
+  [yellow]-l, --link NOTE_ID[/yellow]  Create a link to another note
+  [yellow]--id CUSTOM_ID[/yellow]      Use a custom, memorable ID (recommended for projects)
+
+[bold]Examples:[/bold]
+  [blue]zettl p "Learn Rust" --id learn-rust[/blue]
+  [blue]zettl project "Q1 Planning" --id q1-2024[/blue]
+  [blue]zettl p "Website Redesign" --id web-redesign -t urgent[/blue]
+
+[bold]Note:[/bold] Projects serve as organizational containers. Use custom IDs to make
+them easy to reference when creating tasks, ideas, and notes with @project-id.
+""",
+
+            "p": f"""
+[bold green]p [CONTENT][/bold green] - Shortcut for 'project' command
+
+See 'zettl project --help' for full documentation.
 """,
 
             "list": f"""

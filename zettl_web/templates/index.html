@@ -1035,12 +1035,157 @@ document.addEventListener('DOMContentLoaded', function() {
         const llmActions = ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'];
     }
 
-    
+    // Project ID cache for autocomplete
+    let projectCache = [];
+    let projectCacheTime = 0;
+    const PROJECT_CACHE_TTL = 300000; // 5 minutes in ms
+
+    // Autocomplete state
+    let autocompleteActive = false;
+    let autocompleteIndex = 0;
+    let autocompleteStart = 0;
+
+    // Function to fetch and cache project IDs
+    async function fetchProjectIds() {
+        const now = Date.now();
+        if (projectCache.length > 0 && now - projectCacheTime < PROJECT_CACHE_TTL) {
+            return projectCache;
+        }
+
+        try {
+            const response = await fetch('/api/command', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ command: 'search -t project' })
+            });
+            const data = await response.json();
+
+            if (data.success && data.result) {
+                // Parse the result to extract project IDs
+                const projects = [];
+                const lines = data.result.split('\n');
+                lines.forEach(line => {
+                    // Match lines like "#project-id: content"
+                    const match = line.match(/#([^:]+):\s*(.+)/);
+                    if (match) {
+                        projects.push({
+                            id: match[1],
+                            content: match[2].substring(0, 50) // First 50 chars
+                        });
+                    }
+                });
+                projectCache = projects;
+                projectCacheTime = now;
+                return projects;
+            }
+        } catch (e) {
+            console.error('Failed to fetch project IDs:', e);
+        }
+        return [];
+    }
+
+    // Create autocomplete dropdown element
+    const autocompleteDropdown = document.createElement('div');
+    autocompleteDropdown.id = 'autocomplete-dropdown';
+    autocompleteDropdown.style.cssText = `
+        position: absolute;
+        display: none;
+        background: #2a2a2a;
+        border: 1px solid #555;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    `;
+    document.body.appendChild(autocompleteDropdown);
+
+    // Function to show autocomplete dropdown
+    function showAutocomplete(projects, searchTerm) {
+        if (projects.length === 0) return;
+
+        const rect = commandInput.getBoundingClientRect();
+        autocompleteDropdown.style.left = rect.left + 'px';
+        autocompleteDropdown.style.top = (rect.bottom + 2) + 'px';
+        autocompleteDropdown.style.width = Math.min(400, rect.width) + 'px';
+        autocompleteDropdown.innerHTML = '';
+
+        // Filter projects based on search term
+        const filtered = projects.filter(p =>
+            p.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.content.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+
+        if (filtered.length === 0) {
+            hideAutocomplete();
+            return;
+        }
+
+        filtered.forEach((project, index) => {
+            const item = document.createElement('div');
+            item.style.cssText = `
+                padding: 8px 12px;
+                cursor: pointer;
+                color: #f0f0f0;
+                ${index === autocompleteIndex ? 'background: #444;' : ''}
+            `;
+            item.innerHTML = `
+                <code style="color: #4a9eff; font-weight: bold;">${escapeHtml(project.id)}</code>
+                <span style="color: #888; font-size: 0.9em; margin-left: 8px;">${escapeHtml(project.content)}...</span>
+            `;
+            item.addEventListener('click', () => selectAutocomplete(project.id));
+            item.addEventListener('mouseenter', () => {
+                autocompleteIndex = index;
+                updateAutocompleteHighlight();
+            });
+            autocompleteDropdown.appendChild(item);
+        });
+
+        autocompleteDropdown.style.display = 'block';
+        autocompleteActive = true;
+    }
+
+    // Function to hide autocomplete
+    function hideAutocomplete() {
+        autocompleteDropdown.style.display = 'none';
+        autocompleteActive = false;
+        autocompleteIndex = 0;
+    }
+
+    // Function to select autocomplete item
+    function selectAutocomplete(projectId) {
+        const text = commandInput.value;
+        const beforeAt = text.substring(0, autocompleteStart);
+        const afterCursor = text.substring(commandInput.selectionStart);
+        commandInput.value = beforeAt + '@' + projectId + ' ' + afterCursor.replace(/^[^\s]*/, '');
+        commandInput.selectionStart = commandInput.selectionEnd = beforeAt.length + projectId.length + 2;
+        hideAutocomplete();
+        commandInput.focus();
+        autoResizeTextarea();
+        updateShortcutButtons();
+    }
+
+    // Function to update autocomplete highlight
+    function updateAutocompleteHighlight() {
+        const items = autocompleteDropdown.querySelectorAll('div');
+        items.forEach((item, index) => {
+            item.style.background = index === autocompleteIndex ? '#444' : 'transparent';
+        });
+    }
+
     // Command to options mapping - for dynamic buttons
     const commandOptions = {
         'list': ['-l', '--limit', '-f', '--full', '-c', '--compact', '-h', '--help'],
         'new': ['-t', '--tag', '-l', '--link', '-h', '--help'],
         'add': ['-t', '--tag', '-l', '--link', '-h', '--help'],
+        'task': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
+        't': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
+        'idea': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
+        'i': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
+        'note': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
+        'n': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
+        'project': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
+        'p': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
         'show': ['-h', '--help'],
         'search': ['-t', '--tag', '+t', '--exclude-tag', '-f', '--full', '-h', '--help'],
         'tags': ['-h', '--help'],
@@ -1061,7 +1206,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // For commands that need auto-quotes
-    const autoQuoteCommands = ['new', 'add'];
+    const autoQuoteCommands = ['new', 'add', 't', 'task', 'i', 'idea', 'n', 'note', 'p', 'project'];
 
     // Sub-options for commands like llm
     const subOptions = {
@@ -1076,7 +1221,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Top-level commands for initial buttons (organized by category)
     const topLevelCommands = [
         // Note Creation/Editing
-        'new', 'edit', 'append', 'prepend', 'delete',
+        'new', 't', 'i', 'n', 'p', 'edit', 'append', 'prepend', 'delete',
         // Viewing
         'show', 'list', 'search',
         // Organization
@@ -1280,7 +1425,39 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Auto-resize the textarea whenever input changes
-    commandInput.addEventListener('input', autoResizeTextarea);
+    commandInput.addEventListener('input', function(e) {
+        autoResizeTextarea();
+
+        // Check for @ symbol to trigger project autocomplete
+        const text = commandInput.value;
+        const cursorPos = commandInput.selectionStart;
+
+        // Find if there's an @ symbol before the cursor
+        let atIndex = -1;
+        for (let i = cursorPos - 1; i >= 0; i--) {
+            if (text[i] === '@') {
+                atIndex = i;
+                break;
+            } else if (text[i] === ' ' || text[i] === '\n') {
+                break;
+            }
+        }
+
+        if (atIndex >= 0) {
+            // Extract the search term after @
+            const searchTerm = text.substring(atIndex + 1, cursorPos);
+            if (!searchTerm.includes(' ')) {
+                autocompleteStart = atIndex;
+                fetchProjectIds().then(projects => {
+                    showAutocomplete(projects, searchTerm);
+                });
+            } else {
+                hideAutocomplete();
+            }
+        } else {
+            hideAutocomplete();
+        }
+    });
     
     // Load button preferences from settings
     loadButtonPreferences();
@@ -1293,16 +1470,56 @@ document.addEventListener('DOMContentLoaded', function() {
         commandInput.focus();
         autoResizeTextarea();
     }, 300);
+
+    // Hide autocomplete when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!commandInput.contains(e.target) && !autocompleteDropdown.contains(e.target)) {
+            hideAutocomplete();
+        }
+    });
     
     // Handle keyboard events for command input - updated for textarea
     commandInput.addEventListener('keydown', function(e) {
+        // Handle autocomplete navigation
+        if (autocompleteActive) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const items = autocompleteDropdown.querySelectorAll('div');
+                autocompleteIndex = Math.min(autocompleteIndex + 1, items.length - 1);
+                updateAutocompleteHighlight();
+                return;
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                autocompleteIndex = Math.max(autocompleteIndex - 1, 0);
+                updateAutocompleteHighlight();
+                return;
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                const items = autocompleteDropdown.querySelectorAll('div');
+                if (items[autocompleteIndex]) {
+                    const projectId = projectCache.filter(p =>
+                        p.id.toLowerCase().includes(commandInput.value.substring(autocompleteStart + 1, commandInput.selectionStart).toLowerCase()) ||
+                        p.content.toLowerCase().includes(commandInput.value.substring(autocompleteStart + 1, commandInput.selectionStart).toLowerCase())
+                    )[autocompleteIndex]?.id;
+                    if (projectId) {
+                        selectAutocomplete(projectId);
+                    }
+                }
+                return;
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                hideAutocomplete();
+                return;
+            }
+        }
+
         // Enter key submits command (without Shift)
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             executeCommand(commandInput.value);
         }
         // Up arrow for previous command - only when textarea is on first line
-        else if (e.key === 'ArrowUp' && commandInput.selectionStart === 0) {
+        else if (e.key === 'ArrowUp' && commandInput.selectionStart === 0 && !autocompleteActive) {
             e.preventDefault();
             if (historyIndex > 0) {
                 historyIndex--;
@@ -1316,7 +1533,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         // Down arrow for next command - only when textarea is on last line
-        else if (e.key === 'ArrowDown' && commandInput.selectionStart === commandInput.value.length) {
+        else if (e.key === 'ArrowDown' && commandInput.selectionStart === commandInput.value.length && !autocompleteActive) {
             e.preventDefault();
             if (historyIndex < commandHistory.length) {
                 historyIndex++;

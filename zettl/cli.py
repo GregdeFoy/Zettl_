@@ -18,6 +18,7 @@ import re
 import random
 from zettl.help import CommandHelp
 from zettl.auth import auth as zettl_auth
+from datetime import datetime as dt
 
 # Ensure formatter is in CLI mode
 ZettlFormatter.set_mode('cli')
@@ -37,15 +38,44 @@ def get_llm_helper():
     api_key = zettl_auth.require_auth()
     return LLMHelper(api_key=api_key)
 
+# Helper function to parse @ notation for project linking
+def parse_project_links(content):
+    """Extract @project references from content and return cleaned content and project IDs."""
+    pattern = r'@(\S+)'
+    project_ids = re.findall(pattern, content)
+    # Remove @ references from content
+    cleaned_content = re.sub(pattern, '', content).strip()
+    return cleaned_content, project_ids
+
 # Define the function that both commands will use
-def create_new_note(content, tag, link=None):
+def create_new_note(content, tag, link=None, custom_id=None, auto_tags=None):
     """Create a new note with the given content and optional tags."""
     try:
         notes_manager = get_notes_manager()
-        note_id = notes_manager.create_note(content)
+
+        # Parse @ notation for project links
+        cleaned_content, project_ids = parse_project_links(content)
+
+        # Create note with custom ID if provided
+        if custom_id:
+            # Use create_note_with_timestamp to set custom ID
+            now = dt.now().isoformat()
+            note_id = notes_manager.create_note_with_timestamp(cleaned_content, now, custom_id)
+        else:
+            note_id = notes_manager.create_note(cleaned_content)
+
         click.echo(f"Created note #{note_id}")
 
-        # Add tags if provided
+        # Add auto-tags first (e.g., 'task', 'idea', 'note', 'project')
+        if auto_tags:
+            for t in auto_tags:
+                try:
+                    notes_manager.add_tag(note_id, t)
+                    click.echo(f"Added tag '{t}' to note #{note_id}")
+                except Exception as e:
+                    click.echo(f"Warning: Could not add tag '{t}': {str(e)}", err=True)
+
+        # Add user-provided tags
         if tag:
             for t in tag:
                 try:
@@ -54,7 +84,15 @@ def create_new_note(content, tag, link=None):
                 except Exception as e:
                     click.echo(f"Warning: Could not add tag '{t}': {str(e)}", err=True)
 
-        # Create link if provided
+        # Create links to projects referenced with @ notation
+        for project_id in project_ids:
+            try:
+                notes_manager.create_link(note_id, project_id)
+                click.echo(f"Created link from #{note_id} to project #{project_id}")
+            except Exception as e:
+                click.echo(f"Warning: Could not create link to project #{project_id}: {str(e)}", err=True)
+
+        # Create link if provided via -l option
         if link:
             try:
                 notes_manager.create_link(note_id, link)
@@ -148,7 +186,7 @@ def show_help_callback(ctx, param, value):
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def new(content, tag, link):
     """Create a new note with the given content and optional tags."""
-    create_new_note(content, tag, link)
+    create_new_note(content, tag, link, custom_id=None, auto_tags=None)
 
 @cli.command()
 @click.argument('content')
@@ -157,7 +195,95 @@ def new(content, tag, link):
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def add(content, tag, link):
     """Create a new note with the given content and optional tags. Alias for 'new'."""
-    create_new_note(content, tag, link)
+    create_new_note(content, tag, link, custom_id=None, auto_tags=None)
+
+# Task command with shortcut 't'
+@cli.command(name='task')
+@click.argument('content')
+@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the task')
+@click.option('--id', 'custom_id', help='Custom ID for the task (must be unique)')
+@click.option('--link', '-l', help='Note ID to link this task to')
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def task_cmd(content, tag, custom_id, link):
+    """Create a new task (automatically tagged with 'task' and 'todo')."""
+    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['task', 'todo'])
+
+# Shortcut for task
+@cli.command(name='t')
+@click.argument('content')
+@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the task')
+@click.option('--id', 'custom_id', help='Custom ID for the task (must be unique)')
+@click.option('--link', '-l', help='Note ID to link this task to')
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def t_cmd(content, tag, custom_id, link):
+    """Create a new task (shortcut for 'task' command)."""
+    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['task', 'todo'])
+
+# Idea command with shortcut 'i'
+@cli.command(name='idea')
+@click.argument('content')
+@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the idea')
+@click.option('--id', 'custom_id', help='Custom ID for the idea (must be unique)')
+@click.option('--link', '-l', help='Note ID to link this idea to')
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def idea_cmd(content, tag, custom_id, link):
+    """Create a new idea (automatically tagged with 'idea')."""
+    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['idea'])
+
+# Shortcut for idea
+@cli.command(name='i')
+@click.argument('content')
+@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the idea')
+@click.option('--id', 'custom_id', help='Custom ID for the idea (must be unique)')
+@click.option('--link', '-l', help='Note ID to link this idea to')
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def i_cmd(content, tag, custom_id, link):
+    """Create a new idea (shortcut for 'idea' command)."""
+    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['idea'])
+
+# Note command with shortcut 'n'
+@cli.command(name='note')
+@click.argument('content')
+@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the note')
+@click.option('--id', 'custom_id', help='Custom ID for the note (must be unique)')
+@click.option('--link', '-l', help='Note ID to link this note to')
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def note_cmd(content, tag, custom_id, link):
+    """Create a new note (automatically tagged with 'note')."""
+    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['note'])
+
+# Shortcut for note
+@cli.command(name='n')
+@click.argument('content')
+@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the note')
+@click.option('--id', 'custom_id', help='Custom ID for the note (must be unique)')
+@click.option('--link', '-l', help='Note ID to link this note to')
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def n_cmd(content, tag, custom_id, link):
+    """Create a new note (shortcut for 'note' command)."""
+    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['note'])
+
+# Project command with shortcut 'p'
+@cli.command(name='project')
+@click.argument('content')
+@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the project')
+@click.option('--id', 'custom_id', help='Custom ID for the project (must be unique, e.g., "learn-rust")')
+@click.option('--link', '-l', help='Note ID to link this project to')
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def project_cmd(content, tag, custom_id, link):
+    """Create a new project (automatically tagged with 'project')."""
+    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['project'])
+
+# Shortcut for project
+@cli.command(name='p')
+@click.argument('content')
+@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the project')
+@click.option('--id', 'custom_id', help='Custom ID for the project (must be unique, e.g., "learn-rust")')
+@click.option('--link', '-l', help='Note ID to link this project to')
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def p_cmd(content, tag, custom_id, link):
+    """Create a new project (shortcut for 'project' command)."""
+    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['project'])
 
 # Update the list command
 @cli.command()
