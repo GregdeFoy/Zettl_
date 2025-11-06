@@ -66,23 +66,28 @@ def create_new_note(content, tag, link=None, custom_id=None, auto_tags=None):
 
         click.echo(f"Created note #{note_id}")
 
-        # Add auto-tags first (e.g., 'task', 'idea', 'note', 'project')
+        # Collect all tags to add
+        all_tags = []
         if auto_tags:
-            for t in auto_tags:
-                try:
-                    notes_manager.add_tag(note_id, t)
-                    click.echo(f"Added tag '{t}' to note #{note_id}")
-                except Exception as e:
-                    click.echo(f"Warning: Could not add tag '{t}': {str(e)}", err=True)
-
-        # Add user-provided tags
+            all_tags.extend(auto_tags)
         if tag:
-            for t in tag:
-                try:
-                    notes_manager.add_tag(note_id, t)
+            all_tags.extend(tag)
+
+        # Batch add all tags at once
+        if all_tags:
+            try:
+                notes_manager.add_tags_batch(note_id, all_tags)
+                for t in all_tags:
                     click.echo(f"Added tag '{t}' to note #{note_id}")
-                except Exception as e:
-                    click.echo(f"Warning: Could not add tag '{t}': {str(e)}", err=True)
+            except Exception as e:
+                # If batch fails, fall back to individual tags
+                click.echo(f"Warning: Batch tag insertion failed, trying individually: {str(e)}", err=True)
+                for t in all_tags:
+                    try:
+                        notes_manager.add_tag(note_id, t)
+                        click.echo(f"Added tag '{t}' to note #{note_id}")
+                    except Exception as e:
+                        click.echo(f"Warning: Could not add tag '{t}': {str(e)}", err=True)
 
         # Create links to projects referenced with @ notation
         for project_id in project_ids:
@@ -178,24 +183,6 @@ def show_help_callback(ctx, param, value):
     if value and not ctx.resilient_parsing:
         console.print(CommandHelp.get_command_help(ctx.info_name))
         ctx.exit()
-
-@cli.command()
-@click.argument('content')
-@click.option('--tag', '-t', multiple=True, help='Tag(s) to add to the new note')
-@click.option('--link', '-l', help='Note ID to link this note to')
-@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def new(content, tag, link):
-    """Create a new note with the given content and optional tags."""
-    create_new_note(content, tag, link, custom_id=None, auto_tags=None)
-
-@cli.command()
-@click.argument('content')
-@click.option('--tag', '-t', multiple=True, help='Tag(s) to add to the new note')
-@click.option('--link', '-l', help='Note ID to link this note to')
-@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def add(content, tag, link):
-    """Create a new note with the given content and optional tags. Alias for 'new'."""
-    create_new_note(content, tag, link, custom_id=None, auto_tags=None)
 
 # Task command with shortcut 't'
 @cli.command(name='task')
@@ -295,32 +282,48 @@ def list(limit, full, compact):
     """List recent notes with formatting options."""
 
     try:
-        notes = get_notes_manager().list_notes(limit)
+        notes_manager = get_notes_manager()
+        notes = notes_manager.list_notes(limit)
         if not notes:
             click.echo("No notes found.")
             return
-            
+
         console.print(ZettlFormatter.header(f"Recent Notes (showing {len(notes)} of {len(notes)})"))
-        
+
+        # If full mode, batch fetch all tags for all notes at once
+        notes_tags = {}
+        if full:
+            # Get all note IDs
+            note_ids = [note['id'] for note in notes]
+            # Batch fetch all tags for these notes
+            if note_ids:
+                try:
+                    all_tags = notes_manager.db.get_tags_for_notes(note_ids)
+                    # Group tags by note_id
+                    for tag_data in all_tags:
+                        note_id = tag_data['note_id']
+                        if note_id not in notes_tags:
+                            notes_tags[note_id] = []
+                        notes_tags[note_id].append(tag_data['tag'])
+                except Exception:
+                    pass  # Fall back to no tags if batch fetch fails
+
         for note in notes:
             note_id = note['id']
-            created_at = get_notes_manager().format_timestamp(note['created_at'])
-            
+            created_at = notes_manager.format_timestamp(note['created_at'])
+
             if compact:
                 # Very compact mode - just IDs
                 console.print(ZettlFormatter.note_id(note_id))
             elif full:
                 # Full content mode
-                console.print(ZettlFormatter.format_note_display(note, get_notes_manager()))
-                
-                # Add tags if there are any
-                try:
-                    tags = get_notes_manager().get_tags(note_id)
-                    if tags:
-                        console.print(f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}")
-                except Exception:
-                    pass
-                
+                console.print(ZettlFormatter.format_note_display(note, notes_manager))
+
+                # Add tags if there are any (already fetched)
+                tags = notes_tags.get(note_id, [])
+                if tags:
+                    console.print(f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}")
+
                 click.echo()  # Extra line between notes
             else:
                 # Default mode - ID, timestamp, and preview

@@ -42,9 +42,6 @@ class CommandHelp:
 [bold green]zettl v0.1.0[/bold green] - A Zettelkasten-style note-taking tool
 
 [bold]NOTE MANAGEMENT[/bold]
-  [bold yellow]new[/bold yellow] / [bold yellow]add[/bold yellow]          Create a new note
-    [blue]→[/blue] zettl new "Your note content" --tag concept --link 22a4b
-
   [bold yellow]t[/bold yellow] / [bold yellow]task[/bold yellow]            Create a new task (auto-tagged 'task', 'todo')
     [blue]→[/blue] zettl t "Call dentist" @project-health --id task-001
 
@@ -161,40 +158,6 @@ For detailed help on any command: [cyan]zettl COMMAND --help[/cyan]
   The auth command manages your API key authentication. You need to set up
   authentication before using most zettl commands. Get your API key from
   the Zettl web interface.
-""",
-
-            "new": f"""
-[bold green]new [CONTENT][/bold] - Create a new note with the given content
-
-[bold]Usage:[/bold]
-  zettl new "Your note content here"
-
-[bold]Options:[/bold]
-  [yellow]-t, --tag TAG[/yellow]       Add one or more tags to the note (can be used multiple times)
-  [yellow]-l, --link NOTE_ID[/yellow]  Create a link to another note
-
-[bold]Examples:[/bold]
-  [blue]zettl new "This is a new note"[/blue]
-  [blue]zettl new "Note with tag" -t important[/blue]
-  [blue]zettl new "Note with multiple tags" -t concept -t research[/blue]
-  [blue]zettl new "Linked note" --link 22a4b[/blue]
-""",
-
-            "add": f"""
-[bold green]add [CONTENT][/bold] - Create a new note with the given content (alias for 'new')
-
-[bold]Usage:[/bold]
-  zettl add "Your note content here"
-
-[bold]Options:[/bold]
-  [yellow]-t, --tag TAG[/yellow]       Add one or more tags to the note (can be used multiple times)
-  [yellow]-l, --link NOTE_ID[/yellow]  Create a link to another note
-
-[bold]Examples:[/bold]
-  [blue]zettl add "This is a new note"[/blue]
-  [blue]zettl add "Note with tag" -t important[/blue]
-  [blue]zettl add "Note with multiple tags" -t concept -t research[/blue]
-  [blue]zettl add "Linked note" --link 22a4b[/blue]
 """,
 
             "task": f"""

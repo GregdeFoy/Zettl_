@@ -35,6 +35,10 @@ class Notes:
     def add_tag(self, note_id: str, tag: str) -> str:
         """Add a tag to a note."""
         return self.db.add_tag(note_id, tag)
+
+    def add_tags_batch(self, note_id: str, tags: List[str]) -> None:
+        """Add multiple tags to a note in a single request."""
+        return self.db.add_tags_batch(note_id, tags)
         
     def get_tags(self, note_id: str) -> List[str]:
         """Get all tags for a note."""
@@ -68,9 +72,9 @@ class Notes:
         """Get note IDs for tags created today."""
         return self.db.get_tags_created_today(tag)
 
-    def delete_note(self, note_id: str, cascade: bool = True) -> None:
+    def delete_note(self, note_id: str, cascade: bool = True, force: bool = False) -> None:
         """Delete a note and optionally its associated tags and links."""
-        return self.db.delete_note(note_id, cascade)
+        return self.db.delete_note(note_id, cascade, force)
         
     def delete_note_tags(self, note_id: str) -> None:
         """Delete all tags associated with a note."""

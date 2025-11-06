@@ -58,10 +58,68 @@ class Database:
         self.auth_url = AUTH_URL
         self.jwt_token = jwt_token
         self.api_key = api_key
+        self._jwt_cache_file = None
+        self._jwt_cache_key = None
+
+        # Set up JWT caching if using API key
+        if self.api_key:
+            from pathlib import Path
+            import hashlib
+            cache_dir = Path.home() / '.zettl' / 'cache'
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            # Use hashed API key as cache filename
+            key_hash = hashlib.sha256(self.api_key.encode()).hexdigest()[:16]
+            self._jwt_cache_file = cache_dir / f'jwt_{key_hash}'
+            self._jwt_cache_key = self.api_key
+
+            # Try to load cached JWT
+            self._load_cached_jwt()
 
     def invalidate_cache(self, prefix=None):
         """Instance method that calls the module-level function."""
         invalidate_cache(prefix)
+
+    def _load_cached_jwt(self):
+        """Load JWT from cache if available and valid."""
+        if not self._jwt_cache_file or not self._jwt_cache_file.exists():
+            return False
+
+        try:
+            import json
+            with open(self._jwt_cache_file, 'r') as f:
+                cache_data = json.load(f)
+
+            # Check if cache is for the same API key and not expired
+            if cache_data.get('api_key') == self._jwt_cache_key:
+                # JWT tokens are typically valid for hours/days
+                # Check if cached less than 1 hour ago
+                if time.time() - cache_data.get('timestamp', 0) < 3600:
+                    self.jwt_token = cache_data.get('jwt_token')
+                    return True
+        except Exception:
+            pass
+
+        return False
+
+    def _save_jwt_to_cache(self):
+        """Save JWT token to cache."""
+        if not self._jwt_cache_file or not self.jwt_token:
+            return
+
+        try:
+            import json
+            import os
+            cache_data = {
+                'api_key': self._jwt_cache_key,
+                'jwt_token': self.jwt_token,
+                'timestamp': time.time()
+            }
+            with open(self._jwt_cache_file, 'w') as f:
+                json.dump(cache_data, f)
+            # Set restrictive permissions
+            os.chmod(self._jwt_cache_file, 0o600)
+        except Exception:
+            pass
 
     def _get_jwt_from_api_key(self):
         """Convert API key to JWT token via auth service."""
@@ -74,6 +132,8 @@ class Database:
                                    timeout=5)
             if response.status_code == 200:
                 self.jwt_token = response.json().get('token')
+                # Save the JWT to cache for future use
+                self._save_jwt_to_cache()
         except requests.RequestException:
             # API key authentication failed, will result in 401 errors
             pass
@@ -252,9 +312,6 @@ class Database:
         Raises:
             Exception: If note update fails
         """
-        # Verify the note exists first
-        self.get_note(note_id)
-
         # Get current time
         now = self._get_iso_timestamp()
 
@@ -268,8 +325,22 @@ class Database:
 
         try:
             response = self._make_request('PATCH', 'notes', data=update_data, params=params)
-        except Exception as e:
+            # Check if any rows were affected
+            if response.status_code == 204:
+                # Success - note was updated
+                pass
+            elif response.status_code == 200:
+                # Check if empty result (note not found)
+                if not response.json():
+                    raise Exception(f"Note {note_id} not found")
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                raise Exception(f"Note {note_id} not found")
             raise Exception(f"Failed to update note - Request failed: {str(e)}")
+        except Exception as e:
+            if "not found" not in str(e).lower():
+                raise Exception(f"Failed to update note - Request failed: {str(e)}")
+            raise
 
         # Invalidate relevant caches
         invalidate_cache(f"note:{note_id}")
@@ -397,14 +468,27 @@ class Database:
             set_in_cache(cache_key, [], ttl=300)
             return []
 
-        # Fetch all related notes, using cache when possible
-        related_notes = []
-        for related_id in related_ids:
-            try:
-                note = self.get_note(related_id)
-                related_notes.append(note)
-            except Exception:
-                continue
+        # Batch fetch all related notes in a single request
+        # Use PostgREST's IN operator to fetch multiple notes at once
+        ids_str = ','.join(related_ids)
+        params = {'id': f'in.({ids_str})'}
+
+        try:
+            response = self._make_request('GET', 'notes', params=params)
+            related_notes = response.json() or []
+
+            # Also cache individual notes
+            for note in related_notes:
+                set_in_cache(f"note:{note['id']}", note, ttl=600)
+        except Exception:
+            # Fallback to individual fetching if batch fails
+            related_notes = []
+            for related_id in related_ids:
+                try:
+                    note = self.get_note(related_id)
+                    related_notes.append(note)
+                except Exception:
+                    continue
 
         # Cache the result
         set_in_cache(cache_key, related_notes, ttl=300)
@@ -455,6 +539,58 @@ class Database:
 
         return None
 
+    def add_tags_batch(self, note_id: str, tags: List[str]) -> None:
+        """Add multiple tags to a note in a single request."""
+        if not tags:
+            return
+
+        # Verify note exists once
+        self.get_note(note_id)
+
+        # Get existing tags to avoid duplicates
+        existing_tags = set(self.get_tags(note_id))
+
+        # Prepare batch data for new tags only
+        now = self._get_iso_timestamp()
+        tags_data = []
+        for tag in tags:
+            normalized_tag = tag.lower().strip()
+            if normalized_tag and normalized_tag not in existing_tags:
+                tags_data.append({
+                    "note_id": note_id,
+                    "tag": normalized_tag,
+                    "created_at": now
+                })
+
+        if not tags_data:
+            return  # No new tags to add
+
+        try:
+            # PostgREST supports batch inserts with array of objects
+            response = self._make_request('POST', 'tags', data=tags_data)
+
+            # PostgREST returns 201 Created with empty body on successful creation
+            if response.status_code != 201:
+                # Fall back to individual insertion if batch fails
+                for tag_data in tags_data:
+                    try:
+                        self._make_request('POST', 'tags', data=tag_data)
+                    except:
+                        pass  # Continue with other tags
+
+        except Exception:
+            # Fall back to individual insertion if batch fails
+            for tag_data in tags_data:
+                try:
+                    self._make_request('POST', 'tags', data=tag_data)
+                except:
+                    pass  # Continue with other tags
+
+        # Invalidate cache
+        invalidate_cache(f"tags:{note_id}")
+
+        return None
+
     def get_tags(self, note_id: str) -> List[str]:
         """Get all tags for a note with caching."""
         cache_key = f"tags:{note_id}"
@@ -479,6 +615,36 @@ class Database:
         set_in_cache(cache_key, tags, ttl=300)
 
         return tags
+
+    def get_tags_for_notes(self, note_ids: List[str]) -> List[Dict[str, Any]]:
+        """Get all tags for multiple notes in a single query."""
+        if not note_ids:
+            return []
+
+        # Create IN clause for multiple note IDs
+        ids_str = ','.join(note_ids)
+        params = {'note_id': f'in.({ids_str})', 'select': 'note_id,tag'}
+
+        try:
+            response = self._make_request('GET', 'tags', params=params)
+            data = response.json() or []
+
+            # Also update individual caches
+            tags_by_note = {}
+            for tag_data in data:
+                note_id = tag_data['note_id']
+                if note_id not in tags_by_note:
+                    tags_by_note[note_id] = []
+                tags_by_note[note_id].append(tag_data['tag'])
+
+            # Cache individual note tags
+            for note_id in note_ids:
+                tags = tags_by_note.get(note_id, [])
+                set_in_cache(f"tags:{note_id}", tags, ttl=300)
+
+            return data
+        except Exception:
+            return []
 
     def search_notes(self, query: str) -> List[Dict[str, Any]]:
         """Search for notes containing the query string."""
@@ -558,14 +724,27 @@ class Database:
 
         note_ids = [item['note_id'] for item in tag_data]
 
-        # Fetch all the corresponding notes, using cache when possible
-        notes = []
-        for note_id in note_ids:
-            try:
-                note = self.get_note(note_id)
-                notes.append(note)
-            except Exception:
-                continue
+        # Batch fetch all notes in a single request
+        # Use PostgREST's IN operator to fetch multiple notes at once
+        ids_str = ','.join(note_ids)
+        params = {'id': f'in.({ids_str})', 'order': 'created_at.desc'}
+
+        try:
+            response = self._make_request('GET', 'notes', params=params)
+            notes = response.json() or []
+
+            # Also cache individual notes
+            for note in notes:
+                set_in_cache(f"note:{note['id']}", note, ttl=600)
+        except Exception:
+            # Fallback to individual fetching if batch fails
+            notes = []
+            for note_id in note_ids:
+                try:
+                    note = self.get_note(note_id)
+                    notes.append(note)
+                except Exception:
+                    continue
 
         # Cache the result
         set_in_cache(cache_key, notes, ttl=300)
@@ -615,6 +794,25 @@ class Database:
         if cached_result is not None:
             return cached_result
 
+        # Try to use materialized view first (much faster)
+        try:
+            params = {'select': 'tag,count', 'order': 'count.desc,tag'}
+            response = self._make_request('GET', 'tag_counts', params=params)
+
+            data = response.json()
+            if data:
+                tags_with_counts = [
+                    {"tag": item['tag'], "count": item['count']}
+                    for item in data
+                ]
+                # Cache the result
+                set_in_cache(cache_key, tags_with_counts, ttl=300)
+                return tags_with_counts
+        except:
+            # Materialized view doesn't exist or failed, fall back to regular query
+            pass
+
+        # Fallback to regular query if materialized view not available
         # Get all tags with their note_ids
         params = {'select': 'tag,note_id'}
         response = self._make_request('GET', 'tags', params=params)
@@ -648,13 +846,14 @@ class Database:
 
         return tags_with_counts
 
-    def delete_note(self, note_id: str, cascade: bool = True) -> None:
+    def delete_note(self, note_id: str, cascade: bool = True, force: bool = False) -> None:
         """
         Delete a note from the database.
 
         Args:
             note_id: ID of the note to delete
             cascade: If True, also delete associated tags and links
+            force: If True, skip existence checks and delete directly
 
         Returns:
             None
@@ -662,23 +861,54 @@ class Database:
         Raises:
             Exception: If note deletion fails
         """
-        # First verify the note exists
-        self.get_note(note_id)
+        if not force:
+            # Only verify the note exists if not forcing
+            self.get_note(note_id)
 
-        # If cascade is True, delete all associated data first
-        if cascade:
-            # Delete all tags associated with this note
-            self.delete_note_tags(note_id)
+            # If cascade is True, delete all associated data first
+            if cascade:
+                # Delete all tags associated with this note
+                self.delete_note_tags(note_id)
 
-            # Delete all links involving this note
-            self.delete_note_links(note_id)
+                # Delete all links involving this note
+                self.delete_note_links(note_id)
+        else:
+            # Force mode: delete everything in parallel without checking
+            if cascade:
+                # Delete tags, links, and note all at once without pre-queries
+                try:
+                    # Delete tags
+                    params = {'note_id': f'eq.{note_id}'}
+                    self._make_request('DELETE', 'tags', params=params)
+                except:
+                    pass  # Ignore errors in force mode
+
+                try:
+                    # Delete outgoing links
+                    params = {'source_id': f'eq.{note_id}'}
+                    self._make_request('DELETE', 'links', params=params)
+                except:
+                    pass
+
+                try:
+                    # Delete incoming links
+                    params = {'target_id': f'eq.{note_id}'}
+                    self._make_request('DELETE', 'links', params=params)
+                except:
+                    pass
 
         # Delete the note itself
         params = {'id': f'eq.{note_id}'}
-        response = self._make_request('DELETE', 'notes', params=params)
+        try:
+            response = self._make_request('DELETE', 'notes', params=params)
+        except requests.exceptions.HTTPError as e:
+            if not force or e.response.status_code != 404:
+                raise
 
         # Invalidate relevant caches
         invalidate_cache(f"note:{note_id}")
+        invalidate_cache(f"tags:{note_id}")
+        invalidate_cache(f"related_notes:{note_id}")
         invalidate_cache("list_notes")
 
         return None

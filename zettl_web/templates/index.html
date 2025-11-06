@@ -1312,8 +1312,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Command to options mapping - for dynamic buttons
     const commandOptions = {
         'list': ['-l', '--limit', '-f', '--full', '-c', '--compact', '-h', '--help'],
-        'new': ['-t', '--tag', '-l', '--link', '-h', '--help'],
-        'add': ['-t', '--tag', '-l', '--link', '-h', '--help'],
         'task': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
         't': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
         'idea': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
@@ -1342,7 +1340,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // For commands that need auto-quotes
-    const autoQuoteCommands = ['new', 'add', 't', 'task', 'i', 'idea', 'n', 'note', 'p', 'project'];
+    const autoQuoteCommands = ['t', 'task', 'i', 'idea', 'n', 'note', 'p', 'project'];
 
     // Sub-options for commands like llm
     const subOptions = {
@@ -1357,7 +1355,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Top-level commands for initial buttons (organized by category)
     const topLevelCommands = [
         // Note Creation/Editing
-        'new', 't', 'i', 'n', 'p', 'edit', 'append', 'prepend', 'delete',
+        'task', 'idea', 'note', 'project', 'edit', 'append', 'prepend', 'delete',
         // Viewing
         'show', 'list', 'search',
         // Organization
