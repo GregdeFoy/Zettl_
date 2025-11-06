@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zettl - Neo-Brutalist Prototype</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Color Scheme A: Paper & Ink */
+            --bg-primary: #FFFEF2;
+            --bg-secondary: #000000;
+            --accent-1: #FF6B6B;
+            --accent-2: #4ECDC4;
+            --accent-3: #FFE66D;
+            --text-primary: #000000;
+            --text-secondary: #FFFFFF;
+            --border: #000000;
+
+            /* Spacing */
+            --gap: 20px;
+            --border-width: 4px;
+            --shadow-offset: 8px;
+        }
+
+        /* Color Scheme B (commented out, can be toggled) */
+        .theme-digital {
+            --bg-primary: #F7F3E9;
+            --bg-secondary: #1A1A2E;
+            --accent-1: #FF006E;
+            --accent-2: #8338EC;
+            --accent-3: #FFBE0B;
+            --text-primary: #1A1A2E;
+            --text-secondary: #F7F3E9;
+            --border: #1A1A2E;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Space Mono', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: var(--accent-3);
+            border-bottom: var(--border-width) solid var(--border);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 32px;
+            font-weight: 900;
+            letter-spacing: -2px;
+            text-transform: uppercase;
+            transform: rotate(-2deg);
+            display: inline-block;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* Buttons */
+        .btn-neo {
+            background: var(--accent-1);
+            color: var(--text-secondary);
+            border: 3px solid var(--border);
+            padding: 10px 20px;
+            font-weight: 700;
+            text-transform: uppercase;
+            box-shadow: 4px 4px 0 var(--border);
+            transition: all 0.15s;
+            cursor: pointer;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 14px;
+        }
+
+        .btn-neo:hover {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 var(--border);
+        }
+
+        .btn-neo:active {
+            transform: translate(4px, 4px);
+            box-shadow: none;
+        }
+
+        .btn-neo.secondary {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .btn-neo.accent-2 {
+            background: var(--accent-2);
+        }
+
+        /* Layout Container */
+        .container {
+            display: grid;
+            grid-template-columns: 250px 1fr 350px;
+            gap: var(--gap);
+            padding: var(--gap);
+            min-height: calc(100vh - 80px);
+        }
+
+        /* Panels */
+        .panel {
+            background: var(--bg-primary);
+            border: var(--border-width) solid var(--border);
+            box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: var(--accent-2);
+            padding: 15px;
+            border-bottom: var(--border-width) solid var(--border);
+            font-weight: 900;
+            text-transform: uppercase;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 18px;
+            color: var(--text-secondary);
+        }
+
+        .panel-content {
+            padding: 20px;
+            overflow-y: auto;
+            max-height: calc(100vh - 200px);
+        }
+
+        /* Navigation Panel */
+        .nav-item {
+            background: var(--bg-primary);
+            border: 3px solid var(--border);
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-weight: 700;
+            position: relative;
+        }
+
+        .nav-item:hover {
+            background: var(--accent-3);
+            transform: translateX(5px);
+        }
+
+        .nav-item.active {
+            background: var(--accent-1);
+            color: var(--text-secondary);
+            box-shadow: 4px 4px 0 var(--border);
+        }
+
+        .nav-count {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--border);
+            color: var(--text-secondary);
+            padding: 2px 8px;
+            font-size: 12px;
+        }
+
+        /* Note Cards */
+        .note-card {
+            background: var(--bg-primary);
+            border: 3px solid var(--border);
+            box-shadow: 6px 6px 0 var(--border);
+            margin-bottom: 15px;
+            transition: all 0.15s;
+            cursor: pointer;
+        }
+
+        .note-card:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 8px 8px 0 var(--border);
+        }
+
+        .note-card-header {
+            background: var(--accent-3);
+            padding: 10px;
+            border-bottom: 3px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            font-weight: 700;
+        }
+
+        .note-id {
+            background: var(--border);
+            color: var(--text-secondary);
+            padding: 2px 6px;
+            font-size: 12px;
+        }
+
+        .note-card-content {
+            padding: 15px;
+        }
+
+        .note-card-content h3 {
+            margin: 0 0 8px 0;
+            font-size: 18px;
+            font-weight: 900;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .note-tags {
+            padding: 10px;
+            border-top: 3px solid var(--border);
+            background: #F0F0F0;
+        }
+
+        .tag {
+            display: inline-block;
+            background: var(--accent-2);
+            border: 2px solid var(--border);
+            padding: 3px 8px;
+            margin-right: 5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        /* Main Content Area */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: var(--gap);
+        }
+
+        .editor-area {
+            flex: 1;
+            background: var(--bg-primary);
+            border: var(--border-width) solid var(--border);
+            box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--border);
+        }
+
+        .editor-header {
+            background: linear-gradient(45deg, var(--accent-1), var(--accent-2));
+            padding: 15px;
+            border-bottom: var(--border-width) solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .editor-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 24px;
+            font-weight: 900;
+            color: var(--text-secondary);
+        }
+
+        .editor-content {
+            padding: 20px;
+            min-height: 300px;
+            font-family: 'Space Mono', monospace;
+            line-height: 1.6;
+        }
+
+        /* Command Bar */
+        .command-bar {
+            background: var(--bg-primary);
+            border: var(--border-width) solid var(--border);
+            box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--border);
+            padding: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .command-input {
+            flex: 1;
+            background: var(--bg-primary);
+            border: 3px solid var(--border);
+            padding: 12px;
+            font-family: 'Space Mono', monospace;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .command-input:focus {
+            outline: none;
+            background: var(--accent-3);
+            box-shadow: inset 0 0 0 2px var(--border);
+        }
+
+        /* Right Panel - Context */
+        .context-section {
+            background: var(--bg-primary);
+            border: 3px solid var(--border);
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+
+        .context-header {
+            background: var(--accent-1);
+            padding: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 14px;
+            color: var(--text-secondary);
+            border-bottom: 3px solid var(--border);
+        }
+
+        .context-content {
+            padding: 15px;
+        }
+
+        /* Stats Widget */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background: var(--accent-3);
+            border: 2px solid var(--border);
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 900;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-top: 5px;
+        }
+
+        /* Chat Area */
+        .chat-messages {
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            background: #F0F0F0;
+            border: 2px solid var(--border);
+            margin-bottom: 10px;
+        }
+
+        .chat-message {
+            margin-bottom: 10px;
+            padding: 8px;
+            background: var(--bg-primary);
+            border: 2px solid var(--border);
+        }
+
+        .chat-message.user {
+            background: var(--accent-2);
+            color: var(--text-secondary);
+            margin-left: 20px;
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 8px;
+            border: 2px solid var(--border);
+            font-family: 'Space Mono', monospace;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 200px 1fr 300px;
+            }
+        }
+
+        @media (max-width: 968px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .panel {
+                margin-bottom: var(--gap);
+            }
+
+            .nav-panel, .context-panel {
+                display: none;
+            }
+
+            .mobile-menu {
+                display: block;
+            }
+        }
+
+        /* Animations */
+        @keyframes slide-in {
+            from {
+                transform: translateY(20px) rotate(-2deg);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0) rotate(0);
+                opacity: 1;
+            }
+        }
+
+        .animate-in {
+            animation: slide-in 0.3s ease-out;
+        }
+
+        /* Toggle Switch */
+        .theme-toggle {
+            position: relative;
+            width: 60px;
+            height: 30px;
+        }
+
+        .theme-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--accent-2);
+            transition: .4s;
+            border: 3px solid var(--border);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--bg-primary);
+            transition: .4s;
+            border: 2px solid var(--border);
+        }
+
+        input:checked + .slider {
+            background-color: var(--accent-1);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(30px);
+        }
+
+        .mobile-menu {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">ZETTL</div>
+        <div class="header-actions">
+            <button class="btn-neo secondary">CLI MODE</button>
+            <button class="btn-neo accent-2">NEO MODE</button>
+            <span style="margin-left: 20px; font-weight: 700;">@username</span>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Left Navigation Panel -->
+        <aside class="panel nav-panel">
+            <div class="panel-header">NAVIGATION</div>
+            <div class="panel-content">
+                <div class="nav-item active">
+                    RECENT NOTES
+                    <span class="nav-count">12</span>
+                </div>
+                <div class="nav-item">
+                    SEARCH
+                    <span class="nav-count">∞</span>
+                </div>
+                <div class="nav-item">
+                    TAGS
+                    <span class="nav-count">45</span>
+                </div>
+                <div class="nav-item">
+                    PROJECTS
+                    <span class="nav-count">8</span>
+                </div>
+                <div class="nav-item">
+                    TODOS
+                    <span class="nav-count">3</span>
+                </div>
+                <div class="nav-item">
+                    GRAPH VIEW
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Editor/Viewer Area -->
+            <div class="editor-area animate-in">
+                <div class="editor-header">
+                    <div class="editor-title">NOTE #1234 - Philosophy of Design</div>
+                    <div>
+                        <button class="btn-neo" style="padding: 8px 15px; font-size: 12px;">EDIT</button>
+                        <button class="btn-neo secondary" style="padding: 8px 15px; font-size: 12px;">DELETE</button>
+                    </div>
+                </div>
+                <div class="editor-content">
+                    <h2 style="font-family: 'Space Grotesk', sans-serif; margin-bottom: 15px;">Neo-Brutalism in Digital Design</h2>
+                    <p>Neo-brutalism represents a bold departure from the soft, gradient-heavy design trends of recent years. It embraces:</p>
+                    <ul style="margin: 15px 0; padding-left: 20px;">
+                        <li>Bold, thick borders that create strong visual hierarchy</li>
+                        <li>High contrast color schemes with intentional clashing</li>
+                        <li>Geometric shapes and asymmetrical layouts</li>
+                        <li>Typography as a design element, not just text</li>
+                    </ul>
+                    <p>This aesthetic works particularly well for Zettl because it maintains minimalism while adding visual interest. The stark borders and bold colors help users quickly identify different sections and navigate complex information structures.</p>
+
+                    <h3 style="font-family: 'Space Grotesk', sans-serif; margin-top: 20px; margin-bottom: 10px;">Benefits for Knowledge Management</h3>
+                    <p>The visual distinctiveness of neo-brutalist design aids in memory formation and recall. When each note or section has a unique visual treatment, it becomes easier to remember where information is stored.</p>
+                </div>
+            </div>
+
+            <!-- Recent Notes Grid -->
+            <div class="panel" style="max-height: 300px; overflow-y: auto;">
+                <div class="panel-header">RECENT NOTES</div>
+                <div class="panel-content">
+                    <div class="note-card">
+                        <div class="note-card-header">
+                            <span class="note-id">#1235</span>
+                            <span>2024-11-02</span>
+                        </div>
+                        <div class="note-card-content">
+                            <h3>Implementing Authentication</h3>
+                            <p>JWT tokens provide stateless auth...</p>
+                        </div>
+                        <div class="note-tags">
+                            <span class="tag">development</span>
+                            <span class="tag">security</span>
+                        </div>
+                    </div>
+
+                    <div class="note-card">
+                        <div class="note-card-header">
+                            <span class="note-id">#1236</span>
+                            <span>2024-11-01</span>
+                        </div>
+                        <div class="note-card-content">
+                            <h3>Database Schema Design</h3>
+                            <p>PostgreSQL with PostgREST API...</p>
+                        </div>
+                        <div class="note-tags">
+                            <span class="tag">database</span>
+                            <span class="tag">architecture</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Command Bar -->
+            <div class="command-bar">
+                <span style="font-weight: 900; font-family: 'Space Grotesk', sans-serif;">ZETTL&gt;</span>
+                <input type="text" class="command-input" placeholder="Enter command..." value="search @philosophy neo-brutalism">
+                <button class="btn-neo">EXECUTE</button>
+            </div>
+        </main>
+
+        <!-- Right Context Panel -->
+        <aside class="panel context-panel">
+            <div class="panel-header">CONTEXT</div>
+            <div class="panel-content">
+                <!-- Stats Widget -->
+                <div class="context-section">
+                    <div class="context-header">STATISTICS</div>
+                    <div class="context-content">
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-value">1,234</div>
+                                <div class="stat-label">Notes</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">5,678</div>
+                                <div class="stat-label">Links</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">89</div>
+                                <div class="stat-label">Tags</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">12</div>
+                                <div class="stat-label">Projects</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Linked Notes -->
+                <div class="context-section">
+                    <div class="context-header">LINKED NOTES</div>
+                    <div class="context-content">
+                        <div style="margin-bottom: 8px; padding: 8px; background: var(--accent-3); border: 2px solid var(--border); cursor: pointer;">
+                            <strong>#1122</strong> - Design Systems
+                        </div>
+                        <div style="margin-bottom: 8px; padding: 8px; background: var(--accent-3); border: 2px solid var(--border); cursor: pointer;">
+                            <strong>#1098</strong> - Minimalism Principles
+                        </div>
+                        <div style="margin-bottom: 8px; padding: 8px; background: var(--accent-3); border: 2px solid var(--border); cursor: pointer;">
+                            <strong>#1203</strong> - UI/UX Trends 2024
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat -->
+                <div class="context-section">
+                    <div class="context-header">LLM CHAT</div>
+                    <div class="context-content">
+                        <div class="chat-messages">
+                            <div class="chat-message">
+                                How can I improve this design?
+                            </div>
+                            <div class="chat-message user">
+                                Consider adding more visual hierarchy...
+                            </div>
+                        </div>
+                        <div class="chat-input-area">
+                            <input type="text" class="chat-input" placeholder="Ask Claude...">
+                            <button class="btn-neo" style="padding: 8px 15px; font-size: 12px;">SEND</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        // Simple interactivity demo
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        document.querySelectorAll('.note-card').forEach(card => {
+            card.addEventListener('click', function() {
+                this.classList.add('animate-in');
+                setTimeout(() => this.classList.remove('animate-in'), 300);
+            });
+        });
+
+        // Theme toggle simulation
+        document.querySelectorAll('.btn-neo').forEach(btn => {
+            if (btn.textContent === 'NEO MODE') {
+                btn.addEventListener('click', () => {
+                    document.body.classList.toggle('theme-digital');
+                });
+            }
+        });
+
+        // Command execution animation
+        document.querySelector('.command-bar .btn-neo').addEventListener('click', function() {
+            const input = document.querySelector('.command-input');
+            const originalValue = input.value;
+            input.value = 'Executing...';
+            input.style.background = 'var(--accent-2)';
+
+            setTimeout(() => {
+                input.value = originalValue;
+                input.style.background = '';
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

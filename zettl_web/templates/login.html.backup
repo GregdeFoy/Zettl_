@@ -4,27 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zettl - Login</title>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            /* Neo-Brutalist Color Palette */
-            --bg-main: #FFF8E7;
-            --bg-dark: #1E1E1E;
-            --primary: #FF5E5B;
-            --secondary: #FFCC00;
-            --accent: #00D9FF;
-            --success: #00FF88;
-            --text-dark: #1E1E1E;
-            --text-light: #FFF8E7;
-            --border-dark: #1E1E1E;
-            --shadow-color: #1E1E1E;
-            --error-color: #FF5E5B;
-
-            /* Spacing & Borders */
-            --border-width: 4px;
-            --border-width-thick: 6px;
-            --shadow-offset: 6px;
-            --shadow-offset-lg: 10px;
+            --bg-color: #1a1a1a;
+            --card-bg: #2a2a2a;
+            --text-color: #f0f0f0;
+            --primary-color: #90ee90;
+            --error-color: #ff6347;
+            --input-bg: #333;
+            --input-border: #555;
         }
 
         * {
@@ -34,154 +22,94 @@
         }
 
         body {
-            font-family: 'JetBrains Mono', monospace;
-            background: var(--bg-main);
-            color: var(--text-dark);
+            font-family: 'Courier New', monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 20px;
-            position: relative;
-        }
-
-        /* Decorative background pattern */
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-image:
-                repeating-linear-gradient(
-                    45deg,
-                    transparent,
-                    transparent 100px,
-                    rgba(255, 94, 91, 0.03) 100px,
-                    rgba(255, 94, 91, 0.03) 200px
-                );
-            pointer-events: none;
-            z-index: 0;
         }
 
         .login-container {
-            background: var(--bg-main);
-            border: var(--border-width-thick) solid var(--border-dark);
-            box-shadow: var(--shadow-offset-lg) var(--shadow-offset-lg) 0 var(--shadow-color);
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 40px;
             width: 100%;
-            max-width: 450px;
-            transform: rotate(-1deg);
-            animation: wobble 10s ease-in-out infinite;
-            position: relative;
-            z-index: 1;
-        }
-
-        @keyframes wobble {
-            0%, 100% { transform: rotate(-1deg); }
-            50% { transform: rotate(1deg); }
-        }
-
-        .login-header {
-            background: var(--secondary);
-            padding: 30px;
-            border-bottom: var(--border-width-thick) solid var(--border-dark);
-            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
         }
 
         .logo {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 48px;
-            font-weight: 700;
-            letter-spacing: -4px;
-            color: var(--text-dark);
-            display: inline-block;
-            transform: rotate(-3deg);
-            margin-bottom: 10px;
+            text-align: center;
+            margin-bottom: 30px;
+            color: var(--primary-color);
         }
 
-        .tagline {
-            font-size: 14px;
-            font-weight: 500;
-            margin-top: 10px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
+        .logo pre {
+            font-size: 10px;
+            line-height: 1.2;
+            display: inline-block;
+            text-align: left;
         }
 
         h1 {
             text-align: center;
-            color: var(--text-dark);
+            color: var(--primary-color);
             margin-bottom: 30px;
             font-size: 24px;
-            font-family: 'Space Grotesk', sans-serif;
-            font-weight: 700;
-            text-transform: uppercase;
         }
 
         .form-group {
             margin-bottom: 20px;
         }
 
-        .form-content {
-            padding: 30px;
-        }
-
         label {
             display: block;
-            margin-bottom: 8px;
-            font-weight: 700;
-            text-transform: uppercase;
-            font-size: 12px;
-            color: var(--text-dark);
+            margin-bottom: 5px;
+            color: var(--text-color);
+            font-size: 14px;
         }
 
         input[type="text"],
         input[type="password"],
         input[type="email"] {
             width: 100%;
-            padding: 15px;
-            background: var(--bg-main);
-            border: var(--border-width) solid var(--border-dark);
-            color: var(--text-dark);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 16px;
-            font-weight: 500;
-            box-shadow: inset 3px 3px 0 rgba(30, 30, 30, 0.1);
+            padding: 10px;
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            color: var(--text-color);
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
         }
 
         input:focus {
             outline: none;
-            box-shadow: inset 0 0 0 3px var(--accent);
+            border-color: var(--primary-color);
         }
 
         button {
             width: 100%;
-            padding: 18px;
-            margin-top: 20px;
-            background: var(--success);
-            color: var(--text-dark);
-            border: var(--border-width) solid var(--border-dark);
-            font-weight: 700;
+            padding: 12px;
+            background-color: var(--primary-color);
+            border: none;
+            border-radius: 4px;
+            color: #000;
+            font-family: 'Courier New', monospace;
             font-size: 16px;
-            text-transform: uppercase;
-            box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--shadow-color);
+            font-weight: bold;
             cursor: pointer;
-            transition: all 0.15s;
-            font-family: 'Space Grotesk', sans-serif;
+            transition: opacity 0.3s;
         }
 
         button:hover {
-            transform: translate(-2px, -2px);
-            box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0 var(--shadow-color);
-        }
-
-        button:active {
-            transform: translate(4px, 4px);
-            box-shadow: 2px 2px 0 var(--shadow-color);
+            opacity: 0.9;
         }
 
         button:disabled {
-            opacity: 0.6;
+            opacity: 0.5;
             cursor: not-allowed;
         }
 
@@ -203,31 +131,22 @@
 
         .tabs {
             display: flex;
-            background: var(--primary);
-            border-bottom: var(--border-width) solid var(--border-dark);
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--input-border);
         }
 
         .tab {
             flex: 1;
-            padding: 15px;
+            padding: 10px;
             text-align: center;
-            font-weight: 700;
-            text-transform: uppercase;
             cursor: pointer;
-            transition: all 0.2s;
-            color: var(--text-light);
-            border-right: var(--border-width) solid var(--border-dark);
             border-bottom: 2px solid transparent;
             transition: all 0.3s;
         }
 
-        .tab:last-child {
-            border-right: none;
-        }
-
         .tab.active {
-            background: var(--accent);
-            color: var(--text-dark);
+            border-bottom-color: var(--primary-color);
+            color: var(--primary-color);
         }
 
         .tab-content {
@@ -265,10 +184,17 @@
 </head>
 <body>
     <div class="login-container">
-        <div class="login-header">
-            <div class="logo">ZETTL</div>
-            <div class="tagline">Minimalist Knowledge Base</div>
+        <div class="logo">
+            <pre>
+████████ ████████ ████████ ████████ ██
+      ██ ██          ██       ██    ██
+   ██    ████████    ██       ██    ██
+██       ██          ██       ██    ██
+████████ ████████    ██       ██    ████████
+            </pre>
         </div>
+
+        <h1>Zettl Notes</h1>
 
         <div class="tabs">
             <div class="tab active" data-tab="login">Login</div>
@@ -276,7 +202,7 @@
         </div>
 
         <!-- Login Form -->
-        <div class="tab-content active form-content" id="login-tab">
+        <div class="tab-content active" id="login-tab">
             <form id="login-form">
                 <div class="form-group">
                     <label for="login-username">Username or Email</label>
@@ -296,7 +222,7 @@
         </div>
 
         <!-- Register Form -->
-        <div class="tab-content form-content" id="register-tab">
+        <div class="tab-content" id="register-tab">
             <form id="register-form">
                 <div class="form-group">
                     <label for="register-username">Username</label>

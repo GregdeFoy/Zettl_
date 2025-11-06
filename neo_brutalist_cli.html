@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zettl - Neo-Brutalist CLI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Neo-Brutalist Color Palette - Bold & Vibrant */
+            --bg-main: #FFF8E7;        /* Warm cream background */
+            --bg-dark: #1E1E1E;         /* Dark sections */
+            --primary: #FF5E5B;         /* Coral red */
+            --secondary: #FFCC00;       /* Bold yellow */
+            --accent: #00D9FF;          /* Electric cyan */
+            --success: #00FF88;         /* Neon green */
+            --text-dark: #1E1E1E;       /* Almost black */
+            --text-light: #FFF8E7;      /* Cream */
+            --border-dark: #1E1E1E;     /* Black borders */
+            --shadow-color: #1E1E1E;    /* Shadow color */
+
+            /* Spacing & Borders */
+            --border-width: 4px;
+            --border-width-thick: 6px;
+            --shadow-offset: 6px;
+            --shadow-offset-lg: 10px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-main);
+            color: var(--text-dark);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Decorative background pattern */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                repeating-linear-gradient(
+                    45deg,
+                    transparent,
+                    transparent 100px,
+                    rgba(255, 94, 91, 0.03) 100px,
+                    rgba(255, 94, 91, 0.03) 200px
+                );
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header - Neo-Brutalist Style */
+        .header {
+            background: var(--secondary);
+            border-bottom: var(--border-width-thick) solid var(--border-dark);
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 var(--shadow-offset) 0 var(--shadow-color);
+            position: relative;
+            z-index: 100;
+        }
+
+        /* Logo with brutalist treatment */
+        .logo {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            letter-spacing: -3px;
+            color: var(--text-dark);
+            background: var(--bg-main);
+            padding: 8px 20px;
+            border: var(--border-width) solid var(--border-dark);
+            box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--shadow-color);
+            transform: rotate(-2deg);
+            display: inline-block;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .logo:hover {
+            transform: rotate(2deg) scale(1.05);
+            box-shadow: var(--shadow-offset-lg) var(--shadow-offset-lg) 0 var(--shadow-color);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        /* Neo-Brutalist Buttons */
+        .btn {
+            background: var(--primary);
+            color: var(--text-light);
+            border: var(--border-width) solid var(--border-dark);
+            padding: 12px 24px;
+            font-weight: 700;
+            font-size: 14px;
+            text-transform: uppercase;
+            box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--shadow-color);
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: 'Space Grotesk', sans-serif;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0 var(--shadow-color);
+        }
+
+        .btn:active {
+            transform: translate(4px, 4px);
+            box-shadow: 2px 2px 0 var(--shadow-color);
+        }
+
+        .btn.secondary {
+            background: var(--bg-main);
+            color: var(--text-dark);
+        }
+
+        .btn.accent {
+            background: var(--accent);
+            color: var(--text-dark);
+        }
+
+        .btn.success {
+            background: var(--success);
+            color: var(--text-dark);
+        }
+
+        .btn.small {
+            padding: 8px 16px;
+            font-size: 12px;
+        }
+
+        /* Main Terminal Area */
+        .terminal-container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .terminal {
+            background: var(--bg-main);
+            border: var(--border-width-thick) solid var(--border-dark);
+            box-shadow: var(--shadow-offset-lg) var(--shadow-offset-lg) 0 var(--shadow-color);
+            overflow: hidden;
+        }
+
+        .terminal-output {
+            min-height: 400px;
+            max-height: 60vh;
+            overflow-y: auto;
+            padding: 30px;
+            background: var(--bg-main);
+            border-bottom: var(--border-width) solid var(--border-dark);
+        }
+
+        /* Custom scrollbar */
+        .terminal-output::-webkit-scrollbar {
+            width: 16px;
+        }
+
+        .terminal-output::-webkit-scrollbar-track {
+            background: var(--bg-main);
+            border-left: var(--border-width) solid var(--border-dark);
+        }
+
+        .terminal-output::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border: var(--border-width) solid var(--border-dark);
+        }
+
+        /* Terminal output styling */
+        .output-line {
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .output-command {
+            background: var(--secondary);
+            color: var(--text-dark);
+            padding: 8px 12px;
+            border: 3px solid var(--border-dark);
+            font-weight: 700;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+
+        .output-result {
+            background: var(--bg-main);
+            padding: 15px;
+            border-left: 6px solid var(--accent);
+            margin-left: 20px;
+        }
+
+        .output-error {
+            background: var(--primary);
+            color: var(--text-light);
+            padding: 12px;
+            border: 3px solid var(--border-dark);
+            font-weight: 500;
+        }
+
+        .output-success {
+            background: var(--success);
+            color: var(--text-dark);
+            padding: 12px;
+            border: 3px solid var(--border-dark);
+            font-weight: 500;
+        }
+
+        /* Command shortcuts */
+        .command-shortcuts {
+            background: var(--accent);
+            padding: 20px;
+            border-bottom: var(--border-width) solid var(--border-dark);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .shortcut-btn {
+            background: var(--bg-main);
+            color: var(--text-dark);
+            border: 3px solid var(--border-dark);
+            padding: 8px 16px;
+            font-weight: 600;
+            font-size: 13px;
+            box-shadow: 3px 3px 0 var(--shadow-color);
+            cursor: pointer;
+            transition: all 0.1s;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .shortcut-btn:hover {
+            background: var(--secondary);
+            transform: translate(-1px, -1px);
+            box-shadow: 4px 4px 0 var(--shadow-color);
+        }
+
+        .shortcut-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: 1px 1px 0 var(--shadow-color);
+        }
+
+        /* Command Input Area */
+        .command-input-area {
+            background: var(--secondary);
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .prompt {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--text-dark);
+            background: var(--bg-main);
+            padding: 10px 15px;
+            border: 3px solid var(--border-dark);
+            box-shadow: 3px 3px 0 var(--shadow-color);
+            transform: rotate(-1deg);
+        }
+
+        .command-input {
+            flex: 1;
+            background: var(--bg-main);
+            border: var(--border-width) solid var(--border-dark);
+            padding: 15px;
+            font-size: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+            color: var(--text-dark);
+            box-shadow: inset 3px 3px 0 rgba(30, 30, 30, 0.1);
+        }
+
+        .command-input:focus {
+            outline: none;
+            background: var(--bg-main);
+            box-shadow: inset 0 0 0 3px var(--accent);
+        }
+
+        /* Chat Panel (slide-out) */
+        .chat-panel {
+            position: fixed;
+            right: -450px;
+            top: 0;
+            width: 450px;
+            height: 100vh;
+            background: var(--bg-main);
+            border-left: var(--border-width-thick) solid var(--border-dark);
+            box-shadow: -var(--shadow-offset-lg) 0 0 var(--shadow-color);
+            transition: right 0.3s ease;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-panel.open {
+            right: 0;
+        }
+
+        .chat-header {
+            background: var(--primary);
+            padding: 20px;
+            border-bottom: var(--border-width) solid var(--border-dark);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-light);
+            text-transform: uppercase;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: var(--bg-main);
+        }
+
+        .chat-message {
+            margin-bottom: 15px;
+            padding: 12px;
+            border: 3px solid var(--border-dark);
+            background: var(--bg-main);
+            box-shadow: 3px 3px 0 var(--shadow-color);
+        }
+
+        .chat-message.user {
+            background: var(--accent);
+            margin-left: 30px;
+        }
+
+        .chat-message.assistant {
+            background: var(--secondary);
+            margin-right: 30px;
+        }
+
+        .chat-input-area {
+            padding: 20px;
+            background: var(--primary);
+            border-top: var(--border-width) solid var(--border-dark);
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px;
+            border: 3px solid var(--border-dark);
+            background: var(--bg-main);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+        }
+
+        /* Login Screen */
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: var(--bg-main);
+            position: relative;
+            display: none;
+        }
+
+        .login-box {
+            width: 100%;
+            max-width: 450px;
+            background: var(--bg-main);
+            border: var(--border-width-thick) solid var(--border-dark);
+            box-shadow: var(--shadow-offset-lg) var(--shadow-offset-lg) 0 var(--shadow-color);
+            transform: rotate(-1deg);
+            animation: wobble 10s ease-in-out infinite;
+        }
+
+        @keyframes wobble {
+            0%, 100% { transform: rotate(-1deg); }
+            50% { transform: rotate(1deg); }
+        }
+
+        .login-header {
+            background: var(--secondary);
+            padding: 30px;
+            border-bottom: var(--border-width-thick) solid var(--border-dark);
+            text-align: center;
+        }
+
+        .login-logo {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 48px;
+            font-weight: 700;
+            letter-spacing: -4px;
+            color: var(--text-dark);
+            display: inline-block;
+            transform: rotate(-3deg);
+            margin-bottom: 10px;
+        }
+
+        .login-tabs {
+            display: flex;
+            background: var(--primary);
+            border-bottom: var(--border-width) solid var(--border-dark);
+        }
+
+        .login-tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-light);
+            border-right: var(--border-width) solid var(--border-dark);
+        }
+
+        .login-tab:last-child {
+            border-right: none;
+        }
+
+        .login-tab.active {
+            background: var(--accent);
+            color: var(--text-dark);
+        }
+
+        .login-form {
+            padding: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 12px;
+            color: var(--text-dark);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 15px;
+            border: var(--border-width) solid var(--border-dark);
+            background: var(--bg-main);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            font-weight: 500;
+            box-shadow: inset 3px 3px 0 rgba(30, 30, 30, 0.1);
+        }
+
+        .form-input:focus {
+            outline: none;
+            box-shadow: inset 0 0 0 3px var(--accent);
+        }
+
+        .form-btn {
+            width: 100%;
+            padding: 18px;
+            margin-top: 20px;
+            background: var(--success);
+            color: var(--text-dark);
+            border: var(--border-width) solid var(--border-dark);
+            font-weight: 700;
+            font-size: 16px;
+            text-transform: uppercase;
+            box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--shadow-color);
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .form-btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0 var(--shadow-color);
+        }
+
+        .form-btn:active {
+            transform: translate(4px, 4px);
+            box-shadow: 2px 2px 0 var(--shadow-color);
+        }
+
+        /* Settings Screen */
+        .settings-container {
+            max-width: 1000px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: none;
+        }
+
+        .settings-panel {
+            background: var(--bg-main);
+            border: var(--border-width-thick) solid var(--border-dark);
+            box-shadow: var(--shadow-offset-lg) var(--shadow-offset-lg) 0 var(--shadow-color);
+            margin-bottom: 20px;
+        }
+
+        .settings-header {
+            background: var(--accent);
+            padding: 20px;
+            border-bottom: var(--border-width) solid var(--border-dark);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-dark);
+        }
+
+        .settings-content {
+            padding: 30px;
+        }
+
+        .setting-item {
+            margin-bottom: 25px;
+            padding-bottom: 25px;
+            border-bottom: 3px solid var(--border-dark);
+        }
+
+        .setting-item:last-child {
+            border-bottom: none;
+        }
+
+        .setting-label {
+            font-weight: 700;
+            font-size: 16px;
+            margin-bottom: 10px;
+            display: block;
+            text-transform: uppercase;
+            color: var(--text-dark);
+        }
+
+        .setting-description {
+            color: var(--text-dark);
+            opacity: 0.8;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .token-list {
+            background: var(--secondary);
+            border: 3px solid var(--border-dark);
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .token-item {
+            background: var(--bg-main);
+            border: 2px solid var(--border-dark);
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .token-item:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Toggle Switch Neo-Brutalist */
+        .toggle-container {
+            display: inline-flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 80px;
+            height: 40px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--primary);
+            border: var(--border-width) solid var(--border-dark);
+            box-shadow: 3px 3px 0 var(--shadow-color);
+            transition: 0.3s;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 24px;
+            width: 24px;
+            left: 6px;
+            bottom: 5px;
+            background: var(--bg-main);
+            border: 3px solid var(--border-dark);
+            transition: 0.3s;
+        }
+
+        input:checked + .toggle-slider {
+            background: var(--success);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(40px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                padding: 15px;
+            }
+
+            .logo {
+                font-size: 28px;
+            }
+
+            .chat-panel {
+                width: 100%;
+                right: -100%;
+            }
+
+            .terminal-container {
+                margin: 20px auto;
+            }
+
+            .command-shortcuts {
+                padding: 15px;
+            }
+
+            .login-box {
+                margin: 20px;
+                transform: none;
+                animation: none;
+            }
+        }
+
+        /* Utility classes */
+        .hidden {
+            display: none !important;
+        }
+
+        .text-primary {
+            color: var(--primary);
+        }
+
+        .text-accent {
+            color: var(--accent);
+        }
+
+        .text-success {
+            color: var(--success);
+        }
+
+        /* Note display in terminal */
+        .note-display {
+            background: var(--bg-main);
+            border: 4px solid var(--border-dark);
+            box-shadow: 6px 6px 0 var(--shadow-color);
+            margin: 20px 0;
+            overflow: hidden;
+        }
+
+        .note-display-header {
+            background: var(--secondary);
+            padding: 12px;
+            border-bottom: 4px solid var(--border-dark);
+            display: flex;
+            justify-content: space-between;
+            font-weight: 700;
+        }
+
+        .note-display-id {
+            background: var(--text-dark);
+            color: var(--text-light);
+            padding: 3px 8px;
+            font-size: 12px;
+        }
+
+        .note-display-content {
+            padding: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .note-display-tags {
+            background: var(--accent);
+            padding: 12px;
+            border-top: 4px solid var(--border-dark);
+        }
+
+        .note-tag {
+            display: inline-block;
+            background: var(--bg-main);
+            border: 2px solid var(--border-dark);
+            padding: 4px 10px;
+            margin-right: 8px;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <!-- Main Terminal Interface -->
+    <div class="container" id="mainInterface">
+        <header class="header">
+            <div class="logo">ZETTL</div>
+            <div class="header-actions">
+                <button class="btn accent small" onclick="toggleChat()">CHAT</button>
+                <button class="btn secondary small" onclick="showSettings()">SETTINGS</button>
+                <span style="background: var(--bg-main); padding: 8px 16px; border: 3px solid var(--border-dark); font-weight: 700; box-shadow: 3px 3px 0 var(--shadow-color);">@username</span>
+            </div>
+        </header>
+
+        <div class="terminal-container">
+            <div class="terminal">
+                <div class="terminal-output" id="terminalOutput">
+                    <div class="output-line">
+                        <div class="output-command">zettl> list --limit 5</div>
+                        <div class="output-result">
+                            <div class="note-display">
+                                <div class="note-display-header">
+                                    <span class="note-display-id">#1234</span>
+                                    <span>2024-11-03 14:23</span>
+                                </div>
+                                <div class="note-display-content">
+                                    <strong>Neo-Brutalist Design Principles</strong><br>
+                                    Bold borders, high contrast colors, and intentional asymmetry...
+                                </div>
+                                <div class="note-display-tags">
+                                    <span class="note-tag">design</span>
+                                    <span class="note-tag">ui/ux</span>
+                                </div>
+                            </div>
+
+                            <div class="note-display">
+                                <div class="note-display-header">
+                                    <span class="note-display-id">#1233</span>
+                                    <span>2024-11-03 12:45</span>
+                                </div>
+                                <div class="note-display-content">
+                                    <strong>Meeting Notes</strong><br>
+                                    Discussed the implementation timeline for Q4...
+                                </div>
+                                <div class="note-display-tags">
+                                    <span class="note-tag">meetings</span>
+                                    <span class="note-tag">planning</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="output-line">
+                        <div class="output-command">zettl> new</div>
+                        <div class="output-success">✓ Note created successfully with ID: #1235</div>
+                    </div>
+
+                    <div class="output-line">
+                        <div class="output-command">zettl> link 1234 1235</div>
+                        <div class="output-success">✓ Notes linked successfully</div>
+                    </div>
+
+                    <div class="output-line">
+                        <div class="output-command">zettl> search "design patterns"</div>
+                        <div class="output-result">
+                            Found 3 matching notes:<br><br>
+                            <strong>#1234</strong> - Neo-Brutalist Design Principles<br>
+                            <strong>#1198</strong> - Software Design Patterns Overview<br>
+                            <strong>#1156</strong> - UI Component Design System
+                        </div>
+                    </div>
+                </div>
+
+                <div class="command-shortcuts">
+                    <button class="shortcut-btn">new</button>
+                    <button class="shortcut-btn">list</button>
+                    <button class="shortcut-btn">search</button>
+                    <button class="shortcut-btn">edit</button>
+                    <button class="shortcut-btn">delete</button>
+                    <button class="shortcut-btn">tags</button>
+                    <button class="shortcut-btn">link</button>
+                    <button class="shortcut-btn">graph</button>
+                    <button class="shortcut-btn">todos</button>
+                    <button class="shortcut-btn">llm</button>
+                    <button class="shortcut-btn">help</button>
+                    <button class="shortcut-btn">clear</button>
+                </div>
+
+                <div class="command-input-area">
+                    <div class="prompt">zettl></div>
+                    <input type="text" class="command-input" placeholder="Enter command..." autofocus>
+                    <button class="btn success">EXECUTE</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Panel -->
+    <div class="chat-panel" id="chatPanel">
+        <div class="chat-header">
+            <span class="chat-title">CLAUDE CHAT</span>
+            <button class="btn small" onclick="toggleChat()">×</button>
+        </div>
+        <div class="chat-messages">
+            <div class="chat-message assistant">
+                Hello! I'm Claude, your AI assistant. How can I help you with your notes today?
+            </div>
+            <div class="chat-message user">
+                Can you help me organize my design notes?
+            </div>
+            <div class="chat-message assistant">
+                I'd be happy to help organize your design notes! I can see you have several design-related notes. Would you like me to:
+                1. Create tags for different design categories
+                2. Link related design notes together
+                3. Create a summary note of your design principles
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" class="chat-input" placeholder="Type your message...">
+            <button class="btn">SEND</button>
+        </div>
+    </div>
+
+    <!-- Login Screen -->
+    <div class="login-container" id="loginScreen">
+        <div class="login-box">
+            <div class="login-header">
+                <div class="login-logo">ZETTL</div>
+                <div style="font-size: 14px; font-weight: 500; margin-top: 10px;">MINIMALIST KNOWLEDGE BASE</div>
+            </div>
+            <div class="login-tabs">
+                <div class="login-tab active" onclick="switchTab('login')">LOGIN</div>
+                <div class="login-tab" onclick="switchTab('register')">REGISTER</div>
+            </div>
+            <div class="login-form">
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="form-input" placeholder="Enter your username" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-input" placeholder="Enter your password" required>
+                    </div>
+                    <button type="submit" class="form-btn">LOGIN →</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Screen -->
+    <div class="settings-container" id="settingsScreen">
+        <header class="header">
+            <div class="logo">ZETTL</div>
+            <div class="header-actions">
+                <button class="btn secondary" onclick="showMain()">← BACK</button>
+            </div>
+        </header>
+
+        <div style="margin-top: 30px;">
+            <div class="settings-panel">
+                <div class="settings-header">API Configuration</div>
+                <div class="settings-content">
+                    <div class="setting-item">
+                        <label class="setting-label">Claude API Key</label>
+                        <div class="setting-description">Your Anthropic API key for Claude integration</div>
+                        <input type="password" class="form-input" placeholder="sk-ant-..." value="sk-ant-api03-...">
+                        <button class="btn success" style="margin-top: 15px;">SAVE KEY</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-panel">
+                <div class="settings-header">CLI Tokens</div>
+                <div class="settings-content">
+                    <div class="setting-item">
+                        <label class="setting-label">Active Tokens</label>
+                        <div class="setting-description">Manage your CLI access tokens</div>
+                        <button class="btn accent">GENERATE NEW TOKEN</button>
+                        <div class="token-list">
+                            <div class="token-item">
+                                <span><strong>Token:</strong> zettl_cli_a1b2c3...</span>
+                                <button class="btn small" style="background: var(--primary);">REVOKE</button>
+                            </div>
+                            <div class="token-item">
+                                <span><strong>Token:</strong> zettl_cli_x9y8z7...</span>
+                                <button class="btn small" style="background: var(--primary);">REVOKE</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-panel">
+                <div class="settings-header">Interface Preferences</div>
+                <div class="settings-content">
+                    <div class="setting-item">
+                        <label class="setting-label">Command Shortcuts</label>
+                        <div class="setting-description">Show quick command buttons above input</div>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span style="font-weight: 600;">ENABLED</span>
+                        </div>
+                    </div>
+
+                    <div class="setting-item">
+                        <label class="setting-label">Auto-save Notes</label>
+                        <div class="setting-description">Automatically save notes as you type</div>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span style="font-weight: 600;">DISABLED</span>
+                        </div>
+                    </div>
+
+                    <div class="setting-item">
+                        <label class="setting-label">Sound Effects</label>
+                        <div class="setting-description">Play sounds for commands and notifications</div>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span style="font-weight: 600;">DISABLED</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-panel">
+                <div class="settings-header">Danger Zone</div>
+                <div class="settings-content" style="background: var(--primary); margin: -30px; padding: 30px;">
+                    <div class="setting-item" style="border: none;">
+                        <label class="setting-label" style="color: var(--text-light);">Delete Account</label>
+                        <div class="setting-description" style="color: var(--text-light);">
+                            Permanently delete your account and all associated data. This action cannot be undone.
+                        </div>
+                        <button class="btn" style="background: var(--text-dark); color: var(--text-light); margin-top: 15px;">
+                            DELETE ACCOUNT
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Toggle chat panel
+        function toggleChat() {
+            const chatPanel = document.getElementById('chatPanel');
+            chatPanel.classList.toggle('open');
+        }
+
+        // Screen navigation
+        function showSettings() {
+            document.getElementById('mainInterface').style.display = 'none';
+            document.getElementById('settingsScreen').style.display = 'block';
+            document.getElementById('loginScreen').style.display = 'none';
+        }
+
+        function showMain() {
+            document.getElementById('mainInterface').style.display = 'block';
+            document.getElementById('settingsScreen').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'none';
+        }
+
+        function showLogin() {
+            document.getElementById('mainInterface').style.display = 'none';
+            document.getElementById('settingsScreen').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'flex';
+        }
+
+        // Tab switching in login
+        function switchTab(tab) {
+            const tabs = document.querySelectorAll('.login-tab');
+            tabs.forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update form for register
+            const form = document.getElementById('loginForm');
+            const btn = form.querySelector('.form-btn');
+
+            if (tab === 'register') {
+                btn.textContent = 'REGISTER →';
+                // Add email field for registration
+                if (!form.querySelector('input[type="email"]')) {
+                    const emailGroup = document.createElement('div');
+                    emailGroup.className = 'form-group';
+                    emailGroup.innerHTML = `
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-input" placeholder="Enter your email" required>
+                    `;
+                    form.insertBefore(emailGroup, form.children[1]);
+                }
+            } else {
+                btn.textContent = 'LOGIN →';
+                // Remove email field for login
+                const emailField = form.querySelector('input[type="email"]');
+                if (emailField) {
+                    emailField.parentElement.remove();
+                }
+            }
+        }
+
+        // Shortcut button functionality
+        document.querySelectorAll('.shortcut-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const input = document.querySelector('.command-input');
+                input.value = this.textContent + ' ';
+                input.focus();
+            });
+        });
+
+        // Execute button animation
+        document.querySelector('.btn.success').addEventListener('click', function() {
+            const input = document.querySelector('.command-input');
+            const output = document.getElementById('terminalOutput');
+
+            if (input.value.trim()) {
+                // Add command to output
+                const commandLine = document.createElement('div');
+                commandLine.className = 'output-line';
+                commandLine.innerHTML = `
+                    <div class="output-command">zettl> ${input.value}</div>
+                    <div class="output-success">✓ Command executed</div>
+                `;
+                output.appendChild(commandLine);
+
+                // Scroll to bottom
+                output.scrollTop = output.scrollHeight;
+
+                // Clear input
+                input.value = '';
+            }
+        });
+
+        // Enter key to execute
+        document.querySelector('.command-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.querySelector('.btn.success').click();
+            }
+        });
+
+        // Toggle switch functionality
+        document.querySelectorAll('.toggle-switch input').forEach(toggle => {
+            toggle.addEventListener('change', function() {
+                const label = this.closest('.toggle-container').querySelector('span');
+                label.textContent = this.checked ? 'ENABLED' : 'DISABLED';
+            });
+        });
+
+        // Logo animation
+        document.querySelectorAll('.logo').forEach(logo => {
+            logo.addEventListener('click', function() {
+                this.style.transform = `rotate(${Math.random() * 10 - 5}deg)`;
+            });
+        });
+
+        // Start with main interface
+        showMain();
+    </script>
+</body>
+</html>
