@@ -194,91 +194,107 @@ def show_help_callback(ctx, param, value):
 
 # Task command with shortcut 't'
 @cli.command(name='task')
-@click.argument('content')
+@click.argument('content', nargs=-1, required=True)
 @click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the task')
 @click.option('--id', 'custom_id', help='Custom ID for the task (must be unique)')
 @click.option('--link', '-l', help='Note ID to link this task to')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def task_cmd(content, tag, custom_id, link):
     """Create a new task (automatically tagged with 'task' and 'todo')."""
-    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['task', 'todo'])
+    # Join multiple arguments into a single string
+    content_str = ' '.join(content)
+    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['task', 'todo'])
 
 # Shortcut for task
 @cli.command(name='t')
-@click.argument('content')
+@click.argument('content', nargs=-1, required=True)
 @click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the task')
 @click.option('--id', 'custom_id', help='Custom ID for the task (must be unique)')
 @click.option('--link', '-l', help='Note ID to link this task to')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def t_cmd(content, tag, custom_id, link):
     """Create a new task (shortcut for 'task' command)."""
-    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['task', 'todo'])
+    # Join multiple arguments into a single string
+    content_str = ' '.join(content)
+    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['task', 'todo'])
 
 # Idea command with shortcut 'i'
 @cli.command(name='idea')
-@click.argument('content')
+@click.argument('content', nargs=-1, required=True)
 @click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the idea')
 @click.option('--id', 'custom_id', help='Custom ID for the idea (must be unique)')
 @click.option('--link', '-l', help='Note ID to link this idea to')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def idea_cmd(content, tag, custom_id, link):
     """Create a new idea (automatically tagged with 'idea')."""
-    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['idea'])
+    # Join multiple arguments into a single string
+    content_str = ' '.join(content)
+    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['idea'])
 
 # Shortcut for idea
 @cli.command(name='i')
-@click.argument('content')
+@click.argument('content', nargs=-1, required=True)
 @click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the idea')
 @click.option('--id', 'custom_id', help='Custom ID for the idea (must be unique)')
 @click.option('--link', '-l', help='Note ID to link this idea to')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def i_cmd(content, tag, custom_id, link):
     """Create a new idea (shortcut for 'idea' command)."""
-    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['idea'])
+    # Join multiple arguments into a single string
+    content_str = ' '.join(content)
+    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['idea'])
 
 # Note command with shortcut 'n'
 @cli.command(name='note')
-@click.argument('content')
+@click.argument('content', nargs=-1, required=True)
 @click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the note')
 @click.option('--id', 'custom_id', help='Custom ID for the note (must be unique)')
 @click.option('--link', '-l', help='Note ID to link this note to')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def note_cmd(content, tag, custom_id, link):
     """Create a new note (automatically tagged with 'note')."""
-    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['note'])
+    # Join multiple arguments into a single string
+    content_str = ' '.join(content)
+    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['note'])
 
 # Shortcut for note
 @cli.command(name='n')
-@click.argument('content')
+@click.argument('content', nargs=-1, required=True)
 @click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the note')
 @click.option('--id', 'custom_id', help='Custom ID for the note (must be unique)')
 @click.option('--link', '-l', help='Note ID to link this note to')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def n_cmd(content, tag, custom_id, link):
     """Create a new note (shortcut for 'note' command)."""
-    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['note'])
+    # Join multiple arguments into a single string
+    content_str = ' '.join(content)
+    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['note'])
 
 # Project command with shortcut 'p'
 @cli.command(name='project')
-@click.argument('content')
+@click.argument('content', nargs=-1, required=True)
 @click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the project')
 @click.option('--id', 'custom_id', help='Custom ID for the project (must be unique, e.g., "learn-rust")')
 @click.option('--link', '-l', help='Note ID to link this project to')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def project_cmd(content, tag, custom_id, link):
     """Create a new project (automatically tagged with 'project')."""
-    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['project'])
+    # Join multiple arguments into a single string
+    content_str = ' '.join(content)
+    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['project'])
 
 # Shortcut for project
 @cli.command(name='p')
-@click.argument('content')
+@click.argument('content', nargs=-1, required=True)
 @click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the project')
 @click.option('--id', 'custom_id', help='Custom ID for the project (must be unique, e.g., "learn-rust")')
 @click.option('--link', '-l', help='Note ID to link this project to')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def p_cmd(content, tag, custom_id, link):
     """Create a new project (shortcut for 'project' command)."""
-    create_new_note(content, tag, link, custom_id=custom_id, auto_tags=['project'])
+    # Join multiple arguments into a single string
+    content_str = ' '.join(content)
+    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['project'])
 
 # Update the list command
 @cli.command()

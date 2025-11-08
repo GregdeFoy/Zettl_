@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: zettl
-Version: 0.5.2
+Version: 0.5.3
 Requires-Dist: Click
 Requires-Dist: python-dotenv
 Requires-Dist: requests

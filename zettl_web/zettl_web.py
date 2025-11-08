@@ -184,26 +184,6 @@ def parse_command(command_str):
 
 
 COMMAND_OPTIONS = {
-    'new': {
-            'short_opts': {
-        't': {'name': 'tag', 'multiple': True},
-        'l': {'name': 'link'}
-    },
-    'long_opts': {
-        'tag': {'multiple': True},
-        'link': {}
-    }
-    },
-    'add': {
-            'short_opts': {
-        't': {'name': 'tag', 'multiple': True},
-        'l': {'name': 'link'}
-    },
-    'long_opts': {
-        'tag': {'multiple': True},
-        'link': {}
-    }
-    },
     'list': {
         'short_opts': {
             'l': {'name': 'limit', 'type': int},
@@ -294,6 +274,50 @@ COMMAND_OPTIONS = {
     'edit': {
         'short_opts': {},
         'long_opts': {}
+    },
+    'task': {
+        'short_opts': {
+            't': {'name': 'tag', 'multiple': True},
+            'l': {'name': 'link'}
+        },
+        'long_opts': {
+            'tag': {'multiple': True},
+            'link': {},
+            'id': {}
+        }
+    },
+    'idea': {
+        'short_opts': {
+            't': {'name': 'tag', 'multiple': True},
+            'l': {'name': 'link'}
+        },
+        'long_opts': {
+            'tag': {'multiple': True},
+            'link': {},
+            'id': {}
+        }
+    },
+    'note': {
+        'short_opts': {
+            't': {'name': 'tag', 'multiple': True},
+            'l': {'name': 'link'}
+        },
+        'long_opts': {
+            'tag': {'multiple': True},
+            'link': {},
+            'id': {}
+        }
+    },
+    'project': {
+        'short_opts': {
+            't': {'name': 'tag', 'multiple': True},
+            'l': {'name': 'link'}
+        },
+        'long_opts': {
+            'tag': {'multiple': True},
+            'link': {},
+            'id': {}
+        }
     },
 
     # Add similar configs for other commands
@@ -897,6 +921,18 @@ def execute_command():
     # Parse the command with better handling for options and quotes
     cmd, args = parse_command(command)
 
+    # Map shortcut commands to their full versions
+    command_map = {
+        't': 'task',
+        'i': 'idea',
+        'n': 'note',
+        'p': 'project'
+    }
+
+    # Apply command mapping for shortcuts
+    if cmd in command_map:
+        cmd = command_map[cmd]
+
     # Check for command-specific help
     if '--help' in args or '-h' in args:
         return show_command_help(cmd)
@@ -952,38 +988,93 @@ def execute_command():
                     content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
                     result += f"{formatted_id} [{formatted_time}]: {content_preview}\n\n"  # Added extra newline
 
-                    
-        elif cmd == "new" or cmd == "add":
-            # Handle content and tags
-            content = remaining_args[0] if remaining_args else ""
-            
-            # Get tags from the 'tag' option which could be from -t or --tag
+
+        elif cmd in ["task", "idea", "note", "project"]:
+            # Handle specialized note creation commands with @ linking support
+            import re
+
+            # Parse @ project links from content
+            def parse_project_links(content):
+                """Extract @project references from content and return cleaned content and project IDs."""
+                pattern = r'@(\S+)'
+                project_ids = re.findall(pattern, content)
+                # Remove @ references from content
+                cleaned_content = re.sub(pattern, '', content).strip()
+                return cleaned_content, project_ids
+
+            # Join remaining args into content string (support multiple words without quotes)
+            content = ' '.join(remaining_args) if remaining_args else ""
+
+            # Parse and remove @ references from content
+            cleaned_content, project_links = parse_project_links(content)
+
+            # Get custom ID if provided
+            custom_id = options.get('id', '')
+
+            # Get tags from options
             tags = []
             if 'tag' in options:
                 if isinstance(options['tag'], list):
-                    # Multiple tag option usage
                     tags.extend(options['tag'])
                 else:
-                    # Single tag option
                     tags.append(options['tag'])
-            
-            # Create the note
-            note_id = notes_manager.create_note(content)
-            result = f"Created note #{note_id}\n"
-            
-            
-            # Add tags if provided
+
+            # Add automatic tags based on command type
+            auto_tags = []
+            if cmd == "task":
+                auto_tags = ['task', 'todo']
+            elif cmd == "idea":
+                auto_tags = ['idea']
+            elif cmd == "note":
+                auto_tags = ['note']
+            elif cmd == "project":
+                auto_tags = ['project']
+
+            # Create the note with custom ID if provided
+            if custom_id:
+                try:
+                    from datetime import datetime
+                    now = datetime.now().isoformat()
+                    note_id = notes_manager.create_note_with_timestamp(cleaned_content, now, custom_id)
+                    result = f"Created {cmd} #{note_id}\n"
+                except Exception as e:
+                    # If custom ID already exists, use regular creation
+                    if "already exists" in str(e) or "duplicate" in str(e).lower():
+                        note_id = notes_manager.create_note(cleaned_content)
+                        result = f"Created {cmd} #{note_id} (custom ID '{custom_id}' already exists)\n"
+                    else:
+                        raise e
+            else:
+                note_id = notes_manager.create_note(cleaned_content)
+                result = f"Created {cmd} #{note_id}\n"
+
+            # Add automatic tags
+            for tag in auto_tags:
+                try:
+                    notes_manager.add_tag(note_id, tag)
+                    result += f"Added tag '{tag}' to note #{note_id}\n"
+                except Exception as e:
+                    result += f"{ZettlFormatter.warning(f'Could not add tag {tag}: {str(e)}')}\n"
+
+            # Add user-provided tags
             for tag in tags:
-                if tag:
+                if tag and tag not in auto_tags:
                     try:
                         notes_manager.add_tag(note_id, tag)
                         result += f"Added tag '{tag}' to note #{note_id}\n"
                     except Exception as e:
                         result += f"{ZettlFormatter.warning(f'Could not add tag {tag}: {str(e)}')}\n"
 
+            # Create links from @ references
+            for project_id in project_links:
+                try:
+                    notes_manager.create_link(note_id, project_id)
+                    result += f"Created link from #{note_id} to project #{project_id}\n"
+                except Exception as e:
+                    result += f"{ZettlFormatter.warning(f'Could not create link to project #{project_id}: {str(e)}')}\n"
 
+            # Create link from -l option if provided
             link = options.get('link', options.get('l', ''))
-            # Create link if provided
             if link:
                 try:
                     notes_manager.create_link(note_id, link)
@@ -991,7 +1082,6 @@ def execute_command():
                 except Exception as e:
                     result += f"{ZettlFormatter.warning(f'Could not create link to note #{link}: {str(e)}')}\n"
 
-                    
         elif cmd == "show":
             if not remaining_args:
                 result = ZettlFormatter.error("Please provide a note ID")
