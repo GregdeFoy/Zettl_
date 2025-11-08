@@ -350,12 +350,21 @@ def show(note_id):
     try:
         note = get_notes_manager().get_note(note_id)
         console.print(ZettlFormatter.format_note_display(note, get_notes_manager()))
-        
+
         # Show tags if any
         try:
             tags = get_notes_manager().get_tags(note_id)
             if tags:
                 click.echo(f"Tags: {', '.join(tags)}")
+        except Exception:
+            pass
+
+        # Show linked notes if any
+        try:
+            linked_notes = get_notes_manager().get_related_notes(note_id)
+            if linked_notes:
+                linked_ids = [note['id'] for note in linked_notes]
+                click.echo(f"Links: {', '.join(linked_ids)}")
         except Exception:
             pass
     except Exception as e:
@@ -376,13 +385,21 @@ def link(source_id, target_id, context):
 
 @cli.command()
 @click.argument('note_id', required=False)
-@click.argument('tag', required=False)
+@click.argument('tag_string', required=False)
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def tags(note_id, tag):
-    """Show or add tags to a note. If no note_id is provided, list all tags."""
+def tags(note_id, tag_string):
+    """Show or add tags to a note. If no note_id is provided, list all tags.
+
+    Usage:
+        zt tags                            - List all tags with their counts
+        zt tags xyz12                      - Show all tags for note xyz12
+        zt tags xyz12 "tag1"               - Add tag1 to note xyz12
+        zt tags xyz12 "tag1 tag2 tag3..." - Add multiple tags to note xyz12 (space-separated in quotes)
+    """
     try:
-        # If no note_id is provided, list all tags
+        # Handle different argument patterns
         if not note_id:
+            # No arguments - list all tags
             tags_with_counts = get_notes_manager().get_all_tags_with_counts()
             if tags_with_counts:
                 console.print(ZettlFormatter.header(f"All Tags (showing {len(tags_with_counts)})"))
@@ -392,16 +409,25 @@ def tags(note_id, tag):
             else:
                 console.print(ZettlFormatter.warning("No tags found."))
             return
-            
-        # If a tag was provided, add it
-        if tag:
-            get_notes_manager().add_tag(note_id, tag)
-            click.echo(f"Added tag '{tag}' to note #{note_id}")
-            
+
+        # If tag_string was provided, parse and add tags
+        if tag_string:
+            # Split the tag string by spaces to get individual tags
+            tags = tag_string.split()
+
+            if len(tags) == 1:
+                # Single tag - use existing add_tag method
+                get_notes_manager().add_tag(note_id, tags[0])
+                click.echo(f"Added tag '{tags[0]}' to note #{note_id}")
+            else:
+                # Multiple tags - use batch method
+                get_notes_manager().add_tags_batch(note_id, tags)
+                click.echo(f"Added {len(tags)} tags to note #{note_id}: {', '.join(tags)}")
+
         # Show all tags for the note
-        tags = get_notes_manager().get_tags(note_id)
-        if tags:
-            console.print(f"Tags for note #{note_id}: {', '.join([ZettlFormatter.tag(t) for t in tags])}")
+        note_tags = get_notes_manager().get_tags(note_id)
+        if note_tags:
+            console.print(f"Tags for note #{note_id}: {', '.join([ZettlFormatter.tag(t) for t in note_tags])}")
         else:
             click.echo(f"No tags for note #{note_id}")
     except Exception as e:

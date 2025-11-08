@@ -39,7 +39,7 @@ class CommandHelp:
     def get_main_help(cls):
         """Return the main help text."""
         help_text = f"""
-[bold green]zettl v0.5.1[/bold green] - A Zettelkasten-style note-taking tool
+[bold green]zettl v0.5.2[/bold green] - A Zettelkasten-style note-taking tool
 
 [bold]NOTE MANAGEMENT[/bold]
   [bold yellow]t[/bold yellow] / [bold yellow]task[/bold yellow]            Create a new task (auto-tagged 'task', 'todo')
@@ -357,17 +357,20 @@ See 'zettl project --help' for full documentation.
 """,
 
             "tags": f"""
-[bold green]tags [NOTE_ID] [TAG][/bold green] - Show or add tags to a note
+[bold green]tags [NOTE_ID] ["TAGS"][/bold green] - Show or add tags to a note
 
 [bold]Usage:[/bold]
-  zettl tags                  List all tags
-  zettl tags NOTE_ID          Show tags for a specific note
-  zettl tags NOTE_ID TAG      Add a tag to a note
+  zettl tags                          List all tags
+  zettl tags NOTE_ID                  Show tags for a specific note
+  zettl tags NOTE_ID "TAG"            Add a single tag to a note
+  zettl tags NOTE_ID "TAG1 TAG2..."  Add multiple tags to a note (space-separated in quotes)
 
 [bold]Examples:[/bold]
-  [blue]zettl tags[/blue]                 List all tags with counts
-  [blue]zettl tags 22a4b[/blue]           Show tags for note 22a4b
-  [blue]zettl tags 22a4b "concept"[/blue] Add "concept" tag to note 22a4b
+  [blue]zettl tags[/blue]                         List all tags with counts
+  [blue]zettl tags 22a4b[/blue]                   Show tags for note 22a4b
+  [blue]zettl tags 22a4b concept[/blue]           Add "concept" tag to note 22a4b
+  [blue]zettl tags 22a4b "todo urgent"[/blue]     Add "todo" and "urgent" tags to note 22a4b
+  [blue]zettl tags xyz12 "tag1 tag2 tag3"[/blue] Add multiple tags at once
 """,
 
 "todos": f"""

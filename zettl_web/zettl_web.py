@@ -1148,6 +1148,10 @@ def execute_command():
                     
         elif cmd == "tags":
             # Handle various ways the tags command is used
+            # Usage: tags                       - List all tags
+            #        tags note_id               - Show tags for note
+            #        tags note_id "tag1"        - Add single tag
+            #        tags note_id "tag1 tag2..." - Add multiple tags (space-separated in quotes or as separate args)
             if not remaining_args:
                 # List all tags
                 tags_with_counts = notes_manager.get_all_tags_with_counts()
@@ -1160,13 +1164,33 @@ def execute_command():
                     result = ZettlFormatter.warning("No tags found.")
             else:
                 note_id = remaining_args[0]
-                tag = remaining_args[1] if len(remaining_args) > 1 else ""
-                
-                # If a tag was provided, add it
-                if tag:
-                    notes_manager.add_tag(note_id, tag)
-                    result = f"Added tag '{tag}' to note #{note_id}\n"
-                
+
+                # Handle both formats:
+                # 1. Multiple separate arguments: tags note_id tag1 tag2 tag3
+                # 2. Single quoted string: tags note_id "tag1 tag2 tag3"
+                if len(remaining_args) > 2:
+                    # Multiple separate arguments
+                    tags_to_add = remaining_args[1:]
+                elif len(remaining_args) == 2:
+                    # Could be single tag or space-separated tags in quotes
+                    tag_string = remaining_args[1]
+                    tags_to_add = tag_string.split() if ' ' in tag_string else [tag_string]
+                else:
+                    tags_to_add = []
+
+                # If tags were provided, add them
+                if tags_to_add:
+                    if len(tags_to_add) == 1:
+                        # Single tag - use existing add_tag method
+                        notes_manager.add_tag(note_id, tags_to_add[0])
+                        result = f"Added tag '{tags_to_add[0]}' to note #{note_id}\n"
+                    else:
+                        # Multiple tags - use batch method
+                        notes_manager.add_tags_batch(note_id, tags_to_add)
+                        result = f"Added {len(tags_to_add)} tags to note #{note_id}: {', '.join(tags_to_add)}\n"
+                else:
+                    result = ""
+
                 # Show all tags for the note
                 tags = notes_manager.get_tags(note_id)
                 if tags:
