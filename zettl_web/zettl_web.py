@@ -1122,6 +1122,9 @@ def execute_command():
 
                 
         elif cmd == "search":
+            # Import re module for pattern matching in search highlighting
+            import re
+
             # Parse options - handle both single values and lists
             tags = options.get('tag', [])
             exclude_tags = options.get('exclude-tag', [])
@@ -1634,6 +1637,9 @@ def execute_command():
                             result = ZettlFormatter.error(f"Error merging notes: {str(e)}")
 
         elif cmd == "rules":
+            # Import re module for pattern matching
+            import re
+
             # Parse the source flag
             source = 'source' in flags or 's' in flags
             
