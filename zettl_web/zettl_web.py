@@ -234,12 +234,12 @@ COMMAND_OPTIONS = {
     },
     'search': {
         'short_opts': {
-            't': {'name': 'tag'},
+            't': {'name': 'tag', 'multiple': True},
             'f': {'name': 'full', 'flag': True}
         },
         'long_opts': {
-            'tag': {},
-            'exclude-tag': {},
+            'tag': {'multiple': True},
+            'exclude-tag': {'multiple': True},
             'full': {'flag': True}
         }
     },
@@ -413,10 +413,16 @@ def extract_options(args, cmd):
             i += 1
         elif arg.startswith('+t'):
             if i + 1 < len(args) and not args[i+1].startswith('-'):
-                options['exclude-tag'] = args[i+1]
+                # Handle multiple exclude tags
+                if 'exclude-tag' not in options:
+                    options['exclude-tag'] = []
+                options['exclude-tag'].append(args[i+1])
                 i += 2
             else:
-                options['exclude-tag'] = True
+                # If +t without value, treat as flag
+                if 'exclude-tag' not in options:
+                    options['exclude-tag'] = []
+                options['exclude-tag'].append(True)
                 i += 1
         else:
             # Add this else clause to capture non-option arguments
@@ -1026,46 +1032,91 @@ def execute_command():
 
                 
         elif cmd == "search":
-            # Parse options
-            tag = options.get('tag', options.get('t', ''))
-            exclude_tag = options.get('exclude-tag', options.get('+t', ''))
+            # Parse options - handle both single values and lists
+            tags = options.get('tag', [])
+            exclude_tags = options.get('exclude-tag', [])
+
+            # Ensure tags and exclude_tags are always lists
+            if not isinstance(tags, list):
+                tags = [tags] if tags else []
+            if not isinstance(exclude_tags, list):
+                exclude_tags = [exclude_tags] if exclude_tags else []
+
             full = 'f' in flags or 'full' in flags
             query = remaining_args[0] if remaining_args else ""
-            
-            if tag:
-                # Search by tag inclusion
-                notes = notes_manager.get_notes_by_tag(tag)
-                if not notes:
-                    result = ZettlFormatter.warning(f"No notes found with tag '{tag}'")
-                else:
-                    result = f"{ZettlFormatter.header(f'Found {len(notes)} notes with tag {tag}:')}\n\n"
-                    search_results = notes
-            elif query:
+            search_description = []
+
+            # Step 1: Get initial result set based on primary criteria
+            if query:
                 # Search by content
-                notes = notes_manager.search_notes(query)
-                if not notes:
+                search_results = notes_manager.search_notes(query)
+                if not search_results:
                     result = ZettlFormatter.warning(f"No notes found containing '{query}'")
                 else:
-                    result = f"{ZettlFormatter.header(f'Found {len(notes)} notes containing {query}:')}\n\n"
-                    search_results = notes
+                    search_description.append(f"containing '{query}'")
+                    result = ""
             else:
-                # No search criteria specified, use a larger set
-                search_results = notes_manager.list_notes(limit=50)
-                result = f"{ZettlFormatter.header(f'Listing notes (showing {len(search_results)}):')}\n\n"
-            
-            # Filter out excluded tags if specified
-            if exclude_tag and 'search_results' in locals():
-                # Get IDs of notes with the excluded tag
-                excluded_notes = notes_manager.get_notes_by_tag(exclude_tag)
-                excluded_ids = {note['id'] for note in excluded_notes}
-                
-                # Filter out notes with the excluded tag
+                # No primary search criteria - start with all notes
+                # If we have any tag filters, we need to search ALL notes
+                if tags or exclude_tags:
+                    search_results = notes_manager.list_notes(limit=10000)
+                    result = ""
+                else:
+                    # No filters at all - just list recent notes
+                    search_results = notes_manager.list_notes(limit=50)
+                    result = f"{ZettlFormatter.header(f'Listing notes (showing {len(search_results)}):')}\n\n"
+
+            # Step 2: Apply include tag filters (must have ALL specified tags)
+            if tags and 'search_results' in locals():
+                # Get note IDs for each required tag
+                tag_note_sets = []
+                for t in tags:
+                    tag_notes = notes_manager.get_notes_by_tag(t)
+                    tag_note_ids = {note['id'] for note in tag_notes}
+                    tag_note_sets.append(tag_note_ids)
+
+                # Find intersection - notes that have ALL required tags
+                if tag_note_sets:
+                    required_ids = set.intersection(*tag_note_sets) if tag_note_sets else set()
+
+                    # Filter results to only include notes with ALL required tags
+                    original_count = len(search_results)
+                    search_results = [note for note in search_results if note['id'] in required_ids]
+
+                    tags_str = "', '".join(tags)
+                    search_description.append(f"with tags '{tags_str}'")
+
+                    if not search_results and original_count > 0:
+                        result = ZettlFormatter.warning(f"No notes found with all tags: '{tags_str}'")
+
+            # Step 3: Apply exclude tag filters (must not have ANY excluded tags)
+            if exclude_tags and 'search_results' in locals():
+                # Get note IDs for each excluded tag
+                excluded_ids = set()
+                for et in exclude_tags:
+                    excluded_notes = notes_manager.get_notes_by_tag(et)
+                    excluded_ids.update(note['id'] for note in excluded_notes)
+
+                # Filter out notes with ANY excluded tag
                 original_count = len(search_results)
                 search_results = [note for note in search_results if note['id'] not in excluded_ids]
-                
-                # Inform user about filtering
+
+                excluded_tags_str = "', '".join(exclude_tags)
+
                 if original_count != len(search_results):
-                    result += f"{ZettlFormatter.warning(f'Excluded {original_count - len(search_results)} notes with tag {exclude_tag}')}\n\n"
+                    if not result:
+                        result = ""
+                    result += f"{ZettlFormatter.info(f'Excluded {original_count - len(search_results)} notes with tags: {excluded_tags_str}')}\n\n"
+
+            # Build and display search header
+            if 'search_results' in locals() and search_results:
+                if search_description or tags or exclude_tags:
+                    header_msg = f"Found {len(search_results)} notes"
+                    if search_description:
+                        header_msg += f" {' and '.join(search_description)}"
+                    if not result:
+                        result = ""
+                    result = f"{ZettlFormatter.header(header_msg)}\n\n" + result
             
             # Display the results if we have any
             if 'search_results' in locals() and search_results:

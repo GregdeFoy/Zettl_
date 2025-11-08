@@ -122,7 +122,9 @@ def auth():
 def show_auth_help_callback(ctx, param, value):
     """Callback to show auth help and exit."""
     if value and not ctx.resilient_parsing:
-        console.print(CommandHelp.get_command_help("auth"))
+        from rich.text import Text
+        help_text = CommandHelp.get_command_help("auth")
+        console.print(Text.from_markup(help_text))
         ctx.exit()
 
 @auth.command()
@@ -168,7 +170,9 @@ def status():
 def show_main_help_callback(ctx, param, value):
     """Callback to show main help and exit."""
     if value and not ctx.resilient_parsing:
-        console.print(CommandHelp.get_main_help())
+        from rich.text import Text
+        help_text = CommandHelp.get_main_help()
+        console.print(Text.from_markup(help_text))
         ctx.exit()
 
 @cli.command()
@@ -176,12 +180,16 @@ def show_main_help_callback(ctx, param, value):
 def commands():
     """Show all available commands with examples."""
     # The commands command itself shows the main help, so if --help is passed, show the same
-    console.print(CommandHelp.get_main_help())
+    from rich.text import Text
+    help_text = CommandHelp.get_main_help()
+    console.print(Text.from_markup(help_text))
 
 def show_help_callback(ctx, param, value):
     """Callback to show help and exit."""
     if value and not ctx.resilient_parsing:
-        console.print(CommandHelp.get_command_help(ctx.info_name))
+        from rich.text import Text
+        help_text = CommandHelp.get_command_help(ctx.info_name)
+        console.print(Text.from_markup(help_text))
         ctx.exit()
 
 # Task command with shortcut 't'
@@ -401,71 +409,105 @@ def tags(note_id, tag):
 
 @cli.command()
 @click.argument('query', required=False)
-@click.option('--tag', '-t', help='Search for notes with this tag')
-@click.option('--exclude-tag', '+t', help='Exclude notes with this tag')
+@click.option('--tag', '-t', multiple=True, help='Search for notes with this tag (can specify multiple, must have ALL)')
+@click.option('--exclude-tag', '+t', multiple=True, help='Exclude notes with this tag (can specify multiple, excludes ANY)')
 @click.option('--date', '-d', help='Search for notes created on a specific date (YYYY-MM-DD format)')
 @click.option('--full', '-f', is_flag=True, help='Show full content of matching notes')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def search(query, tag, exclude_tag, date, full):
-    """Search for notes containing text, with specific tag, or by date."""
+    """Search for notes containing text, with specific tags, or by date.
+
+    Multiple tags can be specified:
+    - Multiple -t tags: Note must have ALL specified tags (AND logic)
+    - Multiple +t tags: Note must not have ANY specified tags (OR logic for exclusion)
+    """
     try:
+        notes_manager = get_notes_manager()
         results = []
-        
-        if tag:
-            # Search by tag inclusion
-            notes = get_notes_manager().get_notes_by_tag(tag)
-            if not notes:
-                console.print(ZettlFormatter.warning(f"No notes found with tag '{tag}'"))
-                return
-                
-            console.print(ZettlFormatter.header(f"Found {len(notes)} notes with tag '{tag}':"))
-            results = notes
-        elif date:
+        search_description = []
+
+        # Step 1: Get initial result set based on primary criteria
+        if date:
             # Search by date
             try:
-                notes = get_notes_manager().search_notes_by_date(date)
-                if not notes:
+                results = notes_manager.search_notes_by_date(date)
+                if not results:
                     console.print(ZettlFormatter.warning(f"No notes found for date '{date}'"))
                     return
-                    
-                console.print(ZettlFormatter.header(f"Found {len(notes)} notes created on '{date}':"))
-                results = notes
+                search_description.append(f"created on '{date}'")
             except ValueError as e:
                 console.print(ZettlFormatter.error(str(e)))
                 return
         elif query:
             # Search by content
-            notes = get_notes_manager().search_notes(query)
-            if not notes:
+            results = notes_manager.search_notes(query)
+            if not results:
                 console.print(ZettlFormatter.warning(f"No notes found containing '{query}'"))
                 return
-                
-            console.print(ZettlFormatter.header(f"Found {len(notes)} notes containing '{query}':"))
-            results = notes
+            search_description.append(f"containing '{query}'")
         else:
-            # No search criteria specified, use a larger set
-            results = get_notes_manager().list_notes(limit=50)
-            console.print(ZettlFormatter.header(f"Listing notes (showing {len(results)}):"))
-        
-        # Filter out excluded tags if specified
+            # No primary search criteria - start with all notes
+            # If we have any tag filters, we need to search ALL notes
+            if tag or exclude_tag:
+                results = notes_manager.list_notes(limit=10000)
+            else:
+                # No filters at all - just list recent notes
+                results = notes_manager.list_notes(limit=50)
+                console.print(ZettlFormatter.header(f"Listing notes (showing {len(results)}):"))
+
+        # Step 2: Apply include tag filters (must have ALL specified tags)
+        if tag:
+            # Get note IDs for each required tag
+            tag_note_sets = []
+            for t in tag:
+                tag_notes = notes_manager.get_notes_by_tag(t)
+                tag_note_ids = {note['id'] for note in tag_notes}
+                tag_note_sets.append(tag_note_ids)
+
+            # Find intersection - notes that have ALL required tags
+            if tag_note_sets:
+                required_ids = set.intersection(*tag_note_sets) if tag_note_sets else set()
+
+                # Filter results to only include notes with ALL required tags
+                original_count = len(results)
+                results = [note for note in results if note['id'] in required_ids]
+
+                tags_str = "', '".join(tag)
+                search_description.append(f"with tags '{tags_str}'")
+
+                if not results and original_count > 0:
+                    console.print(ZettlFormatter.warning(f"No notes found with all tags: '{tags_str}'"))
+                    return
+
+        # Step 3: Apply exclude tag filters (must not have ANY excluded tags)
         if exclude_tag:
-            # Get IDs of notes with the excluded tag
-            excluded_notes = get_notes_manager().get_notes_by_tag(exclude_tag)
-            excluded_ids = {note['id'] for note in excluded_notes}
-            
-            # Filter out notes with the excluded tag
+            # Get note IDs for each excluded tag
+            excluded_ids = set()
+            for et in exclude_tag:
+                excluded_notes = notes_manager.get_notes_by_tag(et)
+                excluded_ids.update(note['id'] for note in excluded_notes)
+
+            # Filter out notes with ANY excluded tag
             original_count = len(results)
             results = [note for note in results if note['id'] not in excluded_ids]
-            
-            # Inform user about filtering
+
+            excluded_tags_str = "', '".join(exclude_tag)
+
             if original_count != len(results):
-                console.print(ZettlFormatter.warning(f"Excluded {original_count - len(results)} notes with tag '{exclude_tag}'"))
+                console.print(ZettlFormatter.info(f"Excluded {original_count - len(results)} notes with tags: '{excluded_tags_str}'"))
         
+        # Build and display search header
+        if search_description or tag or exclude_tag:
+            header_msg = f"Found {len(results)} notes"
+            if search_description:
+                header_msg += f" {' and '.join(search_description)}"
+            console.print(ZettlFormatter.header(header_msg))
+
         # Display the final results
         if not results:
             console.print(ZettlFormatter.warning("No notes match your criteria after filtering."))
             return
-            
+
         for note in results:
             if full:
                 # Full content mode

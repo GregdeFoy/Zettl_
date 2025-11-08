@@ -16,7 +16,7 @@ class CommandHelp:
     def _convert_to_markdown(cls, text):
         """Convert rich markup to markdown."""
         # [bold green]text[/bold green] -> **text**
-        # [bold]text[/bold] -> **text**
+        # [bold]text[/bold green] -> **text**
         # [blue]text[/blue] -> *text* (use italic for colored text)
         # [cyan]text[/cyan] -> `text` (use code for cyan)
         # [bold yellow]text[/bold yellow] -> **text**
@@ -39,7 +39,7 @@ class CommandHelp:
     def get_main_help(cls):
         """Return the main help text."""
         help_text = f"""
-[bold green]zettl v0.1.0[/bold green] - A Zettelkasten-style note-taking tool
+[bold green]zettl v0.5.1[/bold green] - A Zettelkasten-style note-taking tool
 
 [bold]NOTE MANAGEMENT[/bold]
   [bold yellow]t[/bold yellow] / [bold yellow]task[/bold yellow]            Create a new task (auto-tagged 'task', 'todo')
@@ -144,7 +144,7 @@ For detailed help on any command: [cyan]zettl COMMAND --help[/cyan]
         """Return detailed help for a specific command."""
         help_templates = {
             "auth": f"""
-[bold green]auth[/bold] - Authentication management
+[bold green]auth[/bold green] - Authentication management
 
 [bold]Subcommands:[/bold]
   [yellow]setup[/yellow]   Configure API key authentication for CLI access
@@ -264,7 +264,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "list": f"""
-[bold green]list[/bold] - List recent notes
+[bold green]list[/bold green] - List recent notes
 
 [bold]Options:[/bold]
   [yellow]-l, --limit NUMBER[/yellow]  Number of notes to display (default: 10)
@@ -279,7 +279,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "show": f"""
-[bold green]show NOTE_ID[/bold] - Display note content
+[bold green]show NOTE_ID[/bold green] - Display note content
 
 [bold]Usage:[/bold]
   zettl show NOTE_ID
@@ -289,24 +289,30 @@ See 'zettl project --help' for full documentation.
 """,
 
             "search": f"""
-[bold green]search [QUERY][/bold] - Search for notes containing text, with tag, or by date
+[bold green]search [QUERY][/bold green] - Search for notes containing text, with tags, or by date
 
 [bold]Options:[/bold]
-  [yellow]-t, --tag TAG[/yellow]        Search for notes with this tag
-  [yellow]+t, --exclude-tag TAG[/yellow] Exclude notes with this tag
+  [yellow]-t, --tag TAG[/yellow]        Include notes with this tag (can specify multiple, must have ALL)
+  [yellow]+t, --exclude-tag TAG[/yellow] Exclude notes with this tag (can specify multiple, excludes ANY)
   [yellow]-d, --date DATE[/yellow]      Search for notes created on a specific date (YYYY-MM-DD)
   [yellow]-f, --full[/yellow]           Show full content of matching notes
 
+[bold]Tag Logic:[/bold]
+  • Multiple [cyan]-t[/cyan] tags: Note must have ALL specified tags (AND logic)
+  • Multiple [cyan]+t[/cyan] tags: Note must not have ANY specified tags (OR logic)
+  • Combining both: Must match includes AND not match excludes
+
 [bold]Examples:[/bold]
-  [blue]zettl search "keyword"[/blue]       Search notes containing "keyword"
-  [blue]zettl search -t concept[/blue]      Show notes tagged with "concept"
-  [blue]zettl search -d 2025-04-07[/blue]   Show notes created on April 7, 2025
-  [blue]zettl search -t work +t done[/blue] Show notes tagged "work" but not "done"
-  [blue]zettl search "keyword" --full[/blue] Show full content of matching notes
+  [blue]zettl search "keyword"[/blue]                 Search notes containing "keyword"
+  [blue]zettl search -t work -t urgent[/blue]         Notes with BOTH "work" AND "urgent" tags
+  [blue]zettl search -t project +t done[/blue]        "project" tags but NOT "done"
+  [blue]zettl search +t todo +t done[/blue]           Exclude notes with "todo" OR "done" tags
+  [blue]zettl search -t work -t urgent +t done[/blue] "work" AND "urgent" but NOT "done"
+  [blue]zettl search -d 2025-04-07 -t work[/blue]     Created on date AND has "work" tag
 """,
 
             "link": f"""
-[bold green]link SOURCE_ID TARGET_ID[/bold] - Create link between notes
+[bold green]link SOURCE_ID TARGET_ID[/bold green] - Create link between notes
 
 [bold]Usage:[/bold]
   zettl link SOURCE_ID TARGET_ID
@@ -320,7 +326,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "related": f"""
-[bold green]related NOTE_ID[/bold] - Show notes connected to this note
+[bold green]related NOTE_ID[/bold green] - Show notes connected to this note
 
 [bold]Usage:[/bold]
   zettl related NOTE_ID
@@ -334,7 +340,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "graph": f"""
-[bold green]graph [NOTE_ID][/bold] - Generate a graph visualization of notes
+[bold green]graph [NOTE_ID][/bold green] - Generate a graph visualization of notes
 
 [bold]Usage:[/bold]
   zettl graph [NOTE_ID]
@@ -351,7 +357,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "tags": f"""
-[bold green]tags [NOTE_ID] [TAG][/bold] - Show or add tags to a note
+[bold green]tags [NOTE_ID] [TAG][/bold green] - Show or add tags to a note
 
 [bold]Usage:[/bold]
   zettl tags                  List all tags
@@ -365,7 +371,7 @@ See 'zettl project --help' for full documentation.
 """,
 
 "todos": f"""
-[bold green]todos[/bold] - List all notes tagged with 'todo'
+[bold green]todos[/bold green] - List all notes tagged with 'todo'
 
 [bold]Options:[/bold]
   [yellow]-a, --all[/yellow]            Show all todos (active and completed)
@@ -384,7 +390,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "delete": f"""
-[bold green]delete NOTE_ID[/bold] - Delete a note and its associated data
+[bold green]delete NOTE_ID[/bold green] - Delete a note and its associated data
 
 [bold]Usage:[/bold]
   zettl delete NOTE_ID
@@ -401,7 +407,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "untag": f"""
-[bold green]untag NOTE_ID TAG[/bold] - Remove a tag from a note
+[bold green]untag NOTE_ID TAG[/bold green] - Remove a tag from a note
 
 [bold]Usage:[/bold]
   zettl untag NOTE_ID TAG
@@ -411,7 +417,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "unlink": f"""
-[bold green]unlink SOURCE_ID TARGET_ID[/bold] - Remove a link between two notes
+[bold green]unlink SOURCE_ID TARGET_ID[/bold green] - Remove a link between two notes
 
 [bold]Usage:[/bold]
   zettl unlink SOURCE_ID TARGET_ID
@@ -421,7 +427,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "append": f"""
-[bold green]append NOTE_ID TEXT[/bold] - Append text to the end of a note
+[bold green]append NOTE_ID TEXT[/bold green] - Append text to the end of a note
 
 [bold]Usage:[/bold]
   zettl append NOTE_ID "Text to append"
@@ -441,7 +447,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "prepend": f"""
-[bold green]prepend NOTE_ID TEXT[/bold] - Prepend text to the beginning of a note
+[bold green]prepend NOTE_ID TEXT[/bold green] - Prepend text to the beginning of a note
 
 [bold]Usage:[/bold]
   zettl prepend NOTE_ID "Text to prepend"
@@ -461,7 +467,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "edit": f"""
-[bold green]edit NOTE_ID[/bold] - Edit a note in your default text editor
+[bold green]edit NOTE_ID[/bold green] - Edit a note in your default text editor
 
 [bold]Usage:[/bold]
   zettl edit NOTE_ID
@@ -485,7 +491,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "merge": f"""
-[bold green]merge NOTE_ID1 NOTE_ID2 [NOTE_ID3 ...][/bold] - Merge multiple notes into a single note
+[bold green]merge NOTE_ID1 NOTE_ID2 [NOTE_ID3 ...][/bold green] - Merge multiple notes into a single note
 
 [bold]Usage:[/bold]
   zettl merge NOTE_ID1 NOTE_ID2 [NOTE_ID3 ...]
@@ -510,7 +516,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "llm": f"""
-[bold green]llm NOTE_ID[/bold] - Use Claude AI to analyze and enhance notes
+[bold green]llm NOTE_ID[/bold green] - Use Claude AI to analyze and enhance notes
 
 [bold]Actions:[/bold]
   [yellow]summarize[/yellow]   Generate a concise summary of the note
@@ -538,7 +544,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "api-key": f"""
-[bold green]api-key[/bold] - Manage API keys for CLI access
+[bold green]api-key[/bold green] - Manage API keys for CLI access
 
 [bold]Usage:[/bold]
   api-key                    # List your existing API keys
@@ -560,7 +566,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "rules": f"""
-[bold green]rules[/bold] - Display a random rule from notes tagged with 'rules'
+[bold green]rules[/bold green] - Display a random rule from notes tagged with 'rules'
 
 [bold]Usage:[/bold]
   zettl rules
@@ -574,7 +580,7 @@ See 'zettl project --help' for full documentation.
 """,
 
             "help": f"""
-[bold green]help[/bold] - Show help information
+[bold green]help[/bold green] - Show help information
 
 [bold]Usage:[/bold]
   zettl help              Show general help

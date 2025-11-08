@@ -724,9 +724,13 @@ class Database:
 
         note_ids = [item['note_id'] for item in tag_data]
 
+        # Remove duplicates to avoid fetching the same note multiple times
+        # (a note might have the same tag added multiple times)
+        unique_note_ids = list(set(note_ids))
+
         # Batch fetch all notes in a single request
         # Use PostgREST's IN operator to fetch multiple notes at once
-        ids_str = ','.join(note_ids)
+        ids_str = ','.join(unique_note_ids)
         params = {'id': f'in.({ids_str})', 'order': 'created_at.desc'}
 
         try:
@@ -739,7 +743,7 @@ class Database:
         except Exception:
             # Fallback to individual fetching if batch fails
             notes = []
-            for note_id in note_ids:
+            for note_id in unique_note_ids:
                 try:
                     note = self.get_note(note_id)
                     notes.append(note)
