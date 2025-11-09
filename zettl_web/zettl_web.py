@@ -989,8 +989,8 @@ def execute_command():
                     result += f"{formatted_id} [{formatted_time}]: {content_preview}\n\n"  # Added extra newline
 
 
-        elif cmd in ["task", "idea", "note", "project"]:
-            # Handle specialized note creation commands with @ linking support
+        elif cmd in ["task", "todo", "idea", "note", "project"]:
+            # Handle specialized note creation/listing commands with @ linking support
             import re
 
             # Parse @ project links from content
@@ -1008,79 +1008,269 @@ def execute_command():
             # Parse and remove @ references from content
             cleaned_content, project_links = parse_project_links(content)
 
-            # Get custom ID if provided
-            custom_id = options.get('id', '')
-
-            # Get tags from options
-            tags = []
-            if 'tag' in options:
-                if isinstance(options['tag'], list):
-                    tags.extend(options['tag'])
-                else:
-                    tags.append(options['tag'])
-
-            # Add automatic tags based on command type
-            auto_tags = []
-            if cmd == "task":
+            # Determine automatic tags based on command type
+            if cmd in ["task", "todo"]:
+                list_tag = 'todo'
                 auto_tags = ['task', 'todo']
             elif cmd == "idea":
+                list_tag = 'idea'
                 auto_tags = ['idea']
             elif cmd == "note":
+                list_tag = 'note'
                 auto_tags = ['note']
             elif cmd == "project":
+                list_tag = 'project'
                 auto_tags = ['project']
 
-            # Create the note with custom ID if provided
-            if custom_id:
-                try:
-                    from datetime import datetime
-                    now = datetime.now().isoformat()
-                    note_id = notes_manager.create_note_with_timestamp(cleaned_content, now, custom_id)
-                    result = f"Created {cmd} #{note_id}\n"
-                except Exception as e:
-                    # If custom ID already exists, use regular creation
-                    if "already exists" in str(e) or "duplicate" in str(e).lower():
-                        note_id = notes_manager.create_note(cleaned_content)
-                        result = f"Created {cmd} #{note_id} (custom ID '{custom_id}' already exists)\n"
+            # LIST MODE: If no content provided (after removing @ references), list notes with that tag
+            if not cleaned_content:
+                # Special handling for project list mode to show stats
+                if cmd == "project":
+                    projects = notes_manager.get_notes_by_tag('project')
+
+                    if not projects:
+                        result = f"{ZettlFormatter.warning('No projects found.')}\n"
                     else:
-                        raise e
+                        result = f"{ZettlFormatter.header(f'Active Projects ({len(projects)} total)')}\n\n"
+
+                        # Get all project stats at once
+                        try:
+                            all_stats = notes_manager.db.get_project_stats()
+                            stats_dict = {s['project_id']: s for s in all_stats}
+                        except Exception:
+                            stats_dict = {}
+
+                        for project in projects:
+                            project_id = project['id']
+
+                            # Get stats from the view
+                            stats_data = stats_dict.get(project_id, {'active_todos': 0, 'active_ideas': 0, 'active_notes': 0})
+                            todos_count = stats_data.get('active_todos', 0)
+                            ideas_count = stats_data.get('active_ideas', 0)
+                            notes_count = stats_data.get('active_notes', 0)
+
+                            stats = f"({todos_count} todos, {ideas_count} ideas, {notes_count} notes)"
+
+                            # Get content preview
+                            content_preview = project['content'].split('\n')[0][:60]
+                            if len(project['content']) > 60:
+                                content_preview += "..."
+
+                            formatted_id = ZettlFormatter.note_id(project_id)
+                            result += f"  {formatted_id} {stats}: {content_preview}\n\n"
+                else:
+                    # Regular list for other types
+                    notes = notes_manager.get_notes_by_tag(list_tag)
+
+                    if not notes:
+                        result = f"{ZettlFormatter.warning(f'No {cmd}s found.')}\n"
+                    else:
+                        result = f"{ZettlFormatter.header(f'{cmd.title()}s ({len(notes)} total)')}\n\n"
+
+                        for note in notes:
+                            note_id = note['id']
+                            created_at = notes_manager.db.format_timestamp(note['created_at'])
+                            formatted_id = ZettlFormatter.note_id(note_id)
+                            formatted_time = ZettlFormatter.timestamp(created_at)
+
+                            # Get content preview
+                            content_preview = note['content'][:60] if len(note['content']) > 60 else note['content']
+                            if len(note['content']) > 60:
+                                content_preview += "..."
+
+                            result += f"{formatted_id} [{formatted_time}]: {content_preview}\n\n"
+
+            # DETAIL VIEW MODE (for project) or CREATE MODE
             else:
-                note_id = notes_manager.create_note(cleaned_content)
-                result = f"Created {cmd} #{note_id}\n"
-
-            # Add automatic tags
-            for tag in auto_tags:
-                try:
-                    notes_manager.add_tag(note_id, tag)
-                    result += f"Added tag '{tag}' to note #{note_id}\n"
-                except Exception as e:
-                    result += f"{ZettlFormatter.warning(f'Could not add tag {tag}: {str(e)}')}\n"
-
-            # Add user-provided tags
-            for tag in tags:
-                if tag and tag not in auto_tags:
+                # Check if this is a project command and cleaned_content is an existing project ID
+                if cmd == "project":
                     try:
-                        notes_manager.add_tag(note_id, tag)
-                        result += f"Added tag '{tag}' to note #{note_id}\n"
-                    except Exception as e:
-                        result += f"{ZettlFormatter.warning(f'Could not add tag {tag}: {str(e)}')}\n"
+                        # Try to get the note by this ID
+                        project_note = notes_manager.get_note(cleaned_content)
+                        project_tags = notes_manager.get_tags(cleaned_content)
 
-            # Create links from @ references
-            for project_id in project_links:
-                try:
-                    notes_manager.create_link(note_id, project_id)
-                    result += f"Created link from #{note_id} to project #{project_id}\n"
-                except Exception as e:
-                    result += f"{ZettlFormatter.warning(f'Could not create link to project #{project_id}: {str(e)}')}\n"
+                        # If it's a project, show detail view
+                        if 'project' in [t.lower() for t in project_tags]:
+                            # DETAIL VIEW MODE for project
+                            result = "═" * 63 + "\n"
+                            result += f"  PROJECT: {project_note['content'].split(chr(10))[0][:40]} (#{cleaned_content})\n"
+                            result += "═" * 63 + "\n\n"
 
-            # Create link from -l option if provided
-            link = options.get('link', options.get('l', ''))
-            if link:
-                try:
-                    notes_manager.create_link(note_id, link)
-                    result += f"Created link from #{note_id} to #{link}\n"
-                except Exception as e:
-                    result += f"{ZettlFormatter.warning(f'Could not create link to note #{link}: {str(e)}')}\n"
+                            # Project content
+                            result += f"{project_note['content']}\n\n"
+
+                            # Tags
+                            if project_tags:
+                                result += f"Tags: {', '.join([ZettlFormatter.tag(t) for t in project_tags])}\n\n"
+
+                            # Get linked notes (bidirectional)
+                            try:
+                                linked_notes = notes_manager.get_related_notes(cleaned_content)
+
+                                if not linked_notes:
+                                    result += f"{ZettlFormatter.warning('No notes linked to this project.')}\n"
+                                else:
+                                    # Categorize by note type
+                                    todos = []
+                                    ideas = []
+                                    notes_list = []
+
+                                    for n in linked_notes:
+                                        note_tags = notes_manager.get_tags(n['id'])
+                                        tags_lower = [t.lower() for t in note_tags]
+                                        n['all_tags'] = note_tags  # Store for later use
+
+                                        if 'todo' in tags_lower:
+                                            todos.append(n)
+                                        elif 'idea' in tags_lower:
+                                            ideas.append(n)
+                                        elif 'note' in tags_lower:
+                                            notes_list.append(n)
+
+                                    # Categorize by status
+                                    def categorize_by_status(note_list):
+                                        active, done, canceled = [], [], []
+                                        for n in note_list:
+                                            tags_lower = [t.lower() for t in n.get('all_tags', [])]
+                                            if 'cancel' in tags_lower:
+                                                canceled.append(n)
+                                            elif 'done' in tags_lower:
+                                                done.append(n)
+                                            else:
+                                                active.append(n)
+                                        return active, done, canceled
+
+                                    todos_active, todos_done, todos_canceled = categorize_by_status(todos)
+                                    ideas_active, ideas_done, ideas_canceled = categorize_by_status(ideas)
+                                    notes_active, notes_done, notes_canceled = categorize_by_status(notes_list)
+
+                                    # Statistics section
+                                    result += "─" * 63 + "\n"
+                                    result += "  📊 STATISTICS\n"
+                                    result += "─" * 63 + "\n"
+                                    result += f"  📋 Todos:  {len(todos_active)} active, {len(todos_done)} done, {len(todos_canceled)} canceled\n"
+                                    result += f"  💡 Ideas:  {len(ideas_active)} active, {len(ideas_done)} done, {len(ideas_canceled)} canceled\n"
+                                    result += f"  📝 Notes:  {len(notes_active)} active, {len(notes_done)} done, {len(notes_canceled)} canceled\n"
+                                    result += f"  {'─' * 9}\n"
+                                    total_active = len(todos_active) + len(ideas_active) + len(notes_active)
+                                    total_done = len(todos_done) + len(ideas_done) + len(notes_done)
+                                    total_canceled = len(todos_canceled) + len(ideas_canceled) + len(notes_canceled)
+                                    result += f"  Total:     {total_active} active, {total_done} done, {total_canceled} canceled\n\n"
+
+                                    # Display active items
+                                    if todos_active:
+                                        result += "━" * 63 + "\n"
+                                        result += f"📋 ACTIVE TODOS ({len(todos_active)})\n"
+                                        result += "━" * 63 + "\n"
+                                        for note in todos_active:
+                                            formatted_id = ZettlFormatter.note_id(note['id'])
+                                            content_preview = note['content'][:80] if len(note['content']) > 80 else note['content']
+                                            if len(note['content']) > 80:
+                                                content_preview += "..."
+                                            result += f"  {formatted_id}: {content_preview}\n"
+                                        result += "\n"
+
+                                    if ideas_active:
+                                        result += "━" * 63 + "\n"
+                                        result += f"💡 ACTIVE IDEAS ({len(ideas_active)})\n"
+                                        result += "━" * 63 + "\n"
+                                        for note in ideas_active:
+                                            formatted_id = ZettlFormatter.note_id(note['id'])
+                                            content_preview = note['content'][:80] if len(note['content']) > 80 else note['content']
+                                            if len(note['content']) > 80:
+                                                content_preview += "..."
+                                            result += f"  {formatted_id}: {content_preview}\n"
+                                        result += "\n"
+
+                                    if notes_active:
+                                        result += "━" * 63 + "\n"
+                                        result += f"📝 ACTIVE NOTES ({len(notes_active)})\n"
+                                        result += "━" * 63 + "\n"
+                                        for note in notes_active:
+                                            formatted_id = ZettlFormatter.note_id(note['id'])
+                                            content_preview = note['content'][:80] if len(note['content']) > 80 else note['content']
+                                            if len(note['content']) > 80:
+                                                content_preview += "..."
+                                            result += f"  {formatted_id}: {content_preview}\n"
+                                        result += "\n"
+
+                            except Exception as e:
+                                result += f"{ZettlFormatter.error(f'Error getting linked notes: {str(e)}')}\n"
+
+                            # Don't proceed to CREATE MODE - we're done
+                        else:
+                            # Not a project, proceed to CREATE MODE below
+                            raise Exception("Not a project")
+
+                    except Exception:
+                        # Note doesn't exist or not a project, fall through to CREATE MODE
+                        pass
+
+                # If we reach here, we're in CREATE MODE (or not a project detail view)
+                # Only execute create logic if result hasn't been set (i.e., not detail view)
+                if not result:
+                    # Get custom ID if provided
+                    custom_id = options.get('id', '')
+
+                    # Get tags from options
+                    tags = []
+                    if 'tag' in options:
+                        if isinstance(options['tag'], list):
+                            tags.extend(options['tag'])
+                        else:
+                            tags.append(options['tag'])
+
+                    # Create the note with custom ID if provided
+                    if custom_id:
+                        try:
+                            from datetime import datetime
+                            now = datetime.now().isoformat()
+                            note_id = notes_manager.create_note_with_timestamp(cleaned_content, now, custom_id)
+                            result = f"Created {cmd} #{note_id}\n"
+                        except Exception as e:
+                            # If custom ID already exists, use regular creation
+                            if "already exists" in str(e) or "duplicate" in str(e).lower():
+                                note_id = notes_manager.create_note(cleaned_content)
+                                result = f"Created {cmd} #{note_id} (custom ID '{custom_id}' already exists)\n"
+                            else:
+                                raise e
+                    else:
+                        note_id = notes_manager.create_note(cleaned_content)
+                        result = f"Created {cmd} #{note_id}\n"
+
+                    # Add automatic tags
+                    for tag in auto_tags:
+                        try:
+                            notes_manager.add_tag(note_id, tag)
+                            result += f"Added tag '{tag}' to note #{note_id}\n"
+                        except Exception as e:
+                            result += f"{ZettlFormatter.warning(f'Could not add tag {tag}: {str(e)}')}\n"
+
+                    # Add user-provided tags
+                    for tag in tags:
+                        if tag and tag not in auto_tags:
+                            try:
+                                notes_manager.add_tag(note_id, tag)
+                                result += f"Added tag '{tag}' to note #{note_id}\n"
+                            except Exception as e:
+                                result += f"{ZettlFormatter.warning(f'Could not add tag {tag}: {str(e)}')}\n"
+
+                    # Create links from @ references
+                    for project_id in project_links:
+                        try:
+                            notes_manager.create_link(note_id, project_id)
+                            result += f"Created link from #{note_id} to project #{project_id}\n"
+                        except Exception as e:
+                            result += f"{ZettlFormatter.warning(f'Could not create link to project #{project_id}: {str(e)}')}\n"
+
+                    # Create link from -l option if provided
+                    link = options.get('link', options.get('l', ''))
+                    if link:
+                        try:
+                            notes_manager.create_link(note_id, link)
+                            result += f"Created link from #{note_id} to #{link}\n"
+                        except Exception as e:
+                            result += f"{ZettlFormatter.warning(f'Could not create link to note #{link}: {str(e)}')}\n"
 
         elif cmd == "show":
             if not remaining_args:

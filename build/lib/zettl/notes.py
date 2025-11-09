@@ -31,7 +31,11 @@ class Notes:
     def get_related_notes(self, note_id: str) -> List[Dict[str, Any]]:
         """Get all notes linked to the given note."""
         return self.db.get_related_notes(note_id)
-        
+
+    def get_linked_notes(self, note_id: str) -> List[Dict[str, Any]]:
+        """Get notes that this note links to (outgoing links only)."""
+        return self.db.get_linked_notes(note_id)
+
     def add_tag(self, note_id: str, tag: str) -> str:
         """Add a tag to a note."""
         return self.db.add_tag(note_id, tag)

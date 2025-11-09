@@ -192,109 +192,1035 @@ def show_help_callback(ctx, param, value):
         console.print(Text.from_markup(help_text))
         ctx.exit()
 
-# Task command with shortcut 't'
-@cli.command(name='task')
-@click.argument('content', nargs=-1, required=True)
-@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the task')
-@click.option('--id', 'custom_id', help='Custom ID for the task (must be unique)')
-@click.option('--link', '-l', help='Note ID to link this task to')
-@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def task_cmd(content, tag, custom_id, link):
-    """Create a new task (automatically tagged with 'task' and 'todo')."""
-    # Join multiple arguments into a single string
-    content_str = ' '.join(content)
-    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['task', 'todo'])
-
-# Shortcut for task
-@cli.command(name='t')
-@click.argument('content', nargs=-1, required=True)
-@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the task')
-@click.option('--id', 'custom_id', help='Custom ID for the task (must be unique)')
-@click.option('--link', '-l', help='Note ID to link this task to')
-@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def t_cmd(content, tag, custom_id, link):
-    """Create a new task (shortcut for 'task' command)."""
-    # Join multiple arguments into a single string
-    content_str = ' '.join(content)
-    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['task', 'todo'])
 
 # Idea command with shortcut 'i'
 @cli.command(name='idea')
-@click.argument('content', nargs=-1, required=True)
-@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the idea')
-@click.option('--id', 'custom_id', help='Custom ID for the idea (must be unique)')
-@click.option('--link', '-l', help='Note ID to link this idea to')
+@click.argument('content', nargs=-1, required=False)
+@click.option('--all', '-a', 'show_all', is_flag=True, help='Show all ideas (both active and completed)')
+@click.option('--cancel', '-c', is_flag=True, help='Show canceled ideas')
+@click.option('--tag', '-t', multiple=True, help='Filter ideas by tag (list mode) or add tags (create mode)')
+@click.option('--link', '-l', help='Note ID to link this idea to (create mode only)')
+@click.option('--id', 'custom_id', help='Custom ID for the idea (create mode only, must be unique)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def idea_cmd(content, tag, custom_id, link):
-    """Create a new idea (automatically tagged with 'idea')."""
-    # Join multiple arguments into a single string
-    content_str = ' '.join(content)
-    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['idea'])
+def idea_cmd(content, show_all, cancel, tag, link, custom_id):
+    """Create or list ideas. Use @project to link/filter by project.
+
+    CREATE MODE (when content provided):
+        zt idea "New app concept" -t tech
+        zt idea "Feature idea @myproject" -t important
+
+    LIST MODE (when no content or only @ provided):
+        zt idea                    # List all active ideas
+        zt idea @myproject         # List ideas for project
+        zt idea -t tech            # List ideas with tag
+    """
+    try:
+        # Join content into a string and parse @ mentions
+        content_string = ' '.join(content) if content else ''
+
+        # Extract @project mentions
+        project_ids = re.findall(r'@(\S+)', content_string)
+
+        # Remove @mentions from content
+        remaining_content = re.sub(r'@\S+', '', content_string).strip()
+
+        # Determine mode based on remaining content
+        if remaining_content:
+            # CREATE MODE: has content after removing @ mentions
+            # Pass the ORIGINAL content so that create_new_note can parse @ and create links
+            notes_manager = get_notes_manager()
+            create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['idea'])
+            return
+
+        # LIST MODE: no content or only @ mentions
+        notes_manager = get_notes_manager()
+
+        # Get all notes tagged with 'idea' along with ALL their tags efficiently
+        idea_notes = notes_manager.get_notes_with_all_tags_by_tag('idea')
+
+        if not idea_notes:
+            console.print(ZettlFormatter.warning("No ideas found."))
+            return
+
+        # Filter by project if @ mentions provided
+        if project_ids:
+            # Get all notes linked to each project
+            project_filtered_notes = []
+            for project_id in project_ids:
+                # Get notes linked to this project
+                try:
+                    linked_notes = notes_manager.get_related_notes(project_id)
+                    linked_note_ids = {note['id'] for note in linked_notes}
+
+                    # Filter ideas to only those linked to this project
+                    for note in idea_notes:
+                        if note['id'] in linked_note_ids:
+                            if note not in project_filtered_notes:
+                                project_filtered_notes.append(note)
+                except Exception:
+                    # If project doesn't exist or has no links, continue
+                    pass
+
+            idea_notes = project_filtered_notes
+
+            if not idea_notes:
+                projects_str = "', '".join(project_ids)
+                console.print(ZettlFormatter.warning(f"No ideas found for projects: '{projects_str}'."))
+                return
+
+        # Apply filters if specified - now using pre-loaded tags
+        if tag:
+            filters = [f.lower() for f in tag]
+            filtered_notes = []
+
+            for note in idea_notes:
+                note_tags_lower = [t.lower() for t in note.get('all_tags', [])]
+
+                # Check if all filters are in the note's tags
+                if all(f in note_tags_lower for f in filters):
+                    filtered_notes.append(note)
+
+            idea_notes = filtered_notes
+
+            if not idea_notes:
+                filter_str = "', '".join(tag)
+                console.print(ZettlFormatter.warning(f"No ideas found with all tags: '{filter_str}'."))
+                return
+
+        # Group notes by their tags (categories) - using pre-loaded tags
+        active_ideas_by_category = {}
+        done_ideas_by_category = {}
+        canceled_ideas_by_category = {}
+        uncategorized_active = []
+        uncategorized_done = []
+        uncategorized_canceled = []
+
+        # Track unique note IDs to count them at the end
+        unique_active_ids = set()
+        unique_done_ids = set()
+        unique_canceled_ids = set()
+
+        for note in idea_notes:
+            note_id = note['id']
+            note_tags = note.get('all_tags', [])
+            tags_lower = [t.lower() for t in note_tags]
+
+            # Check if this is a done idea
+            is_done = 'done' in tags_lower
+
+            # Check if this is a canceled idea
+            is_canceled = 'cancel' in tags_lower
+
+            # Skip done ideas if not explicitly included
+            if is_done and not show_all:
+                continue
+
+            # Skip canceled ideas if not explicitly requested
+            if is_canceled and not cancel:
+                continue
+
+            # Track unique IDs
+            if is_canceled:
+                unique_canceled_ids.add(note_id)
+            elif is_done:
+                unique_done_ids.add(note_id)
+            else:
+                unique_active_ids.add(note_id)
+
+            # Find category tags (everything except 'idea', 'done', 'cancel', and the filter tags)
+            excluded_tags = ['idea', 'done', 'cancel']
+            if tag:
+                excluded_tags.extend([f.lower() for f in tag])
+
+            categories = [t for t in note_tags if t.lower() not in excluded_tags]
+
+            if not categories:
+                # This idea has no category tags
+                if is_canceled:
+                    uncategorized_canceled.append(note)
+                elif is_done:
+                    uncategorized_done.append(note)
+                else:
+                    uncategorized_active.append(note)
+            else:
+                # Create a combined category key from all tags
+                combined_category = " - ".join(sorted(categories))
+
+                if is_canceled:
+                    if combined_category not in canceled_ideas_by_category:
+                        canceled_ideas_by_category[combined_category] = []
+                    canceled_ideas_by_category[combined_category].append(note)
+                elif is_done:
+                    if combined_category not in done_ideas_by_category:
+                        done_ideas_by_category[combined_category] = []
+                    done_ideas_by_category[combined_category].append(note)
+                else:
+                    if combined_category not in active_ideas_by_category:
+                        active_ideas_by_category[combined_category] = []
+                    active_ideas_by_category[combined_category].append(note)
+
+        # Build the header message
+        header_parts = ["Ideas"]
+        if tag:
+            filter_str = "', '".join(tag)
+            header_parts.append(f"tagged with '{filter_str}'")
+
+        # Display ideas by category
+        if (not active_ideas_by_category and not uncategorized_active and
+            (not show_all or (not done_ideas_by_category and not uncategorized_done)) and
+            (not cancel or (not canceled_ideas_by_category and not uncategorized_canceled))):
+            console.print(ZettlFormatter.warning("No ideas match your criteria."))
+            return
+
+        # Helper function to display a group of ideas
+        def display_ideas_group(category_dict, uncategorized_list, header_text):
+            if header_text:
+                console.print(header_text)
+
+            if category_dict:
+                for category, notes in sorted(category_dict.items()):
+                    # Check if this is a combined category with multiple tags
+                    if " - " in category:
+                        # For combined categories, format each tag separately
+                        tags = category.split(" - ")
+                        formatted_tags = []
+                        for tag_name in tags:
+                            formatted_tags.append(ZettlFormatter.tag(tag_name))
+                        category_display = " - ".join(formatted_tags)
+                        console.print(f"\n{category_display} ({len(notes)})")
+                    else:
+                        # For single categories, use the original format
+                        console.print(f"\n{ZettlFormatter.tag(category)} ({len(notes)})")
+
+                    for note in notes:
+                        formatted_id = ZettlFormatter.note_id(note['id'])
+
+                        # Print note ID on its own line
+                        console.print(f"  {formatted_id}:")
+
+                        # Render markdown content
+                        content = note['content']
+                        md = Markdown(content)
+                        console.print(md)
+                        console.print("")  # Add an empty line between notes
+
+            if uncategorized_list:
+                console.print("\nUncategorized")
+                for note in uncategorized_list:
+                    formatted_id = ZettlFormatter.note_id(note['id'])
+
+                    # Print note ID on its own line
+                    console.print(f"  {formatted_id}:")
+
+                    # Render markdown content
+                    content = note['content']
+                    md = Markdown(content)
+                    console.print(md)
+                    console.print("")  # Add an empty line between notes
+
+        # Display active ideas first
+        if active_ideas_by_category or uncategorized_active:
+            active_header = ZettlFormatter.header(f"Active {' '.join(header_parts)} ({len(unique_active_ids)} total)")
+            display_ideas_group(active_ideas_by_category, uncategorized_active, active_header)
+
+        # Display all done ideas if requested
+        if show_all and (done_ideas_by_category or uncategorized_done):
+            done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids)} total)")
+            console.print(f"\n{done_header}")
+            display_ideas_group(done_ideas_by_category, uncategorized_done, "")
+
+        # Display canceled ideas if requested
+        if cancel and (canceled_ideas_by_category or uncategorized_canceled):
+            canceled_header = ZettlFormatter.header(f"Canceled {' '.join(header_parts)} ({len(unique_canceled_ids)} total)")
+            console.print(f"\n{canceled_header}")
+            display_ideas_group(canceled_ideas_by_category, uncategorized_canceled, "")
+
+    except Exception as e:
+        console.print(ZettlFormatter.error(str(e)))
 
 # Shortcut for idea
 @cli.command(name='i')
-@click.argument('content', nargs=-1, required=True)
-@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the idea')
-@click.option('--id', 'custom_id', help='Custom ID for the idea (must be unique)')
-@click.option('--link', '-l', help='Note ID to link this idea to')
+@click.argument('content', nargs=-1, required=False)
+@click.option('--all', '-a', 'show_all', is_flag=True, help='Show all ideas (both active and completed)')
+@click.option('--cancel', '-c', is_flag=True, help='Show canceled ideas')
+@click.option('--tag', '-t', multiple=True, help='Filter ideas by tag (list mode) or add tags (create mode)')
+@click.option('--link', '-l', help='Note ID to link this idea to (create mode only)')
+@click.option('--id', 'custom_id', help='Custom ID for the idea (create mode only, must be unique)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def i_cmd(content, tag, custom_id, link):
-    """Create a new idea (shortcut for 'idea' command)."""
-    # Join multiple arguments into a single string
-    content_str = ' '.join(content)
-    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['idea'])
+def i_cmd(content, show_all, cancel, tag, link, custom_id):
+    """Shortcut for 'idea' command."""
+    # Duplicate the full idea_cmd logic to avoid Click command invocation issues
+    try:
+        # Join content into a string and parse @ mentions
+        content_string = ' '.join(content) if content else ''
+
+        # Extract @project mentions
+        project_ids = re.findall(r'@(\S+)', content_string)
+
+        # Remove @mentions from content
+        remaining_content = re.sub(r'@\S+', '', content_string).strip()
+
+        # Determine mode based on remaining content
+        if remaining_content:
+            # CREATE MODE
+            notes_manager = get_notes_manager()
+            create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['idea'])
+            return
+
+        # LIST MODE: delegate to idea_cmd callback
+        notes_manager = get_notes_manager()
+        idea_notes = notes_manager.get_notes_with_all_tags_by_tag('idea')
+
+        if not idea_notes:
+            console.print(ZettlFormatter.warning("No ideas found."))
+            return
+
+        # Apply same filtering logic as idea_cmd
+        if project_ids:
+            project_filtered_notes = []
+            for project_id in project_ids:
+                try:
+                    linked_notes = notes_manager.get_related_notes(project_id)
+                    linked_note_ids = {note['id'] for note in linked_notes}
+                    for note in idea_notes:
+                        if note['id'] in linked_note_ids:
+                            if note not in project_filtered_notes:
+                                project_filtered_notes.append(note)
+                except Exception:
+                    pass
+            idea_notes = project_filtered_notes
+            if not idea_notes:
+                projects_str = "', '".join(project_ids)
+                console.print(ZettlFormatter.warning(f"No ideas found for projects: '{projects_str}'."))
+                return
+
+        if tag:
+            filters = [f.lower() for f in tag]
+            filtered_notes = [note for note in idea_notes if all(f in [t.lower() for t in note.get('all_tags', [])] for f in filters)]
+            idea_notes = filtered_notes
+            if not idea_notes:
+                filter_str = "', '".join(tag)
+                console.print(ZettlFormatter.warning(f"No ideas found with all tags: '{filter_str}'."))
+                return
+
+        # Call idea_cmd's callback directly by extracting and reusing logic
+        # For simplicity, just manually display using same logic as idea_cmd
+        # (This avoids the Click command invocation complexity)
+
+        active_ideas = [n for n in idea_notes if 'done' not in [t.lower() for t in n.get('all_tags', [])] and 'cancel' not in [t.lower() for t in n.get('all_tags', [])]]
+        if not show_all:
+            idea_notes = active_ideas
+
+        if not idea_notes and not cancel:
+            console.print(ZettlFormatter.warning("No ideas match your criteria."))
+            return
+
+        # Simple display for shortcut
+        console.print(ZettlFormatter.header(f"Ideas ({len(idea_notes)} total)"))
+        for note in idea_notes:
+            formatted_id = ZettlFormatter.note_id(note['id'])
+            console.print(f"\n{formatted_id}:")
+            md = Markdown(note['content'])
+            console.print(md)
+
+    except Exception as e:
+        console.print(ZettlFormatter.error(str(e)))
 
 # Note command with shortcut 'n'
 @cli.command(name='note')
-@click.argument('content', nargs=-1, required=True)
-@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the note')
-@click.option('--id', 'custom_id', help='Custom ID for the note (must be unique)')
-@click.option('--link', '-l', help='Note ID to link this note to')
+@click.argument('content', nargs=-1, required=False)
+@click.option('--all', '-a', 'show_all', is_flag=True, help='Show all notes (both active and completed)')
+@click.option('--cancel', '-c', is_flag=True, help='Show canceled notes')
+@click.option('--tag', '-t', multiple=True, help='Filter notes by tag (list mode) or add tags (create mode)')
+@click.option('--link', '-l', help='Note ID to link this note to (create mode only)')
+@click.option('--id', 'custom_id', help='Custom ID for the note (create mode only, must be unique)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def note_cmd(content, tag, custom_id, link):
-    """Create a new note (automatically tagged with 'note')."""
-    # Join multiple arguments into a single string
-    content_str = ' '.join(content)
-    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['note'])
+def note_cmd(content, show_all, cancel, tag, link, custom_id):
+    """Create or list notes. Use @project to link/filter by project.
+
+    CREATE MODE (when content provided):
+        zt note "Meeting notes" -t work
+        zt note "Research findings @myproject" -t research
+
+    LIST MODE (when no content or only @ provided):
+        zt note                    # List all active notes
+        zt note @myproject         # List notes for project
+        zt note -t work            # List notes with tag
+    """
+    try:
+        # Join content into a string and parse @ mentions
+        content_string = ' '.join(content) if content else ''
+
+        # Extract @project mentions
+        project_ids = re.findall(r'@(\S+)', content_string)
+
+        # Remove @mentions from content
+        remaining_content = re.sub(r'@\S+', '', content_string).strip()
+
+        # Determine mode based on remaining content
+        if remaining_content:
+            # CREATE MODE: has content after removing @ mentions
+            # Pass the ORIGINAL content so that create_new_note can parse @ and create links
+            notes_manager = get_notes_manager()
+            create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['note'])
+            return
+
+        # LIST MODE: no content or only @ mentions
+        notes_manager = get_notes_manager()
+
+        # Get all notes tagged with 'note' along with ALL their tags efficiently
+        note_notes = notes_manager.get_notes_with_all_tags_by_tag('note')
+
+        if not note_notes:
+            console.print(ZettlFormatter.warning("No notes found."))
+            return
+
+        # Filter by project if @ mentions provided
+        if project_ids:
+            # Get all notes linked to each project
+            project_filtered_notes = []
+            for project_id in project_ids:
+                # Get notes linked to this project
+                try:
+                    linked_notes = notes_manager.get_related_notes(project_id)
+                    linked_note_ids = {note['id'] for note in linked_notes}
+
+                    # Filter notes to only those linked to this project
+                    for note in note_notes:
+                        if note['id'] in linked_note_ids:
+                            if note not in project_filtered_notes:
+                                project_filtered_notes.append(note)
+                except Exception:
+                    # If project doesn't exist or has no links, continue
+                    pass
+
+            note_notes = project_filtered_notes
+
+            if not note_notes:
+                projects_str = "', '".join(project_ids)
+                console.print(ZettlFormatter.warning(f"No notes found for projects: '{projects_str}'."))
+                return
+
+        # Apply filters if specified - now using pre-loaded tags
+        if tag:
+            filters = [f.lower() for f in tag]
+            filtered_notes = []
+
+            for note in note_notes:
+                note_tags_lower = [t.lower() for t in note.get('all_tags', [])]
+
+                # Check if all filters are in the note's tags
+                if all(f in note_tags_lower for f in filters):
+                    filtered_notes.append(note)
+
+            note_notes = filtered_notes
+
+            if not note_notes:
+                filter_str = "', '".join(tag)
+                console.print(ZettlFormatter.warning(f"No notes found with all tags: '{filter_str}'."))
+                return
+
+        # Group notes by their tags (categories) - using pre-loaded tags
+        active_notes_by_category = {}
+        done_notes_by_category = {}
+        canceled_notes_by_category = {}
+        uncategorized_active = []
+        uncategorized_done = []
+        uncategorized_canceled = []
+
+        # Track unique note IDs to count them at the end
+        unique_active_ids = set()
+        unique_done_ids = set()
+        unique_canceled_ids = set()
+
+        for note in note_notes:
+            note_id = note['id']
+            note_tags = note.get('all_tags', [])
+            tags_lower = [t.lower() for t in note_tags]
+
+            # Check if this is a done note
+            is_done = 'done' in tags_lower
+
+            # Check if this is a canceled note
+            is_canceled = 'cancel' in tags_lower
+
+            # Skip done notes if not explicitly included
+            if is_done and not show_all:
+                continue
+
+            # Skip canceled notes if not explicitly requested
+            if is_canceled and not cancel:
+                continue
+
+            # Track unique IDs
+            if is_canceled:
+                unique_canceled_ids.add(note_id)
+            elif is_done:
+                unique_done_ids.add(note_id)
+            else:
+                unique_active_ids.add(note_id)
+
+            # Find category tags (everything except 'note', 'done', 'cancel', and the filter tags)
+            excluded_tags = ['note', 'done', 'cancel']
+            if tag:
+                excluded_tags.extend([f.lower() for f in tag])
+
+            categories = [t for t in note_tags if t.lower() not in excluded_tags]
+
+            if not categories:
+                # This note has no category tags
+                if is_canceled:
+                    uncategorized_canceled.append(note)
+                elif is_done:
+                    uncategorized_done.append(note)
+                else:
+                    uncategorized_active.append(note)
+            else:
+                # Create a combined category key from all tags
+                combined_category = " - ".join(sorted(categories))
+
+                if is_canceled:
+                    if combined_category not in canceled_notes_by_category:
+                        canceled_notes_by_category[combined_category] = []
+                    canceled_notes_by_category[combined_category].append(note)
+                elif is_done:
+                    if combined_category not in done_notes_by_category:
+                        done_notes_by_category[combined_category] = []
+                    done_notes_by_category[combined_category].append(note)
+                else:
+                    if combined_category not in active_notes_by_category:
+                        active_notes_by_category[combined_category] = []
+                    active_notes_by_category[combined_category].append(note)
+
+        # Build the header message
+        header_parts = ["Notes"]
+        if tag:
+            filter_str = "', '".join(tag)
+            header_parts.append(f"tagged with '{filter_str}'")
+
+        # Display notes by category
+        if (not active_notes_by_category and not uncategorized_active and
+            (not show_all or (not done_notes_by_category and not uncategorized_done)) and
+            (not cancel or (not canceled_notes_by_category and not uncategorized_canceled))):
+            console.print(ZettlFormatter.warning("No notes match your criteria."))
+            return
+
+        # Helper function to display a group of notes
+        def display_notes_group(category_dict, uncategorized_list, header_text):
+            if header_text:
+                console.print(header_text)
+
+            if category_dict:
+                for category, notes in sorted(category_dict.items()):
+                    # Check if this is a combined category with multiple tags
+                    if " - " in category:
+                        # For combined categories, format each tag separately
+                        tags = category.split(" - ")
+                        formatted_tags = []
+                        for tag_name in tags:
+                            formatted_tags.append(ZettlFormatter.tag(tag_name))
+                        category_display = " - ".join(formatted_tags)
+                        console.print(f"\n{category_display} ({len(notes)})")
+                    else:
+                        # For single categories, use the original format
+                        console.print(f"\n{ZettlFormatter.tag(category)} ({len(notes)})")
+
+                    for note in notes:
+                        formatted_id = ZettlFormatter.note_id(note['id'])
+
+                        # Print note ID on its own line
+                        console.print(f"  {formatted_id}:")
+
+                        # Render markdown content
+                        content = note['content']
+                        md = Markdown(content)
+                        console.print(md)
+                        console.print("")  # Add an empty line between notes
+
+            if uncategorized_list:
+                console.print("\nUncategorized")
+                for note in uncategorized_list:
+                    formatted_id = ZettlFormatter.note_id(note['id'])
+
+                    # Print note ID on its own line
+                    console.print(f"  {formatted_id}:")
+
+                    # Render markdown content
+                    content = note['content']
+                    md = Markdown(content)
+                    console.print(md)
+                    console.print("")  # Add an empty line between notes
+
+        # Display active notes first
+        if active_notes_by_category or uncategorized_active:
+            active_header = ZettlFormatter.header(f"Active {' '.join(header_parts)} ({len(unique_active_ids)} total)")
+            display_notes_group(active_notes_by_category, uncategorized_active, active_header)
+
+        # Display all done notes if requested
+        if show_all and (done_notes_by_category or uncategorized_done):
+            done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids)} total)")
+            console.print(f"\n{done_header}")
+            display_notes_group(done_notes_by_category, uncategorized_done, "")
+
+        # Display canceled notes if requested
+        if cancel and (canceled_notes_by_category or uncategorized_canceled):
+            canceled_header = ZettlFormatter.header(f"Canceled {' '.join(header_parts)} ({len(unique_canceled_ids)} total)")
+            console.print(f"\n{canceled_header}")
+            display_notes_group(canceled_notes_by_category, uncategorized_canceled, "")
+
+    except Exception as e:
+        console.print(ZettlFormatter.error(str(e)))
 
 # Shortcut for note
 @cli.command(name='n')
-@click.argument('content', nargs=-1, required=True)
-@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the note')
-@click.option('--id', 'custom_id', help='Custom ID for the note (must be unique)')
-@click.option('--link', '-l', help='Note ID to link this note to')
+@click.argument('content', nargs=-1, required=False)
+@click.option('--all', '-a', 'show_all', is_flag=True, help='Show all notes (both active and completed)')
+@click.option('--cancel', '-c', is_flag=True, help='Show canceled notes')
+@click.option('--tag', '-t', multiple=True, help='Filter notes by tag (list mode) or add tags (create mode)')
+@click.option('--link', '-l', help='Note ID to link this note to (create mode only)')
+@click.option('--id', 'custom_id', help='Custom ID for the note (create mode only, must be unique)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def n_cmd(content, tag, custom_id, link):
-    """Create a new note (shortcut for 'note' command)."""
-    # Join multiple arguments into a single string
-    content_str = ' '.join(content)
-    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['note'])
+def n_cmd(content, show_all, cancel, tag, link, custom_id):
+    """Shortcut for 'note' command."""
+    # Duplicate the full note_cmd logic to avoid Click command invocation issues
+    try:
+        # Join content into a string and parse @ mentions
+        content_string = ' '.join(content) if content else ''
+
+        # Extract @project mentions
+        project_ids = re.findall(r'@(\S+)', content_string)
+
+        # Remove @mentions from content
+        remaining_content = re.sub(r'@\S+', '', content_string).strip()
+
+        # Determine mode based on remaining content
+        if remaining_content:
+            # CREATE MODE
+            notes_manager = get_notes_manager()
+            create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['note'])
+            return
+
+        # LIST MODE
+        notes_manager = get_notes_manager()
+        note_notes = notes_manager.get_notes_with_all_tags_by_tag('note')
+
+        if not note_notes:
+            console.print(ZettlFormatter.warning("No notes found."))
+            return
+
+        # Apply same filtering logic as note_cmd
+        if project_ids:
+            project_filtered_notes = []
+            for project_id in project_ids:
+                try:
+                    linked_notes = notes_manager.get_related_notes(project_id)
+                    linked_note_ids = {note['id'] for note in linked_notes}
+                    for note in note_notes:
+                        if note['id'] in linked_note_ids:
+                            if note not in project_filtered_notes:
+                                project_filtered_notes.append(note)
+                except Exception:
+                    pass
+            note_notes = project_filtered_notes
+            if not note_notes:
+                projects_str = "', '".join(project_ids)
+                console.print(ZettlFormatter.warning(f"No notes found for projects: '{projects_str}'."))
+                return
+
+        if tag:
+            filters = [f.lower() for f in tag]
+            filtered_notes = [note for note in note_notes if all(f in [t.lower() for t in note.get('all_tags', [])] for f in filters)]
+            note_notes = filtered_notes
+            if not note_notes:
+                filter_str = "', '".join(tag)
+                console.print(ZettlFormatter.warning(f"No notes found with all tags: '{filter_str}'."))
+                return
+
+        # Filter by status
+        active_notes = [n for n in note_notes if 'done' not in [t.lower() for t in n.get('all_tags', [])] and 'cancel' not in [t.lower() for t in n.get('all_tags', [])]]
+        if not show_all:
+            note_notes = active_notes
+
+        if not note_notes and not cancel:
+            console.print(ZettlFormatter.warning("No notes match your criteria."))
+            return
+
+        # Simple display for shortcut
+        console.print(ZettlFormatter.header(f"Notes ({len(note_notes)} total)"))
+        for note in note_notes:
+            formatted_id = ZettlFormatter.note_id(note['id'])
+            console.print(f"\n{formatted_id}:")
+            md = Markdown(note['content'])
+            console.print(md)
+
+    except Exception as e:
+        console.print(ZettlFormatter.error(str(e)))
+
+def display_project_detail(project_note, project_id, notes_manager, show_all, full, tag_filter):
+    """Display detailed project view with categorized linked notes."""
+    # Header
+    console.print("═" * 63)
+    console.print(f"  PROJECT: {project_note['content'].split(chr(10))[0][:40]} (#{project_id})")
+    console.print("═" * 63)
+    console.print()
+
+    # Project content
+    console.print(ZettlFormatter.format_note_display(project_note, notes_manager))
+
+    # Tags
+    try:
+        tags = notes_manager.get_tags(project_id)
+        if tags:
+            click.echo(f"Tags: {', '.join(tags)}")
+    except Exception:
+        pass
+
+    # Get linked notes (bidirectional)
+    try:
+        linked_notes = notes_manager.get_related_notes(project_id)
+
+        if not linked_notes:
+            console.print(ZettlFormatter.warning("No notes linked to this project."))
+            return
+
+        # Ensure each note has tags loaded
+        for note in linked_notes:
+            if 'all_tags' not in note or not note['all_tags']:
+                try:
+                    note['all_tags'] = notes_manager.get_tags(note['id'])
+                except Exception:
+                    note['all_tags'] = []
+
+        # Categorize by note type with priority: todo > idea > note
+        # This prevents double-counting notes with multiple type tags
+        todos = []
+        ideas = []
+        notes = []
+
+        for n in linked_notes:
+            tags_lower = [t.lower() for t in n.get('all_tags', [])]
+            if 'todo' in tags_lower:
+                todos.append(n)
+            elif 'idea' in tags_lower:
+                ideas.append(n)
+            elif 'note' in tags_lower:
+                notes.append(n)
+
+        # Apply tag filter if specified
+        if tag_filter:
+            filters = [f.lower() for f in tag_filter]
+            todos = [n for n in todos if all(f in [t.lower() for t in n.get('all_tags', [])] for f in filters)]
+            ideas = [n for n in ideas if all(f in [t.lower() for t in n.get('all_tags', [])] for f in filters)]
+            notes = [n for n in notes if all(f in [t.lower() for t in n.get('all_tags', [])] for f in filters)]
+
+        # Categorize by status
+        def categorize_by_status(note_list):
+            active = []
+            done = []
+            canceled = []
+            for n in note_list:
+                tags_lower = [t.lower() for t in n.get('all_tags', [])]
+                if 'cancel' in tags_lower:
+                    canceled.append(n)
+                elif 'done' in tags_lower:
+                    done.append(n)
+                else:
+                    active.append(n)
+            return active, done, canceled
+
+        todos_active, todos_done, todos_canceled = categorize_by_status(todos)
+        ideas_active, ideas_done, ideas_canceled = categorize_by_status(ideas)
+        notes_active, notes_done, notes_canceled = categorize_by_status(notes)
+
+        # Statistics section
+        click.echo()
+        console.print("─" * 63)
+        console.print("  📊 STATISTICS")
+        console.print("─" * 63)
+        console.print(f"  📋 Todos:  {len(todos_active)} active, {len(todos_done)} done, {len(todos_canceled)} canceled")
+        console.print(f"  💡 Ideas:  {len(ideas_active)} active, {len(ideas_done)} done, {len(ideas_canceled)} canceled")
+        console.print(f"  📝 Notes:  {len(notes_active)} active, {len(notes_done)} done, {len(notes_canceled)} canceled")
+        console.print(f"  {'─' * 9}")
+        total_active = len(todos_active) + len(ideas_active) + len(notes_active)
+        total_done = len(todos_done) + len(ideas_done) + len(notes_done)
+        total_canceled = len(todos_canceled) + len(ideas_canceled) + len(notes_canceled)
+        console.print(f"  Total:     {total_active} active, {total_done} done, {total_canceled} canceled")
+
+        # Helper function to group notes by tags
+        def group_by_tags(note_list, exclude_tags):
+            by_category = {}
+            uncategorized = []
+
+            for note in note_list:
+                note_tags = note.get('all_tags', [])
+                excluded = [t.lower() for t in exclude_tags]
+
+                categories = [t for t in note_tags if t.lower() not in excluded]
+
+                if not categories:
+                    uncategorized.append(note)
+                else:
+                    combined_category = " - ".join(sorted(categories))
+                    if combined_category not in by_category:
+                        by_category[combined_category] = []
+                    by_category[combined_category].append(note)
+
+            return by_category, uncategorized
+
+        # Helper function to display a group of notes
+        def display_note_group(note_list, header, emoji, type_tag):
+            if not note_list and not show_all:
+                return
+
+            click.echo()
+            console.print("━" * 63)
+            console.print(f"{emoji} {header}")
+            console.print("━" * 63)
+            click.echo()
+
+            # Exclude tags for grouping
+            exclude_tags = [type_tag, 'done', 'cancel', 'project']
+            if tag_filter:
+                exclude_tags.extend([f.lower() for f in tag_filter])
+
+            by_category, uncategorized = group_by_tags(note_list, exclude_tags)
+
+            # Display categorized notes
+            if by_category:
+                for category, notes_in_cat in sorted(by_category.items()):
+                    # Format category
+                    if " - " in category:
+                        tags = category.split(" - ")
+                        formatted_tags = [ZettlFormatter.tag(t) for t in tags]
+                        category_display = " - ".join(formatted_tags)
+                        console.print(f"  {category_display} ({len(notes_in_cat)})")
+                    else:
+                        console.print(f"  {ZettlFormatter.tag(category)} ({len(notes_in_cat)})")
+
+                    for note in notes_in_cat:
+                        formatted_id = ZettlFormatter.note_id(note['id'])
+                        console.print(f"    {formatted_id}:")
+
+                        if full:
+                            # Full content
+                            content = note['content']
+                            md = Markdown(content)
+                            console.print(md)
+                            click.echo()
+                        else:
+                            # Preview
+                            content_preview = note['content'][:60] + "..." if len(note['content']) > 60 else note['content']
+                            console.print(f"    {content_preview}")
+
+                    click.echo()
+
+            # Display uncategorized
+            if uncategorized:
+                console.print("  Uncategorized")
+                for note in uncategorized:
+                    formatted_id = ZettlFormatter.note_id(note['id'])
+                    console.print(f"    {formatted_id}:")
+
+                    if full:
+                        content = note['content']
+                        md = Markdown(content)
+                        console.print(md)
+                        click.echo()
+                    else:
+                        content_preview = note['content'][:60] + "..." if len(note['content']) > 60 else note['content']
+                        console.print(f"    {content_preview}")
+
+                click.echo()
+
+        # Helper function to display done/canceled sections
+        def display_status_section(note_list, status_label):
+            if not note_list:
+                return
+
+            console.print(f"  ─ {status_label} ({len(note_list)}) ─")
+            for note in note_list:
+                formatted_id = ZettlFormatter.note_id(note['id'])
+                content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
+                console.print(f"    {formatted_id}: {content_preview}")
+            click.echo()
+
+        # Display todos
+        if todos_active or (show_all and (todos_done or todos_canceled)):
+            display_note_group(todos_active, f"TODOS ({len(todos_active)} active)", "📋", "todo")
+
+            if show_all:
+                if todos_done:
+                    display_status_section(todos_done, "Completed")
+                if todos_canceled:
+                    display_status_section(todos_canceled, "Canceled")
+
+        # Display ideas
+        if ideas_active or (show_all and (ideas_done or ideas_canceled)):
+            display_note_group(ideas_active, f"IDEAS ({len(ideas_active)})", "💡", "idea")
+
+            if show_all:
+                if ideas_done:
+                    display_status_section(ideas_done, "Completed")
+                if ideas_canceled:
+                    display_status_section(ideas_canceled, "Canceled")
+
+        # Display notes
+        if notes_active or (show_all and (notes_done or notes_canceled)):
+            display_note_group(notes_active, f"NOTES ({len(notes_active)})", "📝", "note")
+
+            if show_all:
+                if notes_done:
+                    display_status_section(notes_done, "Completed")
+                if notes_canceled:
+                    display_status_section(notes_canceled, "Canceled")
+
+    except Exception as e:
+        console.print(ZettlFormatter.error(f"Error displaying project details: {str(e)}"))
 
 # Project command with shortcut 'p'
 @cli.command(name='project')
-@click.argument('content', nargs=-1, required=True)
-@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the project')
-@click.option('--id', 'custom_id', help='Custom ID for the project (must be unique, e.g., "learn-rust")')
-@click.option('--link', '-l', help='Note ID to link this project to')
+@click.argument('content', nargs=-1, required=False)
+@click.option('--all', '-a', 'show_all', is_flag=True, help='Show all notes including done and canceled')
+@click.option('--full', '-f', is_flag=True, help='Show full content instead of previews')
+@click.option('--tag', '-t', multiple=True, help='Filter linked notes by tag (detail mode) or add tags (create mode)')
+@click.option('--link', '-l', help='Note ID to link this project to (create mode only)')
+@click.option('--id', 'custom_id', help='Custom ID for the project (create mode only, must be unique)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def project_cmd(content, tag, custom_id, link):
-    """Create a new project (automatically tagged with 'project')."""
-    # Join multiple arguments into a single string
-    content_str = ' '.join(content)
-    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['project'])
+def project_cmd(content, show_all, full, tag, link, custom_id):
+    """Create, list, or view project details.
+
+    CREATE MODE (when content provided and not existing project):
+        zt project "New Project" -t active
+        zt project "Research Phase" --id research-2024
+
+    LIST MODE (when no content):
+        zt project                 # List all projects
+
+    DETAIL VIEW (when content is existing project ID):
+        zt project zt              # Show project details with linked notes
+        zt project zt -a           # Include done/canceled notes
+        zt project zt -f           # Show full content
+    """
+    try:
+        notes_manager = get_notes_manager()
+
+        # Join content into a string and parse @ mentions
+        content_string = ' '.join(content) if content else ''
+
+        # Extract @project mentions (for future compatibility)
+        project_ids = re.findall(r'@(\S+)', content_string)
+
+        # Remove @mentions from content
+        remaining_content = re.sub(r'@\S+', '', content_string).strip()
+
+        # Determine mode based on remaining content
+        if not remaining_content:
+            # LIST MODE: show all projects
+            projects = notes_manager.get_notes_with_all_tags_by_tag('project')
+
+            if not projects:
+                console.print(ZettlFormatter.warning("No projects found."))
+                return
+
+            console.print(ZettlFormatter.header(f"Active Projects ({len(projects)} total)"))
+            click.echo()
+
+            # Get all project stats at once from the view
+            try:
+                all_stats = notes_manager.db.get_project_stats()
+                stats_dict = {s['project_id']: s for s in all_stats}
+            except Exception as e:
+                stats_dict = {}
+
+            for project in projects:
+                project_id = project['id']
+
+                # Get stats from the view
+                stats_data = stats_dict.get(project_id, {'active_todos': 0, 'active_ideas': 0, 'active_notes': 0})
+                todos_count = stats_data.get('active_todos', 0)
+                ideas_count = stats_data.get('active_ideas', 0)
+                notes_count = stats_data.get('active_notes', 0)
+
+                stats = f"({todos_count} todos, {ideas_count} ideas, {notes_count} notes)"
+
+                # Get content preview
+                content_preview = project['content'].split('\n')[0][:60]
+                if len(project['content']) > 60:
+                    content_preview += "..."
+
+                formatted_id = ZettlFormatter.note_id(project_id)
+                console.print(f"  {formatted_id} {stats}: {content_preview}")
+
+            return
+
+        # Check if remaining_content is an existing project ID (DETAIL VIEW mode)
+        try:
+            # Try to get the note by this ID
+            project_note = notes_manager.get_note(remaining_content)
+            project_tags = [t.lower() for t in project_note.get('all_tags', [])] if 'all_tags' in project_note else [t.lower() for t in notes_manager.get_tags(remaining_content)]
+
+            # If it's a project, show detail view
+            if 'project' in project_tags:
+                # DETAIL VIEW MODE
+                display_project_detail(project_note, remaining_content, notes_manager, show_all, full, tag)
+                return
+        except Exception:
+            # Note doesn't exist, fall through to CREATE mode
+            pass
+
+        # CREATE MODE: has content that's not an existing project ID
+        create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['project'])
+
+    except Exception as e:
+        console.print(ZettlFormatter.error(str(e)))
 
 # Shortcut for project
 @cli.command(name='p')
-@click.argument('content', nargs=-1, required=True)
-@click.option('--tag', '-t', multiple=True, help='Additional tag(s) to add to the project')
-@click.option('--id', 'custom_id', help='Custom ID for the project (must be unique, e.g., "learn-rust")')
-@click.option('--link', '-l', help='Note ID to link this project to')
+@click.argument('content', nargs=-1, required=False)
+@click.option('--all', '-a', 'show_all', is_flag=True, help='Show all notes including done and canceled')
+@click.option('--full', '-f', is_flag=True, help='Show full content instead of previews')
+@click.option('--tag', '-t', multiple=True, help='Filter linked notes by tag (detail mode) or add tags (create mode)')
+@click.option('--link', '-l', help='Note ID to link this project to (create mode only)')
+@click.option('--id', 'custom_id', help='Custom ID for the project (create mode only, must be unique)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def p_cmd(content, tag, custom_id, link):
-    """Create a new project (shortcut for 'project' command)."""
-    # Join multiple arguments into a single string
-    content_str = ' '.join(content)
-    create_new_note(content_str, tag, link, custom_id=custom_id, auto_tags=['project'])
+def p_cmd(content, show_all, full, tag, link, custom_id):
+    """Shortcut for 'project' command."""
+    # Duplicate the project_cmd logic to avoid Click invocation issues
+    try:
+        notes_manager = get_notes_manager()
+
+        # Join content into a string and parse @ mentions
+        content_string = ' '.join(content) if content else ''
+
+        # Extract @project mentions (for future compatibility)
+        project_ids = re.findall(r'@(\S+)', content_string)
+
+        # Remove @mentions from content
+        remaining_content = re.sub(r'@\S+', '', content_string).strip()
+
+        # Determine mode based on remaining content
+        if not remaining_content:
+            # LIST MODE: simplified for shortcut
+            console.print(ZettlFormatter.warning("Use 'zt project' to list all projects"))
+            return
+
+        # Check if remaining_content is an existing project ID (DETAIL VIEW mode)
+        try:
+            project_note = notes_manager.get_note(remaining_content)
+            project_tags = [t.lower() for t in project_note.get('all_tags', [])] if 'all_tags' in project_note else [t.lower() for t in notes_manager.get_tags(remaining_content)]
+
+            if 'project' in project_tags:
+                # DETAIL VIEW MODE
+                display_project_detail(project_note, remaining_content, notes_manager, show_all, full, tag)
+                return
+        except Exception:
+            pass
+
+        # CREATE MODE
+        create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['project'])
+
+    except Exception as e:
+        console.print(ZettlFormatter.error(str(e)))
 
 # Update the list command
 @cli.command()
@@ -360,11 +1286,18 @@ def list(limit, full, compact):
 
 @cli.command()
 @click.argument('note_id')
+@click.option('--related', '-r', is_flag=True, help='Show full details of related/connected notes')
+@click.option('--full', '-f', is_flag=True, help='Show full content of related notes (only with --related)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def show(note_id):
-    """Display note content."""
+def show(note_id, related, full):
+    """Display note content, optionally with related notes."""
     try:
         note = get_notes_manager().get_note(note_id)
+
+        # If showing related notes, add a header for the source note
+        if related:
+            console.print(ZettlFormatter.header(f"Source Note"))
+
         console.print(ZettlFormatter.format_note_display(note, get_notes_manager()))
 
         # Show tags if any
@@ -375,12 +1308,29 @@ def show(note_id):
         except Exception:
             pass
 
-        # Show linked notes if any
+        # Show linked notes
         try:
             linked_notes = get_notes_manager().get_related_notes(note_id)
             if linked_notes:
-                linked_ids = [note['id'] for note in linked_notes]
-                click.echo(f"Links: {', '.join(linked_ids)}")
+                if related:
+                    # Show full related notes with content
+                    click.echo("\n")  # Extra space after source note
+                    console.print(ZettlFormatter.header(f"Connected Notes ({len(linked_notes)} total)"))
+
+                    for note in linked_notes:
+                        if full:
+                            # Full content mode
+                            console.print(ZettlFormatter.format_note_display(note, get_notes_manager()))
+                            click.echo()  # Extra line between notes
+                        else:
+                            # Preview mode
+                            content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
+                            formatted_id = ZettlFormatter.note_id(note['id'])
+                            console.print(f"{formatted_id}: {content_preview}")
+                else:
+                    # Just show IDs (original behavior)
+                    linked_ids = [note['id'] for note in linked_notes]
+                    click.echo(f"Links: {', '.join(linked_ids)}")
         except Exception:
             pass
     except Exception as e:
@@ -572,43 +1522,6 @@ def search(query, tag, exclude_tag, date, full):
                     pattern = re.compile(re.escape(query), re.IGNORECASE)
                     content_preview = pattern.sub(r"[bold yellow]\g<0>[/bold yellow]", content_preview)
 
-                formatted_id = ZettlFormatter.note_id(note['id'])
-                console.print(f"{formatted_id}: {content_preview}")
-    except Exception as e:
-        console.print(ZettlFormatter.error(str(e)))
-
-@cli.command()
-@click.argument('note_id')
-@click.option('--full', '-f', is_flag=True, help='Show full content of related notes')
-@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def related(note_id, full):
-    """Show notes connected to this note with improved formatting."""
-    try:
-        # First, show the source note
-        try:
-            source_note = get_notes_manager().get_note(note_id)
-            console.print(ZettlFormatter.header(f"Source Note"))
-            console.print(ZettlFormatter.format_note_display(source_note, get_notes_manager()))
-            click.echo("\n")  # Extra space after source note
-        except Exception as e:
-            console.print(ZettlFormatter.warning(f"Could not display source note: {str(e)}"))
-        
-        # Now show related notes
-        related_notes = get_notes_manager().get_related_notes(note_id)
-        if not related_notes:
-            console.print(ZettlFormatter.warning(f"No notes connected to note #{note_id}"))
-            return
-            
-        console.print(ZettlFormatter.header(f"Connected Notes ({len(related_notes)} total)"))
-        
-        for note in related_notes:
-            if full:
-                # Full content mode
-                console.print(ZettlFormatter.format_note_display(note, get_notes_manager()))
-                click.echo()  # Extra line between notes
-            else:
-                # Preview mode
-                content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
                 formatted_id = ZettlFormatter.note_id(note['id'])
                 console.print(f"{formatted_id}: {content_preview}")
     except Exception as e:
@@ -1146,18 +2059,46 @@ def merge(note_ids, force):
     except Exception as e:
         console.print(ZettlFormatter.error(f"Error merging notes: {str(e)}"), err=True)
 
-@cli.command()
+@cli.command(name='todo')
+@click.argument('content', nargs=-1, required=False)
 @click.option('--donetoday', '-dt', is_flag=True, help='List todos that were completed today')
 @click.option('--all', '-a', 'show_all', is_flag=True, help='Show all todos (both active and completed)')
 @click.option('--cancel', '-c', is_flag=True, help='Show canceled todos')
-@click.option('--tag', '-t', multiple=True, help='Filter todos by one or more additional tags')
-@click.option('--eisenhower', '-e', is_flag=True, help='Display todos in Eisenhower matrix format')
+@click.option('--tag', '-t', multiple=True, help='Filter todos by tag (list mode) or add tags (create mode)')
+@click.option('--link', '-l', help='Note ID to link this todo to (create mode only)')
+@click.option('--id', 'custom_id', help='Custom ID for the todo (create mode only, must be unique)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def todos(donetoday, show_all, cancel, tag, eisenhower):
-    """List all notes tagged with 'todo' grouped by category."""
+def todo_cmd(content, donetoday, show_all, cancel, tag, link, custom_id):
+    """Create or list todos. Use @project to link/filter by project.
 
+    CREATE MODE (when content provided):
+        zt todo "Buy milk" -t shopping
+        zt todo "Fix bug @myproject" -t urgent
+
+    LIST MODE (when no content or only @ provided):
+        zt todo                    # List all active todos
+        zt todo @myproject         # List todos for project
+        zt todo -t urgent          # List todos with tag
+    """
     try:
-        # Get the notes manager once and reuse it
+        # Join content into a string and parse @ mentions
+        content_string = ' '.join(content) if content else ''
+
+        # Extract @project mentions
+        project_ids = re.findall(r'@(\S+)', content_string)
+
+        # Remove @mentions from content
+        remaining_content = re.sub(r'@\S+', '', content_string).strip()
+
+        # Determine mode based on remaining content
+        if remaining_content:
+            # CREATE MODE: has content after removing @ mentions
+            # Pass the ORIGINAL content so that create_new_note can parse @ and create links
+            notes_manager = get_notes_manager()
+            create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['todo'])
+            return
+
+        # LIST MODE: no content or only @ mentions
         notes_manager = get_notes_manager()
 
         # Get all notes tagged with 'todo' along with ALL their tags efficiently
@@ -1184,10 +2125,31 @@ def todos(donetoday, show_all, cancel, tag, eisenhower):
                 console.print(ZettlFormatter.warning("No todos completed today."))
                 return
 
-        # Special handling for Eisenhower matrix display
-        if eisenhower:
-            display_eisenhower_matrix(todo_notes, show_all, donetoday, cancel)
-            return
+        # Filter by project if @ mentions provided
+        if project_ids:
+            # Get all notes linked to each project
+            project_filtered_notes = []
+            for project_id in project_ids:
+                # Get notes linked to this project
+                try:
+                    linked_notes = notes_manager.get_related_notes(project_id)
+                    linked_note_ids = {note['id'] for note in linked_notes}
+
+                    # Filter todos to only those linked to this project
+                    for note in todo_notes:
+                        if note['id'] in linked_note_ids:
+                            if note not in project_filtered_notes:
+                                project_filtered_notes.append(note)
+                except Exception:
+                    # If project doesn't exist or has no links, continue
+                    pass
+
+            todo_notes = project_filtered_notes
+
+            if not todo_notes:
+                projects_str = "', '".join(project_ids)
+                console.print(ZettlFormatter.warning(f"No todos found for projects: '{projects_str}'."))
+                return
 
         # Apply filters if specified - now using pre-loaded tags
         if tag:
@@ -1359,143 +2321,258 @@ def todos(donetoday, show_all, cancel, tag, eisenhower):
     except Exception as e:
         console.print(ZettlFormatter.error(str(e)))
 
-def display_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=False, include_cancel=False):
-    """Display todos in an Eisenhower matrix format."""
-    # Create four quadrants for Eisenhower categorization
-    urgent_important = []      # do - Quadrant 1
-    not_urgent_important = []  # pl - Quadrant 2
-    urgent_not_important = []  # dl - Quadrant 3
-    not_urgent_not_important = []  # dr - Quadrant 4
-    uncategorized = []
-    done_todos = []            # Completed todos
-    canceled_todos = []        # Canceled todos
+# Shortcut for todo
+@cli.command(name='t')
+@click.argument('content', nargs=-1, required=False)
+@click.option('--donetoday', '-dt', is_flag=True, help='List todos that were completed today')
+@click.option('--all', '-a', 'show_all', is_flag=True, help='Show all todos (both active and completed)')
+@click.option('--cancel', '-c', is_flag=True, help='Show canceled todos')
+@click.option('--tag', '-t', multiple=True, help='Filter todos by tag (list mode) or add tags (create mode)')
+@click.option('--link', '-l', help='Note ID to link this todo to (create mode only)')
+@click.option('--id', 'custom_id', help='Custom ID for the todo (create mode only, must be unique)')
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def t_cmd(content, donetoday, show_all, cancel, tag, link, custom_id):
+    """Shortcut for 'todo' command."""
+    try:
+        # Join content into a string and parse @ mentions
+        content_string = ' '.join(content) if content else ''
 
-    # Track unique note IDs for counting
-    unique_ids = set()
+        # Extract @project mentions
+        project_ids = re.findall(r'@(\S+)', content_string)
 
-    for note in todo_notes:
-        note_id = note['id']
-        # Use the pre-loaded tags from the view
-        note_tags = note.get('all_tags', [])
-        tags_lower = [t.lower() for t in note_tags]
-        
-        # Check status flags
-        is_done = 'done' in tags_lower
-        is_canceled = 'cancel' in tags_lower
+        # Remove @mentions from content
+        remaining_content = re.sub(r'@\S+', '', content_string).strip()
 
-        # Skip based on flags
-        if is_canceled and not include_cancel:
-            continue
+        # Determine mode based on remaining content
+        if remaining_content:
+            # CREATE MODE: has content after removing @ mentions
+            # Pass the ORIGINAL content so that create_new_note can parse @ and create links
+            notes_manager = get_notes_manager()
+            create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['todo'])
+            return
 
-        if is_done and not include_done:
-            continue
-        
-        # Add to appropriate category
-        if is_canceled:
-            canceled_todos.append(note)
-        elif is_done:
-            done_todos.append(note)
-        elif 'do' in tags_lower:
-            urgent_important.append(note)
-        elif 'pl' in tags_lower:
-            not_urgent_important.append(note)
-        elif 'dl' in tags_lower:
-            urgent_not_important.append(note)
-        elif 'dr' in tags_lower:
-            not_urgent_not_important.append(note)
-        else:
-            uncategorized.append(note)
-        
-        # Track all displayed todos
-        unique_ids.add(note_id)
-    
-    # Display matrix header
-    console.print(ZettlFormatter.header("Eisenhower Matrix"))
-    click.echo(f"Total todos: {len(unique_ids)}")
-    click.echo()
-    
-    # Helper to format a single note
-    def format_note(note):
-        formatted_id = ZettlFormatter.note_id(note['id'])
-        content_lines = note['content'].split('\n')
-        return f"  {formatted_id}: {content_lines[0]}"
-    
-    # Matrix dimension and layout constants
-    MATRIX_WIDTH = 120
-    COL_WIDTH = MATRIX_WIDTH // 2 - 2  # Allow for the divider
-    separator = "-" * MATRIX_WIDTH
-    
-    # Display top header
-    console.print(f"{' ' * 20}URGENT{' ' * (COL_WIDTH - 26)}|{' ' * 10}NOT URGENT")
-    console.print(separator)
+        # LIST MODE: no content or only @ mentions
+        notes_manager = get_notes_manager()
 
-    # Display Q1 and Q2 headers (DO and PLAN)
-    q1_header = "[bold]IMPORTANT[/bold]"
-    q1_label = f"[green]DO[/green] ({len(urgent_important)})"
-    q2_label = f"[blue]PLAN[/blue] ({len(not_urgent_important)})"
+        # Get all notes tagged with 'todo' along with ALL their tags efficiently
+        todo_notes = notes_manager.get_notes_with_all_tags_by_tag('todo')
 
-    console.print(f"{q1_header.ljust(15)} | {q1_label.ljust(COL_WIDTH - 3)}| {q2_label}")
-    console.print(separator)
-    
-    # Display Q1 and Q2 content
-    q1_height = len(urgent_important)
-    q2_height = len(not_urgent_important)
-    max_top_height = max(q1_height, q2_height)
-    
-    for i in range(max_top_height):
-        left = format_note(urgent_important[i]) if i < q1_height else ""
-        right = format_note(not_urgent_important[i]) if i < q2_height else ""
-        
-        # Ensure columns align properly
-        if len(left) > COL_WIDTH:
-            left = left[:COL_WIDTH-3] + "..."
-            
-        click.echo(f"{left.ljust(COL_WIDTH)} | {right}")
-    
-    click.echo(separator)
-    
-    # Display Q3 and Q4 headers (DELEGATE and DROP)
-    q3_header = "[bold]NOT IMPORTANT[/bold]"
-    q3_label = f"[yellow]DELEGATE[/yellow] ({len(urgent_not_important)})"
-    q4_label = f"[red]DROP[/red] ({len(not_urgent_not_important)})"
+        if not todo_notes:
+            console.print(ZettlFormatter.warning("No todos found."))
+            return
 
-    console.print(f"{q3_header.ljust(15)} | {q3_label.ljust(COL_WIDTH - 3)}| {q4_label}")
-    console.print(separator)
-    
-    # Display Q3 and Q4 content
-    q3_height = len(urgent_not_important)
-    q4_height = len(not_urgent_not_important)
-    max_bottom_height = max(q3_height, q4_height)
-    
-    for i in range(max_bottom_height):
-        left = format_note(urgent_not_important[i]) if i < q3_height else ""
-        right = format_note(not_urgent_not_important[i]) if i < q4_height else ""
-        
-        # Ensure columns align properly
-        if len(left) > COL_WIDTH:
-            left = left[:COL_WIDTH-3] + "..."
-            
-        click.echo(f"{left.ljust(COL_WIDTH)} | {right}")
-    
-    # Display additional categories if requested
-    if uncategorized:
-        click.echo("\n" + separator)
-        console.print(ZettlFormatter.warning(f"Uncategorized Todos ({len(uncategorized)})"))
-        for note in uncategorized:
-            click.echo(format_note(note))
-    
-    if include_done and done_todos:
-        click.echo("\n" + separator)
-        console.print(ZettlFormatter.header(f"Completed Todos ({len(done_todos)})"))
-        for note in done_todos:
-            click.echo(format_note(note))
-    
-    if include_cancel and canceled_todos:
-        click.echo("\n" + separator)
-        console.print(ZettlFormatter.header(f"Canceled Todos ({len(canceled_todos)})"))
-        for note in canceled_todos:
-            click.echo(format_note(note))
+        # Filter for todos completed today if requested
+        if donetoday:
+            done_today_data = notes_manager.get_tags_created_today('done')
+            if not done_today_data:
+                console.print(ZettlFormatter.warning("No todos completed today."))
+                return
 
+            # Extract note IDs from the done today data
+            done_today_ids = {item['note_id'] for item in done_today_data}
+
+            # Filter todo_notes to only include those completed today
+            todo_notes = [note for note in todo_notes if note['id'] in done_today_ids]
+
+            if not todo_notes:
+                console.print(ZettlFormatter.warning("No todos completed today."))
+                return
+
+        # Filter by project if @ mentions provided
+        if project_ids:
+            # Get all notes linked to each project
+            project_filtered_notes = []
+            for project_id in project_ids:
+                # Get notes linked to this project
+                try:
+                    linked_notes = notes_manager.get_related_notes(project_id)
+                    linked_note_ids = {note['id'] for note in linked_notes}
+
+                    # Filter todos to only those linked to this project
+                    for note in todo_notes:
+                        if note['id'] in linked_note_ids:
+                            if note not in project_filtered_notes:
+                                project_filtered_notes.append(note)
+                except Exception:
+                    # If project doesn't exist or has no links, continue
+                    pass
+
+            todo_notes = project_filtered_notes
+
+            if not todo_notes:
+                projects_str = "', '".join(project_ids)
+                console.print(ZettlFormatter.warning(f"No todos found for projects: '{projects_str}'."))
+                return
+
+        # Apply filters if specified - now using pre-loaded tags
+        if tag:
+            filters = [f.lower() for f in tag]
+            filtered_notes = []
+
+            for note in todo_notes:
+                note_tags_lower = [t.lower() for t in note.get('all_tags', [])]
+
+                # Check if all filters are in the note's tags
+                if all(f in note_tags_lower for f in filters):
+                    filtered_notes.append(note)
+
+            todo_notes = filtered_notes
+
+            if not todo_notes:
+                filter_str = "', '".join(tag)
+                console.print(ZettlFormatter.warning(f"No todos found with all tags: '{filter_str}'."))
+                return
+
+        # Group notes by their tags (categories) - using pre-loaded tags
+        active_todos_by_category = {}
+        done_todos_by_category = {}
+        canceled_todos_by_category = {}
+        uncategorized_active = []
+        uncategorized_done = []
+        uncategorized_canceled = []
+
+        # Track unique note IDs to count them at the end
+        unique_active_ids = set()
+        unique_done_ids = set()
+        unique_canceled_ids = set()
+
+        for note in todo_notes:
+            note_id = note['id']
+            note_tags = note.get('all_tags', [])
+            tags_lower = [t.lower() for t in note_tags]
+
+            # Check if this is a done todo
+            is_done = 'done' in tags_lower
+
+            # Check if this is a canceled todo
+            is_canceled = 'cancel' in tags_lower
+
+            # Skip done todos if not explicitly included
+            if is_done and not show_all and not donetoday:
+                continue
+
+            # Skip canceled todos if not explicitly requested
+            if is_canceled and not cancel:
+                continue
+
+            # Track unique IDs
+            if is_canceled:
+                unique_canceled_ids.add(note_id)
+            elif is_done:
+                unique_done_ids.add(note_id)
+            else:
+                unique_active_ids.add(note_id)
+
+            # Find category tags (everything except 'todo', 'done', 'cancel', and the filter tags)
+            excluded_tags = ['todo', 'done', 'cancel']
+            if tag:
+                excluded_tags.extend([f.lower() for f in tag])
+
+            categories = [t for t in note_tags if t.lower() not in excluded_tags]
+
+            if not categories:
+                # This todo has no category tags
+                if is_canceled:
+                    uncategorized_canceled.append(note)
+                elif is_done:
+                    uncategorized_done.append(note)
+                else:
+                    uncategorized_active.append(note)
+            else:
+                # Create a combined category key from all tags
+                combined_category = " - ".join(sorted(categories))
+
+                if is_canceled:
+                    if combined_category not in canceled_todos_by_category:
+                        canceled_todos_by_category[combined_category] = []
+                    canceled_todos_by_category[combined_category].append(note)
+                elif is_done:
+                    if combined_category not in done_todos_by_category:
+                        done_todos_by_category[combined_category] = []
+                    done_todos_by_category[combined_category].append(note)
+                else:
+                    if combined_category not in active_todos_by_category:
+                        active_todos_by_category[combined_category] = []
+                    active_todos_by_category[combined_category].append(note)
+
+        # Build the header message
+        header_parts = ["Todos"]
+        if tag:
+            filter_str = "', '".join(tag)
+            header_parts.append(f"tagged with '{filter_str}'")
+
+        # Display todos by category
+        if (not active_todos_by_category and not uncategorized_active and
+            (not show_all and not donetoday or (not done_todos_by_category and not uncategorized_done)) and
+            (not cancel or (not canceled_todos_by_category and not uncategorized_canceled))):
+            console.print(ZettlFormatter.warning("No todos match your criteria."))
+            return
+
+        # Helper function to display a group of todos
+        def display_todos_group(category_dict, uncategorized_list, header_text):
+            if header_text:
+                console.print(header_text)
+
+            if category_dict:
+                for category, notes in sorted(category_dict.items()):
+                    # Check if this is a combined category with multiple tags
+                    if " - " in category:
+                        # For combined categories, format each tag separately
+                        tags = category.split(" - ")
+                        formatted_tags = []
+                        for tag_name in tags:
+                            formatted_tags.append(ZettlFormatter.tag(tag_name))
+                        category_display = " - ".join(formatted_tags)
+                        console.print(f"\n{category_display} ({len(notes)})")
+                    else:
+                        # For single categories, use the original format
+                        console.print(f"\n{ZettlFormatter.tag(category)} ({len(notes)})")
+
+                    for note in notes:
+                        formatted_id = ZettlFormatter.note_id(note['id'])
+
+                        # Print note ID on its own line
+                        console.print(f"  {formatted_id}:")
+
+                        # Render markdown content
+                        content = note['content']
+                        md = Markdown(content)
+                        console.print(md)
+                        console.print("")  # Add an empty line between notes
+
+            if uncategorized_list:
+                console.print("\nUncategorized")
+                for note in uncategorized_list:
+                    formatted_id = ZettlFormatter.note_id(note['id'])
+
+                    # Print note ID on its own line
+                    console.print(f"  {formatted_id}:")
+
+                    # Render markdown content
+                    content = note['content']
+                    md = Markdown(content)
+                    console.print(md)
+                    console.print("")  # Add an empty line between notes
+
+        # Display active todos first
+        if active_todos_by_category or uncategorized_active:
+            active_header = ZettlFormatter.header(f"Active {' '.join(header_parts)} ({len(unique_active_ids)} total)")
+            display_todos_group(active_todos_by_category, uncategorized_active, active_header)
+
+        # Display all done todos if requested
+        if (show_all or donetoday) and (done_todos_by_category or uncategorized_done):
+            done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids)} total)")
+            console.print(f"\n{done_header}")
+            display_todos_group(done_todos_by_category, uncategorized_done, "")
+
+        # Display canceled todos if requested
+        if cancel and (canceled_todos_by_category or uncategorized_canceled):
+            canceled_header = ZettlFormatter.header(f"Canceled {' '.join(header_parts)} ({len(unique_canceled_ids)} total)")
+            console.print(f"\n{canceled_header}")
+            display_todos_group(canceled_todos_by_category, uncategorized_canceled, "")
+
+    except Exception as e:
+        console.print(ZettlFormatter.error(str(e)))
 
 @cli.command()
 @click.option('--source', '-s', is_flag=True, help='Show the source note ID')
