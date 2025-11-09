@@ -39,7 +39,7 @@ class CommandHelp:
     def get_main_help(cls):
         """Return the main help text."""
         help_text = f"""
-[bold green]zettl v0.5.2[/bold green] - A Zettelkasten-style note-taking tool
+[bold green]zettl v0.6.1[/bold green] - A Zettelkasten-style note-taking tool
 
 [bold]NOTE MANAGEMENT[/bold]
   [bold yellow]todo[/bold yellow] / [bold yellow]t[/bold yellow]            List todos OR create new todo (auto-tagged 'todo')

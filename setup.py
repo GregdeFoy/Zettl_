@@ -11,7 +11,7 @@ else:
 
 setup(
     name="zettl",
-    version="0.5.3",
+    version="0.6.1",
     packages=find_packages(),
     include_package_data=True,
     install_requires=[

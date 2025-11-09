@@ -11,4 +11,4 @@ AUTH_URL = os.getenv("AUTH_URL", "https://zettlnotes.app/api/auth")
 
 # Application settings
 APP_NAME = "zettl"
-APP_VERSION = "0.5.2"
+APP_VERSION = "0.6.1"
