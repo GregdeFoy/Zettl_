@@ -464,15 +464,15 @@
         // Available buttons list (matches topLevelCommands in index.html)
         const availableButtons = [
             // Note Creation/Editing
-            'task', 'idea', 'note', 'project', 'edit', 'append', 'prepend', 'delete',
+            'todo', 'idea', 'note', 'project', 'edit', 'append', 'prepend', 'delete',
             // Viewing
             'show', 'list', 'search',
             // Organization
-            'tags', 'untag', 'link', 'unlink', 'related', 'graph', 'merge',
+            'tags', 'untag', 'link', 'unlink', 'graph', 'merge',
             // AI
             'llm',
             // Special Features
-            'todos', 'rules',
+            'rules',
             // System
             'api-key', 'help', 'clear', 'settings', 'logout'
         ];
@@ -511,11 +511,11 @@
             container.style.cssText = 'display: block;'; // Change to block for categories
 
             const categories = {
-                'Note Creation/Editing': ['task', 'idea', 'note', 'project', 'edit', 'append', 'prepend', 'delete'],
+                'Note Creation/Editing': ['todo', 'idea', 'note', 'project', 'edit', 'append', 'prepend', 'delete'],
                 'Viewing': ['show', 'list', 'search'],
-                'Organization': ['tags', 'untag', 'link', 'unlink', 'related', 'graph', 'merge'],
+                'Organization': ['tags', 'untag', 'link', 'unlink', 'graph', 'merge'],
                 'AI': ['llm'],
-                'Special Features': ['todos', 'rules'],
+                'Special Features': ['rules'],
                 'System': ['api-key', 'help', 'clear', 'settings', 'logout']
             };
 

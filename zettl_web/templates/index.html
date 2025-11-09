@@ -1312,22 +1312,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // Command to options mapping - for dynamic buttons
     const commandOptions = {
         'list': ['-l', '--limit', '-f', '--full', '-c', '--compact', '-h', '--help'],
-        'task': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
-        't': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
-        'idea': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
-        'i': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
-        'note': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
-        'n': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
-        'project': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
-        'p': ['-t', '--tag', '-l', '--link', '--id', '-h', '--help'],
-        'show': ['-h', '--help'],
+        'todo': ['-t', '--tag', '-l', '--link', '--id', '-dt', '--donetoday', '-a', '--all', '-c', '--cancel', '-h', '--help'],
+        't': ['-t', '--tag', '-l', '--link', '--id', '-dt', '--donetoday', '-a', '--all', '-c', '--cancel', '-h', '--help'],
+        'idea': ['-t', '--tag', '-l', '--link', '--id', '-a', '--all', '-c', '--cancel', '-h', '--help'],
+        'i': ['-t', '--tag', '-l', '--link', '--id', '-a', '--all', '-c', '--cancel', '-h', '--help'],
+        'note': ['-t', '--tag', '-l', '--link', '--id', '-a', '--all', '-c', '--cancel', '-h', '--help'],
+        'n': ['-t', '--tag', '-l', '--link', '--id', '-a', '--all', '-c', '--cancel', '-h', '--help'],
+        'project': ['-t', '--tag', '-l', '--link', '--id', '-a', '--all', '-f', '--full', '-h', '--help'],
+        'p': ['-t', '--tag', '-l', '--link', '--id', '-a', '--all', '-f', '--full', '-h', '--help'],
+        'show': ['-r', '--related', '-f', '--full', '-h', '--help'],
         'search': ['-t', '--tag', '+t', '--exclude-tag', '-f', '--full', '-h', '--help'],
         'tags': ['-h', '--help'],
         'link': ['-c', '--context', '-h', '--help'],
-        'related': ['-f', '--full', '-h', '--help'],
         'graph': ['-o', '--output', '-d', '--depth', '-h', '--help'],
         'llm': ['-a', '--action', '-c', '--count', '-s', '--show-source', '-d', '--debug', '-h', '--help'],
-        'todos': ['-a', '--all', '-dt', '--donetoday', '-c', '--cancel', '-t', '--tag', '-h', '--help', '-e', '-eisenhower'],
         'delete': ['--keep-links', '--keep-tags', '-f', '--force', '-h', '--help'],
         'untag': ['-h', '--help'],
         'unlink': ['-h', '--help'],
@@ -1340,7 +1338,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // For commands that need auto-quotes
-    const autoQuoteCommands = ['t', 'task', 'i', 'idea', 'n', 'note', 'p', 'project'];
+    const autoQuoteCommands = ['t', 'todo', 'i', 'idea', 'n', 'note', 'p', 'project'];
 
     // Sub-options for commands like llm
     const subOptions = {
@@ -1355,15 +1353,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Top-level commands for initial buttons (organized by category)
     const topLevelCommands = [
         // Note Creation/Editing
-        'task', 'idea', 'note', 'project', 'edit', 'append', 'prepend', 'delete',
+        'todo', 'idea', 'note', 'project', 'edit', 'append', 'prepend', 'delete',
         // Viewing
         'show', 'list', 'search',
         // Organization
-        'tags', 'untag', 'link', 'unlink', 'related', 'graph', 'merge',
+        'tags', 'untag', 'link', 'unlink', 'graph', 'merge',
         // AI
         'llm',
         // Special Features
-        'todos', 'rules',
+        'rules',
         // System
         'api-key', 'help', 'clear', 'settings', 'logout'
     ];

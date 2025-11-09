@@ -495,6 +495,54 @@ class Database:
 
         return related_notes
 
+    def get_linked_notes(self, note_id: str) -> List[Dict[str, Any]]:
+        """Get notes that this note links to (outgoing links only) with caching."""
+        cache_key = f"linked_notes:{note_id}"
+
+        # Check if in cache
+        cached_notes = get_from_cache(cache_key)
+        if cached_notes is not None:
+            return cached_notes
+
+        # Get outgoing links only
+        params = {'source_id': f'eq.{note_id}', 'select': 'target_id'}
+        outgoing_response = self._make_request('GET', 'links', params=params)
+
+        # Extract IDs from outgoing links
+        outgoing_data = outgoing_response.json()
+        if not outgoing_data:
+            # Cache empty result
+            set_in_cache(cache_key, [], ttl=300)
+            return []
+
+        related_ids = [link['target_id'] for link in outgoing_data]
+
+        # Batch fetch all linked notes in a single request
+        ids_str = ','.join(related_ids)
+        params = {'id': f'in.({ids_str})'}
+
+        try:
+            response = self._make_request('GET', 'notes', params=params)
+            linked_notes = response.json() or []
+
+            # Also cache individual notes
+            for note in linked_notes:
+                set_in_cache(f"note:{note['id']}", note, ttl=600)
+        except Exception:
+            # Fallback to individual fetching if batch fails
+            linked_notes = []
+            for related_id in related_ids:
+                try:
+                    note = self.get_note(related_id)
+                    linked_notes.append(note)
+                except Exception:
+                    continue
+
+        # Cache the result
+        set_in_cache(cache_key, linked_notes, ttl=300)
+
+        return linked_notes
+
     def add_tag(self, note_id: str, tag: str) -> str:
         """Add a tag to a note."""
         # Verify note exists
@@ -849,6 +897,42 @@ class Database:
         set_in_cache(cache_key, tags_with_counts, ttl=300)
 
         return tags_with_counts
+
+    def get_project_stats(self, project_id: str = None) -> Dict[str, Any]:
+        """
+        Get statistics for a project or all projects from the project_stats view.
+
+        Args:
+            project_id: Optional project ID. If None, returns stats for all projects.
+
+        Returns:
+            Dict with project stats (active_todos, active_ideas, active_notes)
+            or list of dicts if no project_id specified
+        """
+        cache_key = f"project_stats_{project_id}" if project_id else "project_stats_all"
+
+        # Check cache
+        cached_result = get_from_cache(cache_key)
+        if cached_result is not None:
+            return cached_result
+
+        # Query the view
+        params = {'select': 'project_id,active_todos,active_ideas,active_notes'}
+        if project_id:
+            params['project_id'] = f'eq.{project_id}'
+
+        response = self._make_request('GET', 'project_stats', params=params)
+        data = response.json()
+
+        # Cache the result
+        set_in_cache(cache_key, data, ttl=300)  # Cache for 5 minutes
+
+        if project_id:
+            # Return single project stats or empty dict if not found
+            return data[0] if data else {'project_id': project_id, 'active_todos': 0, 'active_ideas': 0, 'active_notes': 0}
+        else:
+            # Return all project stats
+            return data
 
     def delete_note(self, note_id: str, cascade: bool = True, force: bool = False) -> None:
         """
