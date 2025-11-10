@@ -923,7 +923,7 @@ def execute_command():
 
     # Map shortcut commands to their full versions
     command_map = {
-        't': 'task',
+        't': 'todo',
         'i': 'idea',
         'n': 'note',
         'p': 'project'
@@ -989,7 +989,7 @@ def execute_command():
                     result += f"{formatted_id} [{formatted_time}]: {content_preview}\n\n"  # Added extra newline
 
 
-        elif cmd in ["task", "todo", "idea", "note", "project"]:
+        elif cmd in ["todo", "idea", "note", "project"]:
             # Handle specialized note creation/listing commands with @ linking support
             import re
 
@@ -1009,9 +1009,9 @@ def execute_command():
             cleaned_content, project_links = parse_project_links(content)
 
             # Determine automatic tags based on command type
-            if cmd in ["task", "todo"]:
+            if cmd == "todo":
                 list_tag = 'todo'
-                auto_tags = ['task', 'todo']
+                auto_tags = ['todo']
             elif cmd == "idea":
                 list_tag = 'idea'
                 auto_tags = ['idea']
@@ -1058,153 +1058,736 @@ def execute_command():
 
                             formatted_id = ZettlFormatter.note_id(project_id)
                             result += f"  {formatted_id} {stats}: {content_preview}\n\n"
-                else:
-                    # Regular list for other types
-                    notes = notes_manager.get_notes_by_tag(list_tag)
-
-                    if not notes:
-                        result = f"{ZettlFormatter.warning(f'No {cmd}s found.')}\n"
-                    else:
-                        result = f"{ZettlFormatter.header(f'{cmd.title()}s ({len(notes)} total)')}\n\n"
-
-                        for note in notes:
-                            note_id = note['id']
-                            created_at = notes_manager.db.format_timestamp(note['created_at'])
-                            formatted_id = ZettlFormatter.note_id(note_id)
-                            formatted_time = ZettlFormatter.timestamp(created_at)
-
-                            # Get content preview
-                            content_preview = note['content'][:60] if len(note['content']) > 60 else note['content']
-                            if len(note['content']) > 60:
-                                content_preview += "..."
-
-                            result += f"{formatted_id} [{formatted_time}]: {content_preview}\n\n"
-
-            # DETAIL VIEW MODE (for project) or CREATE MODE
-            else:
-                # Check if this is a project command and cleaned_content is an existing project ID
-                if cmd == "project":
-                    try:
-                        # Try to get the note by this ID
-                        project_note = notes_manager.get_note(cleaned_content)
-                        project_tags = notes_manager.get_tags(cleaned_content)
-
-                        # If it's a project, show detail view
-                        if 'project' in [t.lower() for t in project_tags]:
-                            # DETAIL VIEW MODE for project
-                            result = "═" * 63 + "\n"
-                            result += f"  PROJECT: {project_note['content'].split(chr(10))[0][:40]} (#{cleaned_content})\n"
-                            result += "═" * 63 + "\n\n"
-
-                            # Project content
-                            result += f"{project_note['content']}\n\n"
-
-                            # Tags
-                            if project_tags:
-                                result += f"Tags: {', '.join([ZettlFormatter.tag(t) for t in project_tags])}\n\n"
-
-                            # Get linked notes (bidirectional)
-                            try:
-                                linked_notes = notes_manager.get_related_notes(cleaned_content)
-
-                                if not linked_notes:
-                                    result += f"{ZettlFormatter.warning('No notes linked to this project.')}\n"
-                                else:
-                                    # Categorize by note type
-                                    todos = []
-                                    ideas = []
-                                    notes_list = []
-
-                                    for n in linked_notes:
-                                        note_tags = notes_manager.get_tags(n['id'])
-                                        tags_lower = [t.lower() for t in note_tags]
-                                        n['all_tags'] = note_tags  # Store for later use
-
-                                        if 'todo' in tags_lower:
-                                            todos.append(n)
-                                        elif 'idea' in tags_lower:
-                                            ideas.append(n)
-                                        elif 'note' in tags_lower:
-                                            notes_list.append(n)
-
-                                    # Categorize by status
-                                    def categorize_by_status(note_list):
-                                        active, done, canceled = [], [], []
-                                        for n in note_list:
-                                            tags_lower = [t.lower() for t in n.get('all_tags', [])]
-                                            if 'cancel' in tags_lower:
-                                                canceled.append(n)
-                                            elif 'done' in tags_lower:
-                                                done.append(n)
-                                            else:
-                                                active.append(n)
-                                        return active, done, canceled
-
-                                    todos_active, todos_done, todos_canceled = categorize_by_status(todos)
-                                    ideas_active, ideas_done, ideas_canceled = categorize_by_status(ideas)
-                                    notes_active, notes_done, notes_canceled = categorize_by_status(notes_list)
-
-                                    # Statistics section
-                                    result += "─" * 63 + "\n"
-                                    result += "  📊 STATISTICS\n"
-                                    result += "─" * 63 + "\n"
-                                    result += f"  📋 Todos:  {len(todos_active)} active, {len(todos_done)} done, {len(todos_canceled)} canceled\n"
-                                    result += f"  💡 Ideas:  {len(ideas_active)} active, {len(ideas_done)} done, {len(ideas_canceled)} canceled\n"
-                                    result += f"  📝 Notes:  {len(notes_active)} active, {len(notes_done)} done, {len(notes_canceled)} canceled\n"
-                                    result += f"  {'─' * 9}\n"
-                                    total_active = len(todos_active) + len(ideas_active) + len(notes_active)
-                                    total_done = len(todos_done) + len(ideas_done) + len(notes_done)
-                                    total_canceled = len(todos_canceled) + len(ideas_canceled) + len(notes_canceled)
-                                    result += f"  Total:     {total_active} active, {total_done} done, {total_canceled} canceled\n\n"
-
-                                    # Display active items
-                                    if todos_active:
-                                        result += "━" * 63 + "\n"
-                                        result += f"📋 ACTIVE TODOS ({len(todos_active)})\n"
-                                        result += "━" * 63 + "\n"
-                                        for note in todos_active:
-                                            formatted_id = ZettlFormatter.note_id(note['id'])
-                                            content_preview = note['content'][:80] if len(note['content']) > 80 else note['content']
-                                            if len(note['content']) > 80:
-                                                content_preview += "..."
-                                            result += f"  {formatted_id}: {content_preview}\n"
-                                        result += "\n"
-
-                                    if ideas_active:
-                                        result += "━" * 63 + "\n"
-                                        result += f"💡 ACTIVE IDEAS ({len(ideas_active)})\n"
-                                        result += "━" * 63 + "\n"
-                                        for note in ideas_active:
-                                            formatted_id = ZettlFormatter.note_id(note['id'])
-                                            content_preview = note['content'][:80] if len(note['content']) > 80 else note['content']
-                                            if len(note['content']) > 80:
-                                                content_preview += "..."
-                                            result += f"  {formatted_id}: {content_preview}\n"
-                                        result += "\n"
-
-                                    if notes_active:
-                                        result += "━" * 63 + "\n"
-                                        result += f"📝 ACTIVE NOTES ({len(notes_active)})\n"
-                                        result += "━" * 63 + "\n"
-                                        for note in notes_active:
-                                            formatted_id = ZettlFormatter.note_id(note['id'])
-                                            content_preview = note['content'][:80] if len(note['content']) > 80 else note['content']
-                                            if len(note['content']) > 80:
-                                                content_preview += "..."
-                                            result += f"  {formatted_id}: {content_preview}\n"
-                                        result += "\n"
-
-                            except Exception as e:
-                                result += f"{ZettlFormatter.error(f'Error getting linked notes: {str(e)}')}\n"
-
-                            # Don't proceed to CREATE MODE - we're done
+                elif cmd == "todo":
+                    # TODO LIST MODE - Full CLI behavior with filtering
+                    # Extract options
+                    donetoday = 'donetoday' in options or 'dt' in flags
+                    show_all = 'all' in options or 'a' in flags
+                    cancel_flag = 'cancel' in options or 'c' in flags
+                    filter_tags = []
+                    if 'tag' in options:
+                        if isinstance(options['tag'], list):
+                            filter_tags.extend(options['tag'])
                         else:
-                            # Not a project, proceed to CREATE MODE below
-                            raise Exception("Not a project")
+                            filter_tags.append(options['tag'])
 
-                    except Exception:
-                        # Note doesn't exist or not a project, fall through to CREATE MODE
-                        pass
+                    # Get all notes tagged with 'todo'
+                    todo_notes = notes_manager.get_notes_by_tag('todo')
+
+                    if not todo_notes:
+                        result = ZettlFormatter.warning("No todos found.")
+                    else:
+                        # Standard todo list with filtering (same logic as todos command)
+                        # Get notes with 'done' tag added today
+                        done_today_ids = set()
+                        if donetoday:
+                            try:
+                                done_tags_today = notes_manager.db.get_tags_created_today('done')
+                                for tag_data in done_tags_today:
+                                    note_id = tag_data.get('note_id')
+                                    if note_id:
+                                        done_today_ids.add(note_id)
+                            except Exception as e:
+                                result = ZettlFormatter.warning(f"Could not determine todos completed today: {str(e)}")
+
+                        # Filter by project if @ mentions provided
+                        if project_links:
+                            project_filtered_notes = []
+                            for project_id in project_links:
+                                try:
+                                    linked_notes = notes_manager.get_related_notes(project_id)
+                                    linked_note_ids = {note['id'] for note in linked_notes}
+
+                                    for note in todo_notes:
+                                        if note['id'] in linked_note_ids:
+                                            if note not in project_filtered_notes:
+                                                project_filtered_notes.append(note)
+                                except Exception:
+                                    pass
+
+                            todo_notes = project_filtered_notes
+
+                            if not todo_notes:
+                                projects_str = "', '".join(project_links)
+                                result = ZettlFormatter.warning(f"No todos found for projects: '{projects_str}'.")
+                                return jsonify({'result': process_for_web(result)})
+
+                        # Apply tag filters if specified
+                        if filter_tags:
+                            filtered_notes = []
+                            for note in todo_notes:
+                                note_id = note['id']
+                                tags = [t.lower() for t in notes_manager.get_tags(note_id)]
+
+                                if all(f.lower() in tags for f in filter_tags):
+                                    filtered_notes.append(note)
+
+                            todo_notes = filtered_notes
+
+                            if not todo_notes:
+                                filter_str = "', '".join(filter_tags)
+                                result = ZettlFormatter.warning(f"No todos found with all tags: '{filter_str}'.")
+                                return jsonify({'result': process_for_web(result)})
+
+                        # Group notes by status and category
+                        active_todos_by_category = {}
+                        done_todos_by_category = {}
+                        donetoday_todos_by_category = {}
+                        canceled_todos_by_category = {}
+                        uncategorized_active = []
+                        uncategorized_done = []
+                        uncategorized_donetoday = []
+                        uncategorized_canceled = []
+
+                        unique_active_ids = set()
+                        unique_done_ids = set()
+                        unique_donetoday_ids = set()
+                        unique_canceled_ids = set()
+
+                        for note in todo_notes:
+                            note_id = note['id']
+                            tags = notes_manager.get_tags(note_id)
+                            tags_lower = [t.lower() for t in tags]
+
+                            is_done = 'done' in tags_lower
+                            is_canceled = 'cancel' in tags_lower
+                            is_done_today = note_id in done_today_ids
+
+                            # Skip done todos if not explicitly included
+                            if is_done and not show_all and not (is_done_today and donetoday):
+                                continue
+
+                            # Skip canceled todos if not explicitly requested
+                            if is_canceled and not cancel_flag:
+                                continue
+
+                            # Track unique IDs
+                            if is_canceled:
+                                unique_canceled_ids.add(note_id)
+                            elif is_done_today and donetoday:
+                                unique_donetoday_ids.add(note_id)
+                            elif is_done:
+                                unique_done_ids.add(note_id)
+                            else:
+                                unique_active_ids.add(note_id)
+
+                            # Find category tags
+                            excluded_tags = ['todo', 'done', 'cancel']
+                            if filter_tags:
+                                excluded_tags.extend([f.lower() for f in filter_tags])
+
+                            categories = [tag for tag in tags if tag.lower() not in excluded_tags]
+
+                            # Assign to category group
+                            if not categories:
+                                if is_canceled:
+                                    uncategorized_canceled.append(note)
+                                elif is_done_today and donetoday:
+                                    uncategorized_donetoday.append(note)
+                                elif is_done:
+                                    uncategorized_done.append(note)
+                                else:
+                                    uncategorized_active.append(note)
+                            else:
+                                combined_category = " - ".join(sorted(categories))
+
+                                if is_canceled:
+                                    if combined_category not in canceled_todos_by_category:
+                                        canceled_todos_by_category[combined_category] = []
+                                    if note not in canceled_todos_by_category[combined_category]:
+                                        canceled_todos_by_category[combined_category].append(note)
+                                elif is_done_today and donetoday:
+                                    if combined_category not in donetoday_todos_by_category:
+                                        donetoday_todos_by_category[combined_category] = []
+                                    if note not in donetoday_todos_by_category[combined_category]:
+                                        donetoday_todos_by_category[combined_category].append(note)
+                                elif is_done:
+                                    if combined_category not in done_todos_by_category:
+                                        done_todos_by_category[combined_category] = []
+                                    if note not in done_todos_by_category[combined_category]:
+                                        done_todos_by_category[combined_category].append(note)
+                                else:
+                                    if combined_category not in active_todos_by_category:
+                                        active_todos_by_category[combined_category] = []
+                                    if note not in active_todos_by_category[combined_category]:
+                                        active_todos_by_category[combined_category].append(note)
+
+                        # Build header
+                        header_parts = ["Todos"]
+                        if filter_tags:
+                            filter_str = "', '".join(filter_tags)
+                            header_parts.append(f"tagged with '{filter_str}'")
+
+                        # Check if there are any todos to display
+                        if (not active_todos_by_category and not uncategorized_active and
+                            (not show_all or (not done_todos_by_category and not uncategorized_done)) and
+                            (not donetoday or (not donetoday_todos_by_category and not uncategorized_donetoday)) and
+                            (not cancel_flag or (not canceled_todos_by_category and not uncategorized_canceled))):
+                            result = ZettlFormatter.warning("No todos match your criteria.")
+                            return jsonify({'result': process_for_web(result)})
+
+                        # Helper function to display todos
+                        def display_todos_group(category_dict, uncategorized_list, header_text):
+                            output = ""
+                            if header_text:
+                                output += f"{header_text}\n\n"
+
+                            if category_dict:
+                                for category, notes in sorted(category_dict.items()):
+                                    if " - " in category:
+                                        tags_in_cat = category.split(" - ")
+                                        formatted_tags = [ZettlFormatter.tag(t) for t in tags_in_cat]
+                                        category_display = " - ".join(formatted_tags)
+                                        output += f"{category_display} ({len(notes)})\n\n"
+                                    else:
+                                        output += f"{ZettlFormatter.tag(category)} ({len(notes)})\n\n"
+
+                                    for note in notes:
+                                        formatted_id = ZettlFormatter.note_id(note['id'])
+                                        output += f"  {formatted_id}:\n"
+                                        output += f"{note['content']}\n\n"
+
+                            if uncategorized_list:
+                                output += "Uncategorized\n\n"
+                                for note in uncategorized_list:
+                                    formatted_id = ZettlFormatter.note_id(note['id'])
+                                    output += f"  {formatted_id}:\n"
+                                    output += f"{note['content']}\n\n"
+
+                            return output
+
+                        # Display active todos
+                        result = ""
+                        if active_todos_by_category or uncategorized_active:
+                            active_header = ZettlFormatter.header(f"Active {' '.join(header_parts)} ({len(unique_active_ids)} total)")
+                            result += display_todos_group(active_todos_by_category, uncategorized_active, active_header)
+
+                        # Display done today todos
+                        if donetoday:
+                            if donetoday_todos_by_category or uncategorized_donetoday:
+                                donetoday_header = ZettlFormatter.header(f"Completed Today {' '.join(header_parts)} ({len(unique_donetoday_ids)} total)")
+                                result += "\n" + display_todos_group(donetoday_todos_by_category, uncategorized_donetoday, donetoday_header)
+                            else:
+                                result += "\n" + ZettlFormatter.warning("No todos were completed today.")
+
+                        # Display all done todos
+                        if show_all and (done_todos_by_category or uncategorized_done):
+                            if donetoday:
+                                for category in list(done_todos_by_category.keys()):
+                                    done_todos_by_category[category] = [
+                                        note for note in done_todos_by_category[category]
+                                        if note['id'] not in done_today_ids
+                                    ]
+                                    if not done_todos_by_category[category]:
+                                        del done_todos_by_category[category]
+
+                                uncategorized_done = [
+                                    note for note in uncategorized_done
+                                    if note['id'] not in done_today_ids
+                                ]
+
+                            if done_todos_by_category or uncategorized_done:
+                                done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids - unique_donetoday_ids)} total)")
+                                result += "\n" + display_todos_group(done_todos_by_category, uncategorized_done, done_header)
+
+                        # Display canceled todos
+                        if cancel_flag and (canceled_todos_by_category or uncategorized_canceled):
+                            canceled_header = ZettlFormatter.header(f"Canceled {' '.join(header_parts)} ({len(unique_canceled_ids)} total)")
+                            result += "\n" + display_todos_group(canceled_todos_by_category, uncategorized_canceled, canceled_header)
+
+                elif cmd == "idea":
+                    # IDEA LIST MODE - Full CLI behavior with filtering
+                    # Extract options
+                    show_all = 'all' in options or 'a' in flags
+                    cancel_flag = 'cancel' in options or 'c' in flags
+                    filter_tags = []
+                    if 'tag' in options:
+                        if isinstance(options['tag'], list):
+                            filter_tags.extend(options['tag'])
+                        else:
+                            filter_tags.append(options['tag'])
+
+                    # Get all notes tagged with 'idea'
+                    idea_notes = notes_manager.get_notes_by_tag('idea')
+
+                    if not idea_notes:
+                        result = ZettlFormatter.warning("No ideas found.")
+                    else:
+                        # Filter by project if @ mentions provided
+                        if project_links:
+                            project_filtered_notes = []
+                            for project_id in project_links:
+                                try:
+                                    linked_notes = notes_manager.get_related_notes(project_id)
+                                    linked_note_ids = {note['id'] for note in linked_notes}
+
+                                    for note in idea_notes:
+                                        if note['id'] in linked_note_ids:
+                                            if note not in project_filtered_notes:
+                                                project_filtered_notes.append(note)
+                                except Exception:
+                                    pass
+
+                            idea_notes = project_filtered_notes
+
+                            if not idea_notes:
+                                projects_str = "', '".join(project_links)
+                                result = ZettlFormatter.warning(f"No ideas found for projects: '{projects_str}'.")
+                                return jsonify({'result': process_for_web(result)})
+
+                        # Apply tag filters if specified
+                        if filter_tags:
+                            filtered_notes = []
+                            for note in idea_notes:
+                                note_id = note['id']
+                                tags = [t.lower() for t in notes_manager.get_tags(note_id)]
+
+                                if all(f.lower() in tags for f in filter_tags):
+                                    filtered_notes.append(note)
+
+                            idea_notes = filtered_notes
+
+                            if not idea_notes:
+                                filter_str = "', '".join(filter_tags)
+                                result = ZettlFormatter.warning(f"No ideas found with all tags: '{filter_str}'.")
+                                return jsonify({'result': process_for_web(result)})
+
+                        # Group by status and category
+                        active_by_category = {}
+                        done_by_category = {}
+                        canceled_by_category = {}
+                        uncategorized_active = []
+                        uncategorized_done = []
+                        uncategorized_canceled = []
+
+                        unique_active_ids = set()
+                        unique_done_ids = set()
+                        unique_canceled_ids = set()
+
+                        for note in idea_notes:
+                            note_id = note['id']
+                            tags = notes_manager.get_tags(note_id)
+                            tags_lower = [t.lower() for t in tags]
+
+                            is_done = 'done' in tags_lower
+                            is_canceled = 'cancel' in tags_lower
+
+                            # Skip done ideas if not explicitly included
+                            if is_done and not show_all:
+                                continue
+
+                            # Skip canceled ideas if not explicitly requested
+                            if is_canceled and not cancel_flag:
+                                continue
+
+                            # Track unique IDs
+                            if is_canceled:
+                                unique_canceled_ids.add(note_id)
+                            elif is_done:
+                                unique_done_ids.add(note_id)
+                            else:
+                                unique_active_ids.add(note_id)
+
+                            # Find category tags
+                            excluded_tags = ['idea', 'done', 'cancel']
+                            if filter_tags:
+                                excluded_tags.extend([f.lower() for f in filter_tags])
+
+                            categories = [tag for tag in tags if tag.lower() not in excluded_tags]
+
+                            # Assign to category group
+                            if not categories:
+                                if is_canceled:
+                                    uncategorized_canceled.append(note)
+                                elif is_done:
+                                    uncategorized_done.append(note)
+                                else:
+                                    uncategorized_active.append(note)
+                            else:
+                                combined_category = " - ".join(sorted(categories))
+
+                                if is_canceled:
+                                    if combined_category not in canceled_by_category:
+                                        canceled_by_category[combined_category] = []
+                                    if note not in canceled_by_category[combined_category]:
+                                        canceled_by_category[combined_category].append(note)
+                                elif is_done:
+                                    if combined_category not in done_by_category:
+                                        done_by_category[combined_category] = []
+                                    if note not in done_by_category[combined_category]:
+                                        done_by_category[combined_category].append(note)
+                                else:
+                                    if combined_category not in active_by_category:
+                                        active_by_category[combined_category] = []
+                                    if note not in active_by_category[combined_category]:
+                                        active_by_category[combined_category].append(note)
+
+                        # Build header
+                        header_parts = ["Ideas"]
+                        if filter_tags:
+                            filter_str = "', '".join(filter_tags)
+                            header_parts.append(f"tagged with '{filter_str}'")
+
+                        # Check if there are any ideas to display
+                        if (not active_by_category and not uncategorized_active and
+                            (not show_all or (not done_by_category and not uncategorized_done)) and
+                            (not cancel_flag or (not canceled_by_category and not uncategorized_canceled))):
+                            result = ZettlFormatter.warning("No ideas match your criteria.")
+                            return jsonify({'result': process_for_web(result)})
+
+                        # Helper function
+                        def display_group(category_dict, uncategorized_list, header_text):
+                            output = ""
+                            if header_text:
+                                output += f"{header_text}\n\n"
+
+                            if category_dict:
+                                for category, notes_list in sorted(category_dict.items()):
+                                    if " - " in category:
+                                        tags_in_cat = category.split(" - ")
+                                        formatted_tags = [ZettlFormatter.tag(t) for t in tags_in_cat]
+                                        category_display = " - ".join(formatted_tags)
+                                        output += f"{category_display} ({len(notes_list)})\n\n"
+                                    else:
+                                        output += f"{ZettlFormatter.tag(category)} ({len(notes_list)})\n\n"
+
+                                    for note in notes_list:
+                                        formatted_id = ZettlFormatter.note_id(note['id'])
+                                        output += f"  {formatted_id}:\n"
+                                        output += f"{note['content']}\n\n"
+
+                            if uncategorized_list:
+                                output += "Uncategorized\n\n"
+                                for note in uncategorized_list:
+                                    formatted_id = ZettlFormatter.note_id(note['id'])
+                                    output += f"  {formatted_id}:\n"
+                                    output += f"{note['content']}\n\n"
+
+                            return output
+
+                        # Display results
+                        result = ""
+                        if active_by_category or uncategorized_active:
+                            active_header = ZettlFormatter.header(f"Active {' '.join(header_parts)} ({len(unique_active_ids)} total)")
+                            result += display_group(active_by_category, uncategorized_active, active_header)
+
+                        if show_all and (done_by_category or uncategorized_done):
+                            done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids)} total)")
+                            result += "\n" + display_group(done_by_category, uncategorized_done, done_header)
+
+                        if cancel_flag and (canceled_by_category or uncategorized_canceled):
+                            canceled_header = ZettlFormatter.header(f"Canceled {' '.join(header_parts)} ({len(unique_canceled_ids)} total)")
+                            result += "\n" + display_group(canceled_by_category, uncategorized_canceled, canceled_header)
+
+                elif cmd == "note":
+                    # NOTE LIST MODE - Full CLI behavior with filtering
+                    # Extract options
+                    show_all = 'all' in options or 'a' in flags
+                    cancel_flag = 'cancel' in options or 'c' in flags
+                    filter_tags = []
+                    if 'tag' in options:
+                        if isinstance(options['tag'], list):
+                            filter_tags.extend(options['tag'])
+                        else:
+                            filter_tags.append(options['tag'])
+
+                    # Get all notes tagged with 'note'
+                    note_notes = notes_manager.get_notes_by_tag('note')
+
+                    if not note_notes:
+                        result = ZettlFormatter.warning("No notes found.")
+                    else:
+                        # Filter by project if @ mentions provided
+                        if project_links:
+                            project_filtered_notes = []
+                            for project_id in project_links:
+                                try:
+                                    linked_notes = notes_manager.get_related_notes(project_id)
+                                    linked_note_ids = {note['id'] for note in linked_notes}
+
+                                    for note in note_notes:
+                                        if note['id'] in linked_note_ids:
+                                            if note not in project_filtered_notes:
+                                                project_filtered_notes.append(note)
+                                except Exception:
+                                    pass
+
+                            note_notes = project_filtered_notes
+
+                            if not note_notes:
+                                projects_str = "', '".join(project_links)
+                                result = ZettlFormatter.warning(f"No notes found for projects: '{projects_str}'.")
+                                return jsonify({'result': process_for_web(result)})
+
+                        # Apply tag filters if specified
+                        if filter_tags:
+                            filtered_notes = []
+                            for note in note_notes:
+                                note_id = note['id']
+                                tags = [t.lower() for t in notes_manager.get_tags(note_id)]
+
+                                if all(f.lower() in tags for f in filter_tags):
+                                    filtered_notes.append(note)
+
+                            note_notes = filtered_notes
+
+                            if not note_notes:
+                                filter_str = "', '".join(filter_tags)
+                                result = ZettlFormatter.warning(f"No notes found with all tags: '{filter_str}'.")
+                                return jsonify({'result': process_for_web(result)})
+
+                        # Group by status and category
+                        active_by_category = {}
+                        done_by_category = {}
+                        canceled_by_category = {}
+                        uncategorized_active = []
+                        uncategorized_done = []
+                        uncategorized_canceled = []
+
+                        unique_active_ids = set()
+                        unique_done_ids = set()
+                        unique_canceled_ids = set()
+
+                        for note in note_notes:
+                            note_id = note['id']
+                            tags = notes_manager.get_tags(note_id)
+                            tags_lower = [t.lower() for t in tags]
+
+                            is_done = 'done' in tags_lower
+                            is_canceled = 'cancel' in tags_lower
+
+                            # Skip done notes if not explicitly included
+                            if is_done and not show_all:
+                                continue
+
+                            # Skip canceled notes if not explicitly requested
+                            if is_canceled and not cancel_flag:
+                                continue
+
+                            # Track unique IDs
+                            if is_canceled:
+                                unique_canceled_ids.add(note_id)
+                            elif is_done:
+                                unique_done_ids.add(note_id)
+                            else:
+                                unique_active_ids.add(note_id)
+
+                            # Find category tags
+                            excluded_tags = ['note', 'done', 'cancel']
+                            if filter_tags:
+                                excluded_tags.extend([f.lower() for f in filter_tags])
+
+                            categories = [tag for tag in tags if tag.lower() not in excluded_tags]
+
+                            # Assign to category group
+                            if not categories:
+                                if is_canceled:
+                                    uncategorized_canceled.append(note)
+                                elif is_done:
+                                    uncategorized_done.append(note)
+                                else:
+                                    uncategorized_active.append(note)
+                            else:
+                                combined_category = " - ".join(sorted(categories))
+
+                                if is_canceled:
+                                    if combined_category not in canceled_by_category:
+                                        canceled_by_category[combined_category] = []
+                                    if note not in canceled_by_category[combined_category]:
+                                        canceled_by_category[combined_category].append(note)
+                                elif is_done:
+                                    if combined_category not in done_by_category:
+                                        done_by_category[combined_category] = []
+                                    if note not in done_by_category[combined_category]:
+                                        done_by_category[combined_category].append(note)
+                                else:
+                                    if combined_category not in active_by_category:
+                                        active_by_category[combined_category] = []
+                                    if note not in active_by_category[combined_category]:
+                                        active_by_category[combined_category].append(note)
+
+                        # Build header
+                        header_parts = ["Notes"]
+                        if filter_tags:
+                            filter_str = "', '".join(filter_tags)
+                            header_parts.append(f"tagged with '{filter_str}'")
+
+                        # Check if there are any notes to display
+                        if (not active_by_category and not uncategorized_active and
+                            (not show_all or (not done_by_category and not uncategorized_done)) and
+                            (not cancel_flag or (not canceled_by_category and not uncategorized_canceled))):
+                            result = ZettlFormatter.warning("No notes match your criteria.")
+                            return jsonify({'result': process_for_web(result)})
+
+                        # Helper function
+                        def display_group(category_dict, uncategorized_list, header_text):
+                            output = ""
+                            if header_text:
+                                output += f"{header_text}\n\n"
+
+                            if category_dict:
+                                for category, notes_list in sorted(category_dict.items()):
+                                    if " - " in category:
+                                        tags_in_cat = category.split(" - ")
+                                        formatted_tags = [ZettlFormatter.tag(t) for t in tags_in_cat]
+                                        category_display = " - ".join(formatted_tags)
+                                        output += f"{category_display} ({len(notes_list)})\n\n"
+                                    else:
+                                        output += f"{ZettlFormatter.tag(category)} ({len(notes_list)})\n\n"
+
+                                    for note in notes_list:
+                                        formatted_id = ZettlFormatter.note_id(note['id'])
+                                        output += f"  {formatted_id}:\n"
+                                        output += f"{note['content']}\n\n"
+
+                            if uncategorized_list:
+                                output += "Uncategorized\n\n"
+                                for note in uncategorized_list:
+                                    formatted_id = ZettlFormatter.note_id(note['id'])
+                                    output += f"  {formatted_id}:\n"
+                                    output += f"{note['content']}\n\n"
+
+                            return output
+
+                        # Display results
+                        result = ""
+                        if active_by_category or uncategorized_active:
+                            active_header = ZettlFormatter.header(f"Active {' '.join(header_parts)} ({len(unique_active_ids)} total)")
+                            result += display_group(active_by_category, uncategorized_active, active_header)
+
+                        if show_all and (done_by_category or uncategorized_done):
+                            done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids)} total)")
+                            result += "\n" + display_group(done_by_category, uncategorized_done, done_header)
+
+                        if cancel_flag and (canceled_by_category or uncategorized_canceled):
+                            canceled_header = ZettlFormatter.header(f"Canceled {' '.join(header_parts)} ({len(unique_canceled_ids)} total)")
+                            result += "\n" + display_group(canceled_by_category, uncategorized_canceled, canceled_header)
+
+            # DETAIL VIEW MODE (for project with @) or CREATE MODE
+            else:
+                # Check if this is a project command with @ mentions (DETAIL VIEW)
+                if cmd == "project" and project_links:
+                    if len(project_links) > 1:
+                        result = ZettlFormatter.warning("Please specify only one project to view details.\n")
+                    else:
+                        project_id = project_links[0]
+                        try:
+                            # Try to get the project by ID
+                            project_note = notes_manager.get_note(project_id)
+                            project_tags = notes_manager.get_tags(project_id)
+
+                            # Verify it's a project
+                            if 'project' not in [t.lower() for t in project_tags]:
+                                result = ZettlFormatter.error(f"Note '{project_id}' is not a project.\n")
+                            else:
+                                # DETAIL VIEW MODE for project
+                                result = "═" * 63 + "\n"
+                                result += f"  PROJECT: {project_note['content'].split(chr(10))[0][:40]} (#{project_id})\n"
+                                result += "═" * 63 + "\n\n"
+
+                                # Project content
+                                result += f"{project_note['content']}\n\n"
+
+                                # Tags
+                                if project_tags:
+                                    result += f"Tags: {', '.join([ZettlFormatter.tag(t) for t in project_tags])}\n\n"
+
+                                # Get linked notes (bidirectional)
+                                try:
+                                    linked_notes = notes_manager.get_related_notes(project_id)
+
+                                    if not linked_notes:
+                                        result += f"{ZettlFormatter.warning('No notes linked to this project.')}\n"
+                                    else:
+                                        # Categorize by note type
+                                        todos = []
+                                        ideas = []
+                                        notes_list = []
+
+                                        for n in linked_notes:
+                                            note_tags = notes_manager.get_tags(n['id'])
+                                            tags_lower = [t.lower() for t in note_tags]
+                                            n['all_tags'] = note_tags  # Store for later use
+
+                                            if 'todo' in tags_lower:
+                                                todos.append(n)
+                                            elif 'idea' in tags_lower:
+                                                ideas.append(n)
+                                            elif 'note' in tags_lower:
+                                                notes_list.append(n)
+
+                                        # Categorize by status
+                                        def categorize_by_status(note_list):
+                                            active, done, canceled = [], [], []
+                                            for n in note_list:
+                                                tags_lower = [t.lower() for t in n.get('all_tags', [])]
+                                                if 'cancel' in tags_lower:
+                                                    canceled.append(n)
+                                                elif 'done' in tags_lower:
+                                                    done.append(n)
+                                                else:
+                                                    active.append(n)
+                                            return active, done, canceled
+
+                                        todos_active, todos_done, todos_canceled = categorize_by_status(todos)
+                                        ideas_active, ideas_done, ideas_canceled = categorize_by_status(ideas)
+                                        notes_active, notes_done, notes_canceled = categorize_by_status(notes_list)
+
+                                        # Statistics section
+                                        result += "─" * 63 + "\n"
+                                        result += "  📊 STATISTICS\n"
+                                        result += "─" * 63 + "\n"
+                                        result += f"  📋 Todos:  {len(todos_active)} active, {len(todos_done)} done, {len(todos_canceled)} canceled\n"
+                                        result += f"  💡 Ideas:  {len(ideas_active)} active, {len(ideas_done)} done, {len(ideas_canceled)} canceled\n"
+                                        result += f"  📝 Notes:  {len(notes_active)} active, {len(notes_done)} done, {len(notes_canceled)} canceled\n"
+                                        result += f"  {'─' * 9}\n"
+                                        total_active = len(todos_active) + len(ideas_active) + len(notes_active)
+                                        total_done = len(todos_done) + len(ideas_done) + len(notes_done)
+                                        total_canceled = len(todos_canceled) + len(ideas_canceled) + len(notes_canceled)
+                                        result += f"  Total:     {total_active} active, {total_done} done, {total_canceled} canceled\n\n"
+
+                                        # Display active items
+                                        if todos_active:
+                                            result += "━" * 63 + "\n"
+                                            result += f"📋 ACTIVE TODOS ({len(todos_active)})\n"
+                                            result += "━" * 63 + "\n"
+                                            for note in todos_active:
+                                                formatted_id = ZettlFormatter.note_id(note['id'])
+                                                content_preview = note['content'][:80] if len(note['content']) > 80 else note['content']
+                                                if len(note['content']) > 80:
+                                                    content_preview += "..."
+                                                result += f"  {formatted_id}: {content_preview}\n"
+                                            result += "\n"
+
+                                        if ideas_active:
+                                            result += "━" * 63 + "\n"
+                                            result += f"💡 ACTIVE IDEAS ({len(ideas_active)})\n"
+                                            result += "━" * 63 + "\n"
+                                            for note in ideas_active:
+                                                formatted_id = ZettlFormatter.note_id(note['id'])
+                                                content_preview = note['content'][:80] if len(note['content']) > 80 else note['content']
+                                                if len(note['content']) > 80:
+                                                    content_preview += "..."
+                                                result += f"  {formatted_id}: {content_preview}\n"
+                                            result += "\n"
+
+                                        if notes_active:
+                                            result += "━" * 63 + "\n"
+                                            result += f"📝 ACTIVE NOTES ({len(notes_active)})\n"
+                                            result += "━" * 63 + "\n"
+                                            for note in notes_active:
+                                                formatted_id = ZettlFormatter.note_id(note['id'])
+                                                content_preview = note['content'][:80] if len(note['content']) > 80 else note['content']
+                                                if len(note['content']) > 80:
+                                                    content_preview += "..."
+                                                result += f"  {formatted_id}: {content_preview}\n"
+                                            result += "\n"
+
+                                except Exception as e:
+                                    result += f"{ZettlFormatter.error(f'Error getting linked notes: {str(e)}')}\n"
+
+                        except Exception as e:
+                            result = ZettlFormatter.error(f"Project '{project_id}' not found.\n")
 
                 # If we reach here, we're in CREATE MODE (or not a project detail view)
                 # Only execute create logic if result hasn't been set (i.e., not detail view)
@@ -1897,270 +2480,6 @@ def execute_command():
                     # Always show the full rule
                     result += random_rule['full_text']
 
-        elif cmd == "todos":
-            # Check for Eisenhower matrix flag
-            eisenhower = 'e' in flags or 'eisenhower' in flags
-            
-            # Handle existing options
-            donetoday = 'donetoday' in options or 'dt' in flags
-            all_todos = 'all' in options or 'a' in flags
-            cancel = 'cancel' in options or 'c' in options
-            filter_tags = []
-            done = all_todos
-            if 'tag' in options:
-                if isinstance(options['tag'], list):  # Multiple tags
-                    filter_tags.extend(options['tag'])
-                else:  # Single tag
-                    filter_tags.append(options['tag'])
-            
-            # Get all notes tagged with 'todo'
-            todo_notes = notes_manager.get_notes_by_tag('todo')
-            
-            if not todo_notes:
-                result = ZettlFormatter.warning("No todos found.")
-            else:
-                if eisenhower:
-                    # Display Eisenhower matrix
-                    result = format_eisenhower_matrix(todo_notes, all_todos, donetoday, cancel, filter_tags)
-                else:
-                        # Get notes with 'done' tag added today (for donetoday option)
-                        done_today_ids = set()
-                        if donetoday:
-                            from datetime import datetime, timezone
-                            import logging
-                            
-                            # Get today's date in UTC for consistent comparison
-                            today = datetime.now(timezone.utc).date()
-                            logger.debug(f"Today's date (UTC): {today}")
-                            
-                            try:
-                                # Get tags created today using the proper PostgREST method
-                                done_tags_today = notes_manager.db.get_tags_created_today('done')
-
-                                logger.debug(f"Found {len(done_tags_today)} 'done' tags created today")
-                                for tag_data in done_tags_today:
-                                    note_id = tag_data.get('note_id')
-                                    if note_id:
-                                        done_today_ids.add(note_id)
-                                        logger.debug(f"Added note_id {note_id} to done today list")
-
-                                logger.debug(f"Total todos done today: {len(done_today_ids)}")
-                            except Exception as e:
-                                error_msg = f"Could not determine todos completed today: {str(e)}"
-                                logger.error(error_msg)
-                                result += f"{ZettlFormatter.warning(error_msg)}\n\n"
-                        
-                        # Apply filters if specified
-                        if filter_tags:
-                            filtered_notes = []
-                            
-                            for note in todo_notes:
-                                note_id = note['id']
-                                tags = [t.lower() for t in notes_manager.get_tags(note_id)]
-                                
-                                # Check if all filters are in the note's tags
-                                if all(f.lower() in tags for f in filter_tags):
-                                    filtered_notes.append(note)
-                                    
-                            todo_notes = filtered_notes
-                            
-                            if not todo_notes:
-                                filter_str = "', '".join(filter_tags)
-                                result = ZettlFormatter.warning(f"No todos found with all tags: '{filter_str}'.")
-                                return jsonify({'result': process_for_web(result)})
-                        
-                        # Group notes by their tags (categories)
-                        active_todos_by_category = {}
-                        done_todos_by_category = {}
-                        donetoday_todos_by_category = {}
-                        canceled_todos_by_category = {}  # New dict for canceled todos
-                        uncategorized_active = []
-                        uncategorized_done = []
-                        uncategorized_donetoday = []
-                        uncategorized_canceled = []  # New list for uncategorized canceled todos
-                        
-                        # Track unique note IDs to count them at the end
-                        unique_active_ids = set()
-                        unique_done_ids = set()
-                        unique_donetoday_ids = set()
-                        unique_canceled_ids = set()  # New set for canceled todos
-                        
-                        for note in todo_notes:
-                            note_id = note['id']
-                            # Get all tags for this note
-                            tags = notes_manager.get_tags(note_id)
-                            tags_lower = [t.lower() for t in tags]
-                            
-                            # Check if this is a done todo
-                            is_done = 'done' in tags_lower
-                            
-                            # Check if this is a canceled todo
-                            is_canceled = 'cancel' in tags_lower
-                            
-                            # Check if this is done today
-                            is_done_today = note_id in done_today_ids
-                            
-                            # Skip done todos if not explicitly included, unless they're done today and we want those
-                            if is_done and not done and not (is_done_today and donetoday):
-                                continue
-                                
-                            # Skip canceled todos if not explicitly requested
-                            if is_canceled and not cancel:
-                                continue
-                                
-                            # Track unique IDs
-                            if is_canceled:
-                                unique_canceled_ids.add(note_id)
-                            elif is_done_today and donetoday:
-                                unique_donetoday_ids.add(note_id)
-                            elif is_done:
-                                unique_done_ids.add(note_id)
-                            else:
-                                unique_active_ids.add(note_id)
-                            
-                            # Find category tags (everything except 'todo', 'done', 'cancel', and the filter tags)
-                            excluded_tags = ['todo', 'done', 'cancel']  # Added 'cancel' to exclusion list
-                            if filter_tags:
-                                excluded_tags.extend([f.lower() for f in filter_tags])
-                                
-                            categories = [tag for tag in tags if tag.lower() not in excluded_tags]
-                            
-                            # Assign note to appropriate category group
-                            if not categories:
-                                # This todo has no category tags
-                                if is_canceled:
-                                    uncategorized_canceled.append(note)
-                                elif is_done_today and donetoday:
-                                    uncategorized_donetoday.append(note)
-                                elif is_done:
-                                    uncategorized_done.append(note)
-                                else:
-                                    uncategorized_active.append(note)
-                            else:
-                                # Create a combined category key from all tags
-                                if categories:
-                                    combined_category = " - ".join(sorted(categories))
-                                    
-                                    if is_canceled:
-                                        if combined_category not in canceled_todos_by_category:
-                                            canceled_todos_by_category[combined_category] = []
-                                        if note not in canceled_todos_by_category[combined_category]:
-                                            canceled_todos_by_category[combined_category].append(note)
-                                    elif is_done_today and donetoday:
-                                        if combined_category not in donetoday_todos_by_category:
-                                            donetoday_todos_by_category[combined_category] = []
-                                        if note not in donetoday_todos_by_category[combined_category]:
-                                            donetoday_todos_by_category[combined_category].append(note)
-                                    elif is_done:
-                                        if combined_category not in done_todos_by_category:
-                                            done_todos_by_category[combined_category] = []
-                                        if note not in done_todos_by_category[combined_category]:
-                                            done_todos_by_category[combined_category].append(note)
-                                    else:
-                                        if combined_category not in active_todos_by_category:
-                                            active_todos_by_category[combined_category] = []
-                                        if note not in active_todos_by_category[combined_category]:
-                                            active_todos_by_category[combined_category].append(note)
-                                                
-                        # Build the header message
-                        header_parts = ["Todos"]
-                        if filter_tags:
-                            filter_str = "', '".join(filter_tags)
-                            header_parts.append(f"tagged with '{filter_str}'")
-                        
-                        # Prepare the result
-                        result = ""
-                        
-                        # Display todos by category
-                        if (not active_todos_by_category and not uncategorized_active and
-                            (not done or (not done_todos_by_category and not uncategorized_done)) and
-                            (not donetoday or (not donetoday_todos_by_category and not uncategorized_donetoday)) and
-                            (not cancel or (not canceled_todos_by_category and not uncategorized_canceled))):
-                            result = ZettlFormatter.warning("No todos match your criteria.")
-                            return jsonify({'result': process_for_web(result)})
-                                    
-                        def display_todos_group(category_dict, uncategorized_list, header_text):
-                            output = ""
-                            if header_text:
-                                output += f"{header_text}\n\n"
-                            
-                            if category_dict:
-                                for category, notes in sorted(category_dict.items()):
-                                    # Check if this is a combined category with multiple tags
-                                    if " - " in category:
-                                        # For combined categories, format each tag separately
-                                        tags = category.split(" - ")
-                                        formatted_tags = []
-                                        for tag in tags:
-                                            formatted_tags.append(ZettlFormatter.tag(tag))
-                                        category_display = " - ".join(formatted_tags)
-                                        output += f"{category_display} ({len(notes)})\n\n"
-                                    else:
-                                        # For single categories, use the original format
-                                        output += f"{ZettlFormatter.tag(category)} ({len(notes)})\n\n"
-                                    
-                                    for note in notes:
-                                        formatted_id = ZettlFormatter.note_id(note['id'])
-
-                                        # Format note ID on its own line, then content (for proper markdown rendering)
-                                        output += f"  {formatted_id}:\n"
-                                        output += f"{note['content']}\n\n"
-                                
-                            if uncategorized_list:
-                                output += "Uncategorized\n\n"
-                                for note in uncategorized_list:
-                                    formatted_id = ZettlFormatter.note_id(note['id'])
-
-                                    # Format note ID on its own line, then content (for proper markdown rendering)
-                                    output += f"  {formatted_id}:\n"
-                                    output += f"{note['content']}\n\n"
-                            
-                            return output
-                    
-                        # Display active todos first
-                        if active_todos_by_category or uncategorized_active:
-                            active_header = ZettlFormatter.header(f"Active {' '.join(header_parts)} ({len(unique_active_ids)} total)")
-                            result += display_todos_group(active_todos_by_category, uncategorized_active, active_header)
-                        
-                        # Display done today todos if requested
-                        if donetoday:
-                            if donetoday_todos_by_category or uncategorized_donetoday:
-                                donetoday_header = ZettlFormatter.header(f"Completed Today {' '.join(header_parts)} ({len(unique_donetoday_ids)} total)")
-                                result += "\n" + display_todos_group(donetoday_todos_by_category, uncategorized_donetoday, donetoday_header)
-                            else:
-                                result += "\n" + ZettlFormatter.warning("No todos were completed today.")
-                        
-                        # Display all done todos if requested
-                        if done and (done_todos_by_category or uncategorized_done):
-                            # Exclude today's completed todos if they're shown in their own section
-                            if donetoday:
-                                # Filter out notes that are done today from the regular done section
-                                for category in list(done_todos_by_category.keys()):
-                                    done_todos_by_category[category] = [
-                                        note for note in done_todos_by_category[category] 
-                                        if note['id'] not in done_today_ids
-                                    ]
-                                    # Remove empty categories
-                                    if not done_todos_by_category[category]:
-                                        del done_todos_by_category[category]
-                                
-                                # Filter uncategorized done notes too
-                                uncategorized_done = [
-                                    note for note in uncategorized_done 
-                                    if note['id'] not in done_today_ids
-                                ]
-                            
-                            # Only show this section if there are notes to display after filtering
-                            if done_todos_by_category or uncategorized_done:
-                                done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids - unique_donetoday_ids)} total)")
-                                result += "\n" + display_todos_group(done_todos_by_category, uncategorized_done, done_header)
-
-                            # Display canceled todos if requested
-                            if cancel and (canceled_todos_by_category or uncategorized_canceled):
-                                canceled_header = ZettlFormatter.header(f"Canceled {' '.join(header_parts)} ({len(unique_canceled_ids)} total)")
-                                result += "\n" + display_todos_group(canceled_todos_by_category, uncategorized_canceled, canceled_header)
-
-                        
         elif cmd == "help" or cmd == "--help":
             result = CommandHelp.get_main_help()
 

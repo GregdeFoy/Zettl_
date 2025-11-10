@@ -1089,17 +1089,18 @@ def display_project_detail(project_note, project_id, notes_manager, show_all, fu
 def project_cmd(content, show_all, full, tag, link, custom_id):
     """Create, list, or view project details.
 
-    CREATE MODE (when content provided and not existing project):
+    CREATE MODE (when content provided without @):
         zt project "New Project" -t active
         zt project "Research Phase" --id research-2024
+        zt project np                    # Creates project "np" with random ID
 
     LIST MODE (when no content):
         zt project                 # List all projects
 
-    DETAIL VIEW (when content is existing project ID):
-        zt project zt              # Show project details with linked notes
-        zt project zt -a           # Include done/canceled notes
-        zt project zt -f           # Show full content
+    DETAIL VIEW (when @project_id provided):
+        zt project @zt             # Show project details with linked notes
+        zt project @zt -a          # Include done/canceled notes
+        zt project @zt -f          # Show full content
     """
     try:
         notes_manager = get_notes_manager()
@@ -1107,13 +1108,37 @@ def project_cmd(content, show_all, full, tag, link, custom_id):
         # Join content into a string and parse @ mentions
         content_string = ' '.join(content) if content else ''
 
-        # Extract @project mentions (for future compatibility)
+        # Extract @project mentions
         project_ids = re.findall(r'@(\S+)', content_string)
 
         # Remove @mentions from content
         remaining_content = re.sub(r'@\S+', '', content_string).strip()
 
-        # Determine mode based on remaining content
+        # Determine mode based on @mentions and content
+        if project_ids:
+            # DETAIL VIEW MODE: @project_id provided
+            if len(project_ids) > 1:
+                console.print(ZettlFormatter.warning("Please specify only one project to view details."))
+                return
+
+            project_id = project_ids[0]
+            try:
+                # Try to get the project by ID
+                project_note = notes_manager.get_note(project_id)
+                project_tags = [t.lower() for t in project_note.get('all_tags', [])] if 'all_tags' in project_note else [t.lower() for t in notes_manager.get_tags(project_id)]
+
+                # Verify it's a project
+                if 'project' not in project_tags:
+                    console.print(ZettlFormatter.error(f"Note '{project_id}' is not a project."))
+                    return
+
+                # Show detail view
+                display_project_detail(project_note, project_id, notes_manager, show_all, full, tag)
+                return
+            except Exception as e:
+                console.print(ZettlFormatter.error(f"Project '{project_id}' not found."))
+                return
+
         if not remaining_content:
             # LIST MODE: show all projects
             projects = notes_manager.get_notes_with_all_tags_by_tag('project')
@@ -1153,23 +1178,9 @@ def project_cmd(content, show_all, full, tag, link, custom_id):
 
             return
 
-        # Check if remaining_content is an existing project ID (DETAIL VIEW mode)
-        try:
-            # Try to get the note by this ID
-            project_note = notes_manager.get_note(remaining_content)
-            project_tags = [t.lower() for t in project_note.get('all_tags', [])] if 'all_tags' in project_note else [t.lower() for t in notes_manager.get_tags(remaining_content)]
-
-            # If it's a project, show detail view
-            if 'project' in project_tags:
-                # DETAIL VIEW MODE
-                display_project_detail(project_note, remaining_content, notes_manager, show_all, full, tag)
-                return
-        except Exception:
-            # Note doesn't exist, fall through to CREATE mode
-            pass
-
-        # CREATE MODE: has content that's not an existing project ID
-        create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['project'])
+        # CREATE MODE: has content without @ mentions
+        # Always create a new project (even if name matches existing project ID)
+        create_new_note(remaining_content, tag, link, custom_id=custom_id, auto_tags=['project'])
 
     except Exception as e:
         console.print(ZettlFormatter.error(str(e)))
@@ -1192,32 +1203,45 @@ def p_cmd(content, show_all, full, tag, link, custom_id):
         # Join content into a string and parse @ mentions
         content_string = ' '.join(content) if content else ''
 
-        # Extract @project mentions (for future compatibility)
+        # Extract @project mentions
         project_ids = re.findall(r'@(\S+)', content_string)
 
         # Remove @mentions from content
         remaining_content = re.sub(r'@\S+', '', content_string).strip()
 
-        # Determine mode based on remaining content
+        # Determine mode based on @mentions and content
+        if project_ids:
+            # DETAIL VIEW MODE: @project_id provided
+            if len(project_ids) > 1:
+                console.print(ZettlFormatter.warning("Please specify only one project to view details."))
+                return
+
+            project_id = project_ids[0]
+            try:
+                # Try to get the project by ID
+                project_note = notes_manager.get_note(project_id)
+                project_tags = [t.lower() for t in project_note.get('all_tags', [])] if 'all_tags' in project_note else [t.lower() for t in notes_manager.get_tags(project_id)]
+
+                # Verify it's a project
+                if 'project' not in project_tags:
+                    console.print(ZettlFormatter.error(f"Note '{project_id}' is not a project."))
+                    return
+
+                # Show detail view
+                display_project_detail(project_note, project_id, notes_manager, show_all, full, tag)
+                return
+            except Exception as e:
+                console.print(ZettlFormatter.error(f"Project '{project_id}' not found."))
+                return
+
         if not remaining_content:
             # LIST MODE: simplified for shortcut
             console.print(ZettlFormatter.warning("Use 'zt project' to list all projects"))
             return
 
-        # Check if remaining_content is an existing project ID (DETAIL VIEW mode)
-        try:
-            project_note = notes_manager.get_note(remaining_content)
-            project_tags = [t.lower() for t in project_note.get('all_tags', [])] if 'all_tags' in project_note else [t.lower() for t in notes_manager.get_tags(remaining_content)]
-
-            if 'project' in project_tags:
-                # DETAIL VIEW MODE
-                display_project_detail(project_note, remaining_content, notes_manager, show_all, full, tag)
-                return
-        except Exception:
-            pass
-
-        # CREATE MODE
-        create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['project'])
+        # CREATE MODE: has content without @ mentions
+        # Always create a new project (even if name matches existing project ID)
+        create_new_note(remaining_content, tag, link, custom_id=custom_id, auto_tags=['project'])
 
     except Exception as e:
         console.print(ZettlFormatter.error(str(e)))

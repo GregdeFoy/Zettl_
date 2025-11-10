@@ -283,13 +283,16 @@ See 'zettl note --help' for full documentation.
 
 [bold]THREE MODE COMMAND:[/bold]
   • [bold]No content[/bold] = LIST MODE: Shows all projects with statistics
-  • [bold]Existing project ID[/bold] = DETAIL MODE: Shows project with categorized linked notes
-  • [bold]New content[/bold] = CREATE MODE: Creates a new project
+  • [bold]@project_id[/bold] = DETAIL MODE: Shows project with categorized linked notes
+  • [bold]Content (no @)[/bold] = CREATE MODE: Creates a new project
 
 [bold]List Mode:[/bold]
   [blue]zettl project[/blue]                Shows all projects with active todo/idea/note counts
 
-[bold]Detail Mode Options:[/bold]
+[bold]Detail Mode (requires @):[/bold]
+  [blue]zettl project @project_id[/blue]   View project detail with categorized notes
+
+  [bold]Options:[/bold]
   [yellow]-a, --all[/yellow]           Show all linked notes (active, done, and canceled)
   [yellow]-f, --full[/yellow]          Show full content instead of previews
   [yellow]-t, --tag TAG[/yellow]       Filter linked notes by additional tag
@@ -303,18 +306,21 @@ See 'zettl note --help' for full documentation.
   [cyan]# List Mode[/cyan]
   [blue]zettl project[/blue]                List all projects with stats
 
-  [cyan]# Detail Mode[/cyan]
-  [blue]zettl project learn-rust[/blue]     View project detail with categorized notes
-  [blue]zettl project learn-rust -f[/blue]  View with full note content
-  [blue]zettl project learn-rust -t backend[/blue]  Filter to backend-tagged notes
+  [cyan]# Detail Mode (note the @ prefix)[/cyan]
+  [blue]zettl project @learn-rust[/blue]    View project detail with categorized notes
+  [blue]zettl project @learn-rust -f[/blue] View with full note content
+  [blue]zettl project @learn-rust -t backend[/blue]  Filter to backend-tagged notes
 
   [cyan]# Create Mode[/cyan]
   [blue]zettl project "Learn Rust" --id learn-rust[/blue]
   [blue]zettl project "Q1 Planning" --id q1-2024[/blue]
   [blue]zettl project "Website Redesign" --id web-redesign -t urgent[/blue]
+  [blue]zettl project np[/blue]             Creates project "np" with random ID
 
 [bold]Note:[/bold] Projects serve as organizational containers. Use custom IDs to make
 them easy to reference when creating tasks, ideas, and notes with @project-id.
+The @ prefix is required for viewing project details, maintaining consistency
+with the todo/idea/note filtering behavior.
 """,
 
             "p": f"""
