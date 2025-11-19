@@ -278,44 +278,55 @@ COMMAND_OPTIONS = {
     'task': {
         'short_opts': {
             't': {'name': 'tag', 'multiple': True},
-            'l': {'name': 'link'}
+            'l': {'name': 'link', 'multiple': True}
         },
         'long_opts': {
             'tag': {'multiple': True},
-            'link': {},
+            'link': {'multiple': True},
+            'id': {}
+        }
+    },
+    'todo': {
+        'short_opts': {
+            't': {'name': 'tag', 'multiple': True},
+            'l': {'name': 'link', 'multiple': True}
+        },
+        'long_opts': {
+            'tag': {'multiple': True},
+            'link': {'multiple': True},
             'id': {}
         }
     },
     'idea': {
         'short_opts': {
             't': {'name': 'tag', 'multiple': True},
-            'l': {'name': 'link'}
+            'l': {'name': 'link', 'multiple': True}
         },
         'long_opts': {
             'tag': {'multiple': True},
-            'link': {},
+            'link': {'multiple': True},
             'id': {}
         }
     },
     'note': {
         'short_opts': {
             't': {'name': 'tag', 'multiple': True},
-            'l': {'name': 'link'}
+            'l': {'name': 'link', 'multiple': True}
         },
         'long_opts': {
             'tag': {'multiple': True},
-            'link': {},
+            'link': {'multiple': True},
             'id': {}
         }
     },
     'project': {
         'short_opts': {
             't': {'name': 'tag', 'multiple': True},
-            'l': {'name': 'link'}
+            'l': {'name': 'link', 'multiple': True}
         },
         'long_opts': {
             'tag': {'multiple': True},
-            'link': {},
+            'link': {'multiple': True},
             'id': {}
         }
     },
@@ -990,23 +1001,15 @@ def execute_command():
 
 
         elif cmd in ["todo", "idea", "note", "project"]:
-            # Handle specialized note creation/listing commands with @ linking support
-            import re
-
-            # Parse @ project links from content
-            def parse_project_links(content):
-                """Extract @project references from content and return cleaned content and project IDs."""
-                pattern = r'@(\S+)'
-                project_ids = re.findall(pattern, content)
-                # Remove @ references from content
-                cleaned_content = re.sub(pattern, '', content).strip()
-                return cleaned_content, project_ids
+            # Handle specialized note creation/listing commands with -l linking support
 
             # Join remaining args into content string (support multiple words without quotes)
             content = ' '.join(remaining_args) if remaining_args else ""
 
-            # Parse and remove @ references from content
-            cleaned_content, project_links = parse_project_links(content)
+            # Get link options (now supports multiple -l flags)
+            link_ids = options.get('link', [])
+            if isinstance(link_ids, str):
+                link_ids = [link_ids]
 
             # Determine automatic tags based on command type
             if cmd == "todo":
@@ -1022,8 +1025,8 @@ def execute_command():
                 list_tag = 'project'
                 auto_tags = ['project']
 
-            # LIST MODE: If no content provided (after removing @ references), list notes with that tag
-            if not cleaned_content:
+            # LIST MODE: If no content provided, list notes with that tag
+            if not content:
                 # Special handling for project list mode to show stats
                 if cmd == "project":
                     projects = notes_manager.get_notes_by_tag('project')
@@ -1091,9 +1094,9 @@ def execute_command():
                                 result = ZettlFormatter.warning(f"Could not determine todos completed today: {str(e)}")
 
                         # Filter by project if @ mentions provided
-                        if project_links:
+                        if link_ids:
                             project_filtered_notes = []
-                            for project_id in project_links:
+                            for project_id in link_ids:
                                 try:
                                     linked_notes = notes_manager.get_related_notes(project_id)
                                     linked_note_ids = {note['id'] for note in linked_notes}
@@ -1108,8 +1111,8 @@ def execute_command():
                             todo_notes = project_filtered_notes
 
                             if not todo_notes:
-                                projects_str = "', '".join(project_links)
-                                result = ZettlFormatter.warning(f"No todos found for projects: '{projects_str}'.")
+                                links_str = "', '".join(link_ids)
+                                result = ZettlFormatter.warning(f"No todos found linked to: '{links_str}'.")
                                 return jsonify({'result': process_for_web(result)})
 
                         # Apply tag filters if specified
@@ -1314,9 +1317,9 @@ def execute_command():
                         result = ZettlFormatter.warning("No ideas found.")
                     else:
                         # Filter by project if @ mentions provided
-                        if project_links:
+                        if link_ids:
                             project_filtered_notes = []
-                            for project_id in project_links:
+                            for project_id in link_ids:
                                 try:
                                     linked_notes = notes_manager.get_related_notes(project_id)
                                     linked_note_ids = {note['id'] for note in linked_notes}
@@ -1331,8 +1334,8 @@ def execute_command():
                             idea_notes = project_filtered_notes
 
                             if not idea_notes:
-                                projects_str = "', '".join(project_links)
-                                result = ZettlFormatter.warning(f"No ideas found for projects: '{projects_str}'.")
+                                links_str = "', '".join(link_ids)
+                                result = ZettlFormatter.warning(f"No ideas found linked to: '{links_str}'.")
                                 return jsonify({'result': process_for_web(result)})
 
                         # Apply tag filters if specified
@@ -1498,9 +1501,9 @@ def execute_command():
                         result = ZettlFormatter.warning("No notes found.")
                     else:
                         # Filter by project if @ mentions provided
-                        if project_links:
+                        if link_ids:
                             project_filtered_notes = []
-                            for project_id in project_links:
+                            for project_id in link_ids:
                                 try:
                                     linked_notes = notes_manager.get_related_notes(project_id)
                                     linked_note_ids = {note['id'] for note in linked_notes}
@@ -1515,8 +1518,8 @@ def execute_command():
                             note_notes = project_filtered_notes
 
                             if not note_notes:
-                                projects_str = "', '".join(project_links)
-                                result = ZettlFormatter.warning(f"No notes found for projects: '{projects_str}'.")
+                                links_str = "', '".join(link_ids)
+                                result = ZettlFormatter.warning(f"No notes found linked to: '{links_str}'.")
                                 return jsonify({'result': process_for_web(result)})
 
                         # Apply tag filters if specified
@@ -1663,14 +1666,14 @@ def execute_command():
                             canceled_header = ZettlFormatter.header(f"Canceled {' '.join(header_parts)} ({len(unique_canceled_ids)} total)")
                             result += "\n" + display_group(canceled_by_category, uncategorized_canceled, canceled_header)
 
-            # DETAIL VIEW MODE (for project with @) or CREATE MODE
+            # DETAIL VIEW MODE (for project with -l) or CREATE MODE
             else:
-                # Check if this is a project command with @ mentions (DETAIL VIEW)
-                if cmd == "project" and project_links:
-                    if len(project_links) > 1:
+                # Check if this is a project command with -l option (DETAIL VIEW)
+                if cmd == "project" and link_ids:
+                    if len(link_ids) > 1:
                         result = ZettlFormatter.warning("Please specify only one project to view details.\n")
                     else:
-                        project_id = project_links[0]
+                        project_id = link_ids[0]
                         try:
                             # Try to get the project by ID
                             project_note = notes_manager.get_note(project_id)
@@ -1808,17 +1811,17 @@ def execute_command():
                         try:
                             from datetime import datetime
                             now = datetime.now().isoformat()
-                            note_id = notes_manager.create_note_with_timestamp(cleaned_content, now, custom_id)
+                            note_id = notes_manager.create_note_with_timestamp(content, now, custom_id)
                             result = f"Created {cmd} #{note_id}\n"
                         except Exception as e:
                             # If custom ID already exists, use regular creation
                             if "already exists" in str(e) or "duplicate" in str(e).lower():
-                                note_id = notes_manager.create_note(cleaned_content)
+                                note_id = notes_manager.create_note(content)
                                 result = f"Created {cmd} #{note_id} (custom ID '{custom_id}' already exists)\n"
                             else:
                                 raise e
                     else:
-                        note_id = notes_manager.create_note(cleaned_content)
+                        note_id = notes_manager.create_note(content)
                         result = f"Created {cmd} #{note_id}\n"
 
                     # Add automatic tags
@@ -1838,22 +1841,13 @@ def execute_command():
                             except Exception as e:
                                 result += f"{ZettlFormatter.warning(f'Could not add tag {tag}: {str(e)}')}\n"
 
-                    # Create links from @ references
-                    for project_id in project_links:
+                    # Create links from -l options
+                    for link_id in link_ids:
                         try:
-                            notes_manager.create_link(note_id, project_id)
-                            result += f"Created link from #{note_id} to project #{project_id}\n"
+                            notes_manager.create_link(note_id, link_id)
+                            result += f"Created link from #{note_id} to #{link_id}\n"
                         except Exception as e:
-                            result += f"{ZettlFormatter.warning(f'Could not create link to project #{project_id}: {str(e)}')}\n"
-
-                    # Create link from -l option if provided
-                    link = options.get('link', options.get('l', ''))
-                    if link:
-                        try:
-                            notes_manager.create_link(note_id, link)
-                            result += f"Created link from #{note_id} to #{link}\n"
-                        except Exception as e:
-                            result += f"{ZettlFormatter.warning(f'Could not create link to note #{link}: {str(e)}')}\n"
+                            result += f"{ZettlFormatter.warning(f'Could not create link to #{link_id}: {str(e)}')}\n"
 
         elif cmd == "show":
             if not remaining_args:

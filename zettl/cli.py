@@ -38,31 +38,27 @@ def get_llm_helper():
     api_key = zettl_auth.require_auth()
     return LLMHelper(api_key=api_key)
 
-# Helper function to parse @ notation for project linking
-def parse_project_links(content):
-    """Extract @project references from content and return cleaned content and project IDs."""
-    pattern = r'@(\S+)'
-    project_ids = re.findall(pattern, content)
-    # Remove @ references from content
-    cleaned_content = re.sub(pattern, '', content).strip()
-    return cleaned_content, project_ids
-
 # Define the function that both commands will use
 def create_new_note(content, tag, link=None, custom_id=None, auto_tags=None):
-    """Create a new note with the given content and optional tags."""
+    """Create a new note with the given content and optional tags.
+
+    Args:
+        content: The note content
+        tag: Tuple of tags to add
+        link: Tuple of note IDs to link to (from -l flag)
+        custom_id: Custom ID for the note
+        auto_tags: List of automatic tags (e.g., ['todo'], ['idea'])
+    """
     try:
         notes_manager = get_notes_manager()
-
-        # Parse @ notation for project links
-        cleaned_content, project_ids = parse_project_links(content)
 
         # Create note with custom ID if provided
         if custom_id:
             # Use create_note_with_timestamp to set custom ID
             now = dt.now().isoformat()
-            note_id = notes_manager.create_note_with_timestamp(cleaned_content, now, custom_id)
+            note_id = notes_manager.create_note_with_timestamp(content, now, custom_id)
         else:
-            note_id = notes_manager.create_note(cleaned_content)
+            note_id = notes_manager.create_note(content)
 
         click.echo(f"Created note #{note_id}")
 
@@ -89,21 +85,14 @@ def create_new_note(content, tag, link=None, custom_id=None, auto_tags=None):
                     except Exception as e:
                         click.echo(f"Warning: Could not add tag '{t}': {str(e)}", err=True)
 
-        # Create links to projects referenced with @ notation
-        for project_id in project_ids:
-            try:
-                notes_manager.create_link(note_id, project_id)
-                click.echo(f"Created link from #{note_id} to project #{project_id}")
-            except Exception as e:
-                click.echo(f"Warning: Could not create link to project #{project_id}: {str(e)}", err=True)
-
-        # Create link if provided via -l option
+        # Create links if provided via -l option (now supports multiple)
         if link:
-            try:
-                notes_manager.create_link(note_id, link)
-                click.echo(f"Created link from #{note_id} to #{link}")
-            except Exception as e:
-                click.echo(f"Warning: Could not create link to note #{link}: {str(e)}", err=True)
+            for link_id in link:
+                try:
+                    notes_manager.create_link(note_id, link_id)
+                    click.echo(f"Created link from #{note_id} to #{link_id}")
+                except Exception as e:
+                    click.echo(f"Warning: Could not create link to note #{link_id}: {str(e)}", err=True)
     except Exception as e:
         click.echo(f"Error creating note: {str(e)}", err=True)
 
@@ -199,40 +188,32 @@ def show_help_callback(ctx, param, value):
 @click.option('--all', '-a', 'show_all', is_flag=True, help='Show all ideas (both active and completed)')
 @click.option('--cancel', '-c', is_flag=True, help='Show canceled ideas')
 @click.option('--tag', '-t', multiple=True, help='Filter ideas by tag (list mode) or add tags (create mode)')
-@click.option('--link', '-l', help='Note ID to link this idea to (create mode only)')
+@click.option('--link', '-l', multiple=True, help='Note ID to link to (create mode) or filter by (list mode)')
 @click.option('--id', 'custom_id', help='Custom ID for the idea (create mode only, must be unique)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def idea_cmd(content, show_all, cancel, tag, link, custom_id):
-    """Create or list ideas. Use @project to link/filter by project.
+    """Create or list ideas.
 
     CREATE MODE (when content provided):
         zt idea "New app concept" -t tech
-        zt idea "Feature idea @myproject" -t important
+        zt idea "Feature idea" -l myproject -t important
 
-    LIST MODE (when no content or only @ provided):
+    LIST MODE (when no content provided):
         zt idea                    # List all active ideas
-        zt idea @myproject         # List ideas for project
+        zt idea -l myproject       # List ideas linked to note
         zt idea -t tech            # List ideas with tag
     """
     try:
-        # Join content into a string and parse @ mentions
+        # Join content into a string
         content_string = ' '.join(content) if content else ''
 
-        # Extract @project mentions
-        project_ids = re.findall(r'@(\S+)', content_string)
-
-        # Remove @mentions from content
-        remaining_content = re.sub(r'@\S+', '', content_string).strip()
-
-        # Determine mode based on remaining content
-        if remaining_content:
-            # CREATE MODE: has content after removing @ mentions
-            # Pass the ORIGINAL content so that create_new_note can parse @ and create links
-            notes_manager = get_notes_manager()
+        # Determine mode based on content
+        if content_string:
+            # CREATE MODE: has content
             create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['idea'])
             return
 
-        # LIST MODE: no content or only @ mentions
+        # LIST MODE: no content
         notes_manager = get_notes_manager()
 
         # Get all notes tagged with 'idea' along with ALL their tags efficiently
@@ -242,30 +223,30 @@ def idea_cmd(content, show_all, cancel, tag, link, custom_id):
             console.print(ZettlFormatter.warning("No ideas found."))
             return
 
-        # Filter by project if @ mentions provided
-        if project_ids:
-            # Get all notes linked to each project
-            project_filtered_notes = []
-            for project_id in project_ids:
-                # Get notes linked to this project
+        # Filter by linked notes if -l provided
+        if link:
+            # Get all notes linked to each specified note
+            link_filtered_notes = []
+            for link_id in link:
+                # Get notes linked to this note
                 try:
-                    linked_notes = notes_manager.get_related_notes(project_id)
+                    linked_notes = notes_manager.get_related_notes(link_id)
                     linked_note_ids = {note['id'] for note in linked_notes}
 
-                    # Filter ideas to only those linked to this project
+                    # Filter ideas to only those linked to this note
                     for note in idea_notes:
                         if note['id'] in linked_note_ids:
-                            if note not in project_filtered_notes:
-                                project_filtered_notes.append(note)
+                            if note not in link_filtered_notes:
+                                link_filtered_notes.append(note)
                 except Exception:
-                    # If project doesn't exist or has no links, continue
+                    # If note doesn't exist or has no links, continue
                     pass
 
-            idea_notes = project_filtered_notes
+            idea_notes = link_filtered_notes
 
             if not idea_notes:
-                projects_str = "', '".join(project_ids)
-                console.print(ZettlFormatter.warning(f"No ideas found for projects: '{projects_str}'."))
+                links_str = "', '".join(link)
+                console.print(ZettlFormatter.warning(f"No ideas found linked to: '{links_str}'."))
                 return
 
         # Apply filters if specified - now using pre-loaded tags
@@ -444,30 +425,23 @@ def idea_cmd(content, show_all, cancel, tag, link, custom_id):
 @click.option('--all', '-a', 'show_all', is_flag=True, help='Show all ideas (both active and completed)')
 @click.option('--cancel', '-c', is_flag=True, help='Show canceled ideas')
 @click.option('--tag', '-t', multiple=True, help='Filter ideas by tag (list mode) or add tags (create mode)')
-@click.option('--link', '-l', help='Note ID to link this idea to (create mode only)')
+@click.option('--link', '-l', multiple=True, help='Note ID to link to (create mode) or filter by (list mode)')
 @click.option('--id', 'custom_id', help='Custom ID for the idea (create mode only, must be unique)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def i_cmd(content, show_all, cancel, tag, link, custom_id):
     """Shortcut for 'idea' command."""
     # Duplicate the full idea_cmd logic to avoid Click command invocation issues
     try:
-        # Join content into a string and parse @ mentions
+        # Join content into a string
         content_string = ' '.join(content) if content else ''
 
-        # Extract @project mentions
-        project_ids = re.findall(r'@(\S+)', content_string)
-
-        # Remove @mentions from content
-        remaining_content = re.sub(r'@\S+', '', content_string).strip()
-
-        # Determine mode based on remaining content
-        if remaining_content:
+        # Determine mode based on content
+        if content_string:
             # CREATE MODE
-            notes_manager = get_notes_manager()
             create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['idea'])
             return
 
-        # LIST MODE: delegate to idea_cmd callback
+        # LIST MODE
         notes_manager = get_notes_manager()
         idea_notes = notes_manager.get_notes_with_all_tags_by_tag('idea')
 
@@ -475,23 +449,23 @@ def i_cmd(content, show_all, cancel, tag, link, custom_id):
             console.print(ZettlFormatter.warning("No ideas found."))
             return
 
-        # Apply same filtering logic as idea_cmd
-        if project_ids:
-            project_filtered_notes = []
-            for project_id in project_ids:
+        # Apply filtering logic
+        if link:
+            link_filtered_notes = []
+            for link_id in link:
                 try:
-                    linked_notes = notes_manager.get_related_notes(project_id)
+                    linked_notes = notes_manager.get_related_notes(link_id)
                     linked_note_ids = {note['id'] for note in linked_notes}
                     for note in idea_notes:
                         if note['id'] in linked_note_ids:
-                            if note not in project_filtered_notes:
-                                project_filtered_notes.append(note)
+                            if note not in link_filtered_notes:
+                                link_filtered_notes.append(note)
                 except Exception:
                     pass
-            idea_notes = project_filtered_notes
+            idea_notes = link_filtered_notes
             if not idea_notes:
-                projects_str = "', '".join(project_ids)
-                console.print(ZettlFormatter.warning(f"No ideas found for projects: '{projects_str}'."))
+                links_str = "', '".join(link)
+                console.print(ZettlFormatter.warning(f"No ideas found linked to: '{links_str}'."))
                 return
 
         if tag:
@@ -532,40 +506,32 @@ def i_cmd(content, show_all, cancel, tag, link, custom_id):
 @click.option('--all', '-a', 'show_all', is_flag=True, help='Show all notes (both active and completed)')
 @click.option('--cancel', '-c', is_flag=True, help='Show canceled notes')
 @click.option('--tag', '-t', multiple=True, help='Filter notes by tag (list mode) or add tags (create mode)')
-@click.option('--link', '-l', help='Note ID to link this note to (create mode only)')
+@click.option('--link', '-l', multiple=True, help='Note ID to link to (create mode) or filter by (list mode)')
 @click.option('--id', 'custom_id', help='Custom ID for the note (create mode only, must be unique)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def note_cmd(content, show_all, cancel, tag, link, custom_id):
-    """Create or list notes. Use @project to link/filter by project.
+    """Create or list notes.
 
     CREATE MODE (when content provided):
         zt note "Meeting notes" -t work
-        zt note "Research findings @myproject" -t research
+        zt note "Research findings" -l myproject -t research
 
-    LIST MODE (when no content or only @ provided):
+    LIST MODE (when no content provided):
         zt note                    # List all active notes
-        zt note @myproject         # List notes for project
+        zt note -l myproject       # List notes linked to note
         zt note -t work            # List notes with tag
     """
     try:
-        # Join content into a string and parse @ mentions
+        # Join content into a string
         content_string = ' '.join(content) if content else ''
 
-        # Extract @project mentions
-        project_ids = re.findall(r'@(\S+)', content_string)
-
-        # Remove @mentions from content
-        remaining_content = re.sub(r'@\S+', '', content_string).strip()
-
-        # Determine mode based on remaining content
-        if remaining_content:
-            # CREATE MODE: has content after removing @ mentions
-            # Pass the ORIGINAL content so that create_new_note can parse @ and create links
-            notes_manager = get_notes_manager()
+        # Determine mode based on content
+        if content_string:
+            # CREATE MODE: has content
             create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['note'])
             return
 
-        # LIST MODE: no content or only @ mentions
+        # LIST MODE: no content
         notes_manager = get_notes_manager()
 
         # Get all notes tagged with 'note' along with ALL their tags efficiently
@@ -575,30 +541,30 @@ def note_cmd(content, show_all, cancel, tag, link, custom_id):
             console.print(ZettlFormatter.warning("No notes found."))
             return
 
-        # Filter by project if @ mentions provided
-        if project_ids:
-            # Get all notes linked to each project
-            project_filtered_notes = []
-            for project_id in project_ids:
-                # Get notes linked to this project
+        # Filter by linked notes if -l provided
+        if link:
+            # Get all notes linked to each specified note
+            link_filtered_notes = []
+            for link_id in link:
+                # Get notes linked to this note
                 try:
-                    linked_notes = notes_manager.get_related_notes(project_id)
+                    linked_notes = notes_manager.get_related_notes(link_id)
                     linked_note_ids = {note['id'] for note in linked_notes}
 
-                    # Filter notes to only those linked to this project
+                    # Filter notes to only those linked to this note
                     for note in note_notes:
                         if note['id'] in linked_note_ids:
-                            if note not in project_filtered_notes:
-                                project_filtered_notes.append(note)
+                            if note not in link_filtered_notes:
+                                link_filtered_notes.append(note)
                 except Exception:
-                    # If project doesn't exist or has no links, continue
+                    # If note doesn't exist or has no links, continue
                     pass
 
-            note_notes = project_filtered_notes
+            note_notes = link_filtered_notes
 
             if not note_notes:
-                projects_str = "', '".join(project_ids)
-                console.print(ZettlFormatter.warning(f"No notes found for projects: '{projects_str}'."))
+                links_str = "', '".join(link)
+                console.print(ZettlFormatter.warning(f"No notes found linked to: '{links_str}'."))
                 return
 
         # Apply filters if specified - now using pre-loaded tags
@@ -777,26 +743,19 @@ def note_cmd(content, show_all, cancel, tag, link, custom_id):
 @click.option('--all', '-a', 'show_all', is_flag=True, help='Show all notes (both active and completed)')
 @click.option('--cancel', '-c', is_flag=True, help='Show canceled notes')
 @click.option('--tag', '-t', multiple=True, help='Filter notes by tag (list mode) or add tags (create mode)')
-@click.option('--link', '-l', help='Note ID to link this note to (create mode only)')
+@click.option('--link', '-l', multiple=True, help='Note ID to link to (create mode) or filter by (list mode)')
 @click.option('--id', 'custom_id', help='Custom ID for the note (create mode only, must be unique)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def n_cmd(content, show_all, cancel, tag, link, custom_id):
     """Shortcut for 'note' command."""
     # Duplicate the full note_cmd logic to avoid Click command invocation issues
     try:
-        # Join content into a string and parse @ mentions
+        # Join content into a string
         content_string = ' '.join(content) if content else ''
 
-        # Extract @project mentions
-        project_ids = re.findall(r'@(\S+)', content_string)
-
-        # Remove @mentions from content
-        remaining_content = re.sub(r'@\S+', '', content_string).strip()
-
-        # Determine mode based on remaining content
-        if remaining_content:
+        # Determine mode based on content
+        if content_string:
             # CREATE MODE
-            notes_manager = get_notes_manager()
             create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['note'])
             return
 
@@ -808,23 +767,23 @@ def n_cmd(content, show_all, cancel, tag, link, custom_id):
             console.print(ZettlFormatter.warning("No notes found."))
             return
 
-        # Apply same filtering logic as note_cmd
-        if project_ids:
-            project_filtered_notes = []
-            for project_id in project_ids:
+        # Apply filtering logic
+        if link:
+            link_filtered_notes = []
+            for link_id in link:
                 try:
-                    linked_notes = notes_manager.get_related_notes(project_id)
+                    linked_notes = notes_manager.get_related_notes(link_id)
                     linked_note_ids = {note['id'] for note in linked_notes}
                     for note in note_notes:
                         if note['id'] in linked_note_ids:
-                            if note not in project_filtered_notes:
-                                project_filtered_notes.append(note)
+                            if note not in link_filtered_notes:
+                                link_filtered_notes.append(note)
                 except Exception:
                     pass
-            note_notes = project_filtered_notes
+            note_notes = link_filtered_notes
             if not note_notes:
-                projects_str = "', '".join(project_ids)
-                console.print(ZettlFormatter.warning(f"No notes found for projects: '{projects_str}'."))
+                links_str = "', '".join(link)
+                console.print(ZettlFormatter.warning(f"No notes found linked to: '{links_str}'."))
                 return
 
         if tag:
@@ -1083,45 +1042,38 @@ def display_project_detail(project_note, project_id, notes_manager, show_all, fu
 @click.option('--all', '-a', 'show_all', is_flag=True, help='Show all notes including done and canceled')
 @click.option('--full', '-f', is_flag=True, help='Show full content instead of previews')
 @click.option('--tag', '-t', multiple=True, help='Filter linked notes by tag (detail mode) or add tags (create mode)')
-@click.option('--link', '-l', help='Note ID to link this project to (create mode only)')
+@click.option('--link', '-l', multiple=True, help='Project ID to view details (must be a project)')
 @click.option('--id', 'custom_id', help='Custom ID for the project (create mode only, must be unique)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def project_cmd(content, show_all, full, tag, link, custom_id):
     """Create, list, or view project details.
 
-    CREATE MODE (when content provided without @):
+    CREATE MODE (when content provided):
         zt project "New Project" -t active
         zt project "Research Phase" --id research-2024
-        zt project np                    # Creates project "np" with random ID
 
-    LIST MODE (when no content):
+    LIST MODE (when no content and no -l):
         zt project                 # List all projects
 
-    DETAIL VIEW (when @project_id provided):
-        zt project @zt             # Show project details with linked notes
-        zt project @zt -a          # Include done/canceled notes
-        zt project @zt -f          # Show full content
+    DETAIL VIEW (when -l provided):
+        zt project -l myproject    # Show project details with linked notes
+        zt project -l myproject -a # Include done/canceled notes
+        zt project -l myproject -f # Show full content
     """
     try:
         notes_manager = get_notes_manager()
 
-        # Join content into a string and parse @ mentions
+        # Join content into a string
         content_string = ' '.join(content) if content else ''
 
-        # Extract @project mentions
-        project_ids = re.findall(r'@(\S+)', content_string)
-
-        # Remove @mentions from content
-        remaining_content = re.sub(r'@\S+', '', content_string).strip()
-
-        # Determine mode based on @mentions and content
-        if project_ids:
-            # DETAIL VIEW MODE: @project_id provided
-            if len(project_ids) > 1:
+        # Determine mode based on -l flag and content
+        if link:
+            # DETAIL VIEW MODE: -l project_id provided
+            if len(link) > 1:
                 console.print(ZettlFormatter.warning("Please specify only one project to view details."))
                 return
 
-            project_id = project_ids[0]
+            project_id = link[0]
             try:
                 # Try to get the project by ID
                 project_note = notes_manager.get_note(project_id)
@@ -1129,7 +1081,7 @@ def project_cmd(content, show_all, full, tag, link, custom_id):
 
                 # Verify it's a project
                 if 'project' not in project_tags:
-                    console.print(ZettlFormatter.error(f"Note '{project_id}' is not a project."))
+                    console.print(ZettlFormatter.error(f"Note '{project_id}' is not a project. Use 'zt show {project_id}' to view it."))
                     return
 
                 # Show detail view
@@ -1139,7 +1091,7 @@ def project_cmd(content, show_all, full, tag, link, custom_id):
                 console.print(ZettlFormatter.error(f"Project '{project_id}' not found."))
                 return
 
-        if not remaining_content:
+        if not content_string:
             # LIST MODE: show all projects
             projects = notes_manager.get_notes_with_all_tags_by_tag('project')
 
@@ -1178,9 +1130,8 @@ def project_cmd(content, show_all, full, tag, link, custom_id):
 
             return
 
-        # CREATE MODE: has content without @ mentions
-        # Always create a new project (even if name matches existing project ID)
-        create_new_note(remaining_content, tag, link, custom_id=custom_id, auto_tags=['project'])
+        # CREATE MODE: has content
+        create_new_note(content_string, tag, (), custom_id=custom_id, auto_tags=['project'])
 
     except Exception as e:
         console.print(ZettlFormatter.error(str(e)))
@@ -1191,7 +1142,7 @@ def project_cmd(content, show_all, full, tag, link, custom_id):
 @click.option('--all', '-a', 'show_all', is_flag=True, help='Show all notes including done and canceled')
 @click.option('--full', '-f', is_flag=True, help='Show full content instead of previews')
 @click.option('--tag', '-t', multiple=True, help='Filter linked notes by tag (detail mode) or add tags (create mode)')
-@click.option('--link', '-l', help='Note ID to link this project to (create mode only)')
+@click.option('--link', '-l', multiple=True, help='Project ID to view details (must be a project)')
 @click.option('--id', 'custom_id', help='Custom ID for the project (create mode only, must be unique)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def p_cmd(content, show_all, full, tag, link, custom_id):
@@ -1200,23 +1151,17 @@ def p_cmd(content, show_all, full, tag, link, custom_id):
     try:
         notes_manager = get_notes_manager()
 
-        # Join content into a string and parse @ mentions
+        # Join content into a string
         content_string = ' '.join(content) if content else ''
 
-        # Extract @project mentions
-        project_ids = re.findall(r'@(\S+)', content_string)
-
-        # Remove @mentions from content
-        remaining_content = re.sub(r'@\S+', '', content_string).strip()
-
-        # Determine mode based on @mentions and content
-        if project_ids:
-            # DETAIL VIEW MODE: @project_id provided
-            if len(project_ids) > 1:
+        # Determine mode based on -l flag and content
+        if link:
+            # DETAIL VIEW MODE: -l project_id provided
+            if len(link) > 1:
                 console.print(ZettlFormatter.warning("Please specify only one project to view details."))
                 return
 
-            project_id = project_ids[0]
+            project_id = link[0]
             try:
                 # Try to get the project by ID
                 project_note = notes_manager.get_note(project_id)
@@ -1224,7 +1169,7 @@ def p_cmd(content, show_all, full, tag, link, custom_id):
 
                 # Verify it's a project
                 if 'project' not in project_tags:
-                    console.print(ZettlFormatter.error(f"Note '{project_id}' is not a project."))
+                    console.print(ZettlFormatter.error(f"Note '{project_id}' is not a project. Use 'zt show {project_id}' to view it."))
                     return
 
                 # Show detail view
@@ -1234,14 +1179,13 @@ def p_cmd(content, show_all, full, tag, link, custom_id):
                 console.print(ZettlFormatter.error(f"Project '{project_id}' not found."))
                 return
 
-        if not remaining_content:
+        if not content_string:
             # LIST MODE: simplified for shortcut
             console.print(ZettlFormatter.warning("Use 'zt project' to list all projects"))
             return
 
-        # CREATE MODE: has content without @ mentions
-        # Always create a new project (even if name matches existing project ID)
-        create_new_note(remaining_content, tag, link, custom_id=custom_id, auto_tags=['project'])
+        # CREATE MODE: has content
+        create_new_note(content_string, tag, (), custom_id=custom_id, auto_tags=['project'])
 
     except Exception as e:
         console.print(ZettlFormatter.error(str(e)))
@@ -2089,40 +2033,32 @@ def merge(note_ids, force):
 @click.option('--all', '-a', 'show_all', is_flag=True, help='Show all todos (both active and completed)')
 @click.option('--cancel', '-c', is_flag=True, help='Show canceled todos')
 @click.option('--tag', '-t', multiple=True, help='Filter todos by tag (list mode) or add tags (create mode)')
-@click.option('--link', '-l', help='Note ID to link this todo to (create mode only)')
+@click.option('--link', '-l', multiple=True, help='Note ID to link to (create mode) or filter by (list mode)')
 @click.option('--id', 'custom_id', help='Custom ID for the todo (create mode only, must be unique)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def todo_cmd(content, donetoday, show_all, cancel, tag, link, custom_id):
-    """Create or list todos. Use @project to link/filter by project.
+    """Create or list todos.
 
     CREATE MODE (when content provided):
         zt todo "Buy milk" -t shopping
-        zt todo "Fix bug @myproject" -t urgent
+        zt todo "Fix bug" -l myproject -t urgent
 
-    LIST MODE (when no content or only @ provided):
+    LIST MODE (when no content provided):
         zt todo                    # List all active todos
-        zt todo @myproject         # List todos for project
+        zt todo -l myproject       # List todos linked to note
         zt todo -t urgent          # List todos with tag
     """
     try:
-        # Join content into a string and parse @ mentions
+        # Join content into a string
         content_string = ' '.join(content) if content else ''
 
-        # Extract @project mentions
-        project_ids = re.findall(r'@(\S+)', content_string)
-
-        # Remove @mentions from content
-        remaining_content = re.sub(r'@\S+', '', content_string).strip()
-
-        # Determine mode based on remaining content
-        if remaining_content:
-            # CREATE MODE: has content after removing @ mentions
-            # Pass the ORIGINAL content so that create_new_note can parse @ and create links
-            notes_manager = get_notes_manager()
+        # Determine mode based on content
+        if content_string:
+            # CREATE MODE: has content
             create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['todo'])
             return
 
-        # LIST MODE: no content or only @ mentions
+        # LIST MODE: no content
         notes_manager = get_notes_manager()
 
         # Get all notes tagged with 'todo' along with ALL their tags efficiently
@@ -2149,30 +2085,30 @@ def todo_cmd(content, donetoday, show_all, cancel, tag, link, custom_id):
                 console.print(ZettlFormatter.warning("No todos completed today."))
                 return
 
-        # Filter by project if @ mentions provided
-        if project_ids:
-            # Get all notes linked to each project
-            project_filtered_notes = []
-            for project_id in project_ids:
-                # Get notes linked to this project
+        # Filter by linked notes if -l provided
+        if link:
+            # Get all notes linked to each specified note
+            link_filtered_notes = []
+            for link_id in link:
+                # Get notes linked to this note
                 try:
-                    linked_notes = notes_manager.get_related_notes(project_id)
+                    linked_notes = notes_manager.get_related_notes(link_id)
                     linked_note_ids = {note['id'] for note in linked_notes}
 
-                    # Filter todos to only those linked to this project
+                    # Filter todos to only those linked to this note
                     for note in todo_notes:
                         if note['id'] in linked_note_ids:
-                            if note not in project_filtered_notes:
-                                project_filtered_notes.append(note)
+                            if note not in link_filtered_notes:
+                                link_filtered_notes.append(note)
                 except Exception:
-                    # If project doesn't exist or has no links, continue
+                    # If note doesn't exist or has no links, continue
                     pass
 
-            todo_notes = project_filtered_notes
+            todo_notes = link_filtered_notes
 
             if not todo_notes:
-                projects_str = "', '".join(project_ids)
-                console.print(ZettlFormatter.warning(f"No todos found for projects: '{projects_str}'."))
+                links_str = "', '".join(link)
+                console.print(ZettlFormatter.warning(f"No todos found linked to: '{links_str}'."))
                 return
 
         # Apply filters if specified - now using pre-loaded tags
@@ -2352,30 +2288,22 @@ def todo_cmd(content, donetoday, show_all, cancel, tag, link, custom_id):
 @click.option('--all', '-a', 'show_all', is_flag=True, help='Show all todos (both active and completed)')
 @click.option('--cancel', '-c', is_flag=True, help='Show canceled todos')
 @click.option('--tag', '-t', multiple=True, help='Filter todos by tag (list mode) or add tags (create mode)')
-@click.option('--link', '-l', help='Note ID to link this todo to (create mode only)')
+@click.option('--link', '-l', multiple=True, help='Note ID to link to (create mode) or filter by (list mode)')
 @click.option('--id', 'custom_id', help='Custom ID for the todo (create mode only, must be unique)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def t_cmd(content, donetoday, show_all, cancel, tag, link, custom_id):
     """Shortcut for 'todo' command."""
     try:
-        # Join content into a string and parse @ mentions
+        # Join content into a string
         content_string = ' '.join(content) if content else ''
 
-        # Extract @project mentions
-        project_ids = re.findall(r'@(\S+)', content_string)
-
-        # Remove @mentions from content
-        remaining_content = re.sub(r'@\S+', '', content_string).strip()
-
-        # Determine mode based on remaining content
-        if remaining_content:
-            # CREATE MODE: has content after removing @ mentions
-            # Pass the ORIGINAL content so that create_new_note can parse @ and create links
-            notes_manager = get_notes_manager()
+        # Determine mode based on content
+        if content_string:
+            # CREATE MODE: has content
             create_new_note(content_string, tag, link, custom_id=custom_id, auto_tags=['todo'])
             return
 
-        # LIST MODE: no content or only @ mentions
+        # LIST MODE: no content
         notes_manager = get_notes_manager()
 
         # Get all notes tagged with 'todo' along with ALL their tags efficiently
@@ -2402,30 +2330,30 @@ def t_cmd(content, donetoday, show_all, cancel, tag, link, custom_id):
                 console.print(ZettlFormatter.warning("No todos completed today."))
                 return
 
-        # Filter by project if @ mentions provided
-        if project_ids:
-            # Get all notes linked to each project
-            project_filtered_notes = []
-            for project_id in project_ids:
-                # Get notes linked to this project
+        # Filter by linked notes if -l provided
+        if link:
+            # Get all notes linked to each specified note
+            link_filtered_notes = []
+            for link_id in link:
+                # Get notes linked to this note
                 try:
-                    linked_notes = notes_manager.get_related_notes(project_id)
+                    linked_notes = notes_manager.get_related_notes(link_id)
                     linked_note_ids = {note['id'] for note in linked_notes}
 
-                    # Filter todos to only those linked to this project
+                    # Filter todos to only those linked to this note
                     for note in todo_notes:
                         if note['id'] in linked_note_ids:
-                            if note not in project_filtered_notes:
-                                project_filtered_notes.append(note)
+                            if note not in link_filtered_notes:
+                                link_filtered_notes.append(note)
                 except Exception:
-                    # If project doesn't exist or has no links, continue
+                    # If note doesn't exist or has no links, continue
                     pass
 
-            todo_notes = project_filtered_notes
+            todo_notes = link_filtered_notes
 
             if not todo_notes:
-                projects_str = "', '".join(project_ids)
-                console.print(ZettlFormatter.warning(f"No todos found for projects: '{projects_str}'."))
+                links_str = "', '".join(link)
+                console.print(ZettlFormatter.warning(f"No todos found linked to: '{links_str}'."))
                 return
 
         # Apply filters if specified - now using pre-loaded tags

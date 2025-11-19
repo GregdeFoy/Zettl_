@@ -39,24 +39,24 @@ class CommandHelp:
     def get_main_help(cls):
         """Return the main help text."""
         help_text = f"""
-[bold green]zettl v0.6.1[/bold green] - A Zettelkasten-style note-taking tool
+[bold green]zettl v0.7.0[/bold green] - A Zettelkasten-style note-taking tool
 
 [bold]NOTE MANAGEMENT[/bold]
   [bold yellow]todo[/bold yellow] / [bold yellow]t[/bold yellow]            List todos OR create new todo (auto-tagged 'todo')
     [blue]→[/blue] zettl todo                  # List active todos
-    [blue]→[/blue] zettl t "Call dentist" @health-project
+    [blue]→[/blue] zettl t "Call dentist" -l health-project
 
   [bold yellow]idea[/bold yellow] / [bold yellow]i[/bold yellow]            List ideas OR create new idea (auto-tagged 'idea')
     [blue]→[/blue] zettl idea                  # List active ideas
-    [blue]→[/blue] zettl i "Add caching layer" @dev-project
+    [blue]→[/blue] zettl i "Add caching layer" -l dev-project
 
   [bold yellow]note[/bold yellow] / [bold yellow]n[/bold yellow]            List notes OR create new note (auto-tagged 'note')
     [blue]→[/blue] zettl note                  # List active notes
-    [blue]→[/blue] zettl n "Meeting notes" @work-project
+    [blue]→[/blue] zettl n "Meeting notes" -l work-project
 
   [bold yellow]project[/bold yellow] / [bold yellow]p[/bold yellow]         List/view/create projects (auto-tagged 'project')
     [blue]→[/blue] zettl project               # List all projects with stats
-    [blue]→[/blue] zettl p learn-rust          # View project detail
+    [blue]→[/blue] zettl project -l learn-rust # View project detail
     [blue]→[/blue] zettl project "New Project" --id my-proj
 
   [bold yellow]show[/bold yellow]                Display note content and related notes
@@ -126,8 +126,8 @@ class CommandHelp:
 [bold]GETTING STARTED[/bold]
   1. Set up authentication:     [cyan]zettl auth setup[/cyan]
   2. Create a project:          [cyan]zettl project "My Project" --id my-project[/cyan]
-  3. Add tasks to project:      [cyan]zettl todo "First task" @my-project[/cyan]
-  4. Capture ideas:            [cyan]zettl idea "Great idea!" @my-project[/cyan]
+  3. Add tasks to project:      [cyan]zettl todo "First task" -l my-project[/cyan]
+  4. Capture ideas:            [cyan]zettl idea "Great idea!" -l my-project[/cyan]
   5. List your notes:          [cyan]zettl list[/cyan]
   6. View todos:               [cyan]zettl todo[/cyan]
   7. View project stats:       [cyan]zettl project[/cyan]
@@ -173,26 +173,25 @@ For detailed help on any command: [cyan]zettl COMMAND --help[/cyan]
   [yellow]-dt, --donetoday[/yellow]    Show todos completed today
   [yellow]-c, --cancel[/yellow]        Show canceled todos
   [yellow]-t, --tag TAG[/yellow]       Filter todos by additional tag (can specify multiple)
-  [yellow]@PROJECT_ID[/yellow]         Filter todos by project (use @ notation)
+  [yellow]-l, --link NOTE_ID[/yellow]  Filter todos linked to note (can specify multiple)
 
 [bold]Create Mode Options:[/bold]
   [yellow]-t, --tag TAG[/yellow]       Add additional tags to the todo
-  [yellow]-l, --link NOTE_ID[/yellow]  Create a link to another note
+  [yellow]-l, --link NOTE_ID[/yellow]  Create link to note (can specify multiple)
   [yellow]--id CUSTOM_ID[/yellow]      Use a custom ID instead of auto-generated one
-  [yellow]@PROJECT_ID[/yellow]         Link to a project (use @ notation in content)
 
 [bold]Examples:[/bold]
   [cyan]# List Mode[/cyan]
   [blue]zettl todo[/blue]                   List active todos
   [blue]zettl todo -a[/blue]                Show all todos
-  [blue]zettl todo @my-project[/blue]       List todos for a project
+  [blue]zettl todo -l my-project[/blue]     List todos linked to a project
   [blue]zettl todo -t urgent[/blue]         List urgent todos
   [blue]zettl todo -dt[/blue]               Show todos completed today
 
   [cyan]# Create Mode[/cyan]
   [blue]zettl todo "Review pull request"[/blue]
-  [blue]zettl todo "Call dentist" @health-project[/blue]
-  [blue]zettl todo "Fix bug #123" @dev --id bug-123[/blue]
+  [blue]zettl todo "Call dentist" -l health-project[/blue]
+  [blue]zettl todo "Fix bug #123" -l dev --id bug-123[/blue]
   [blue]zettl todo "Write tests" -t urgent[/blue]
 """,
 
@@ -213,25 +212,24 @@ See 'zettl todo --help' for full documentation.
   [yellow]-a, --all[/yellow]           Show all ideas (active, done, and canceled)
   [yellow]-c, --cancel[/yellow]        Show canceled ideas
   [yellow]-t, --tag TAG[/yellow]       Filter ideas by additional tag (can specify multiple)
-  [yellow]@PROJECT_ID[/yellow]         Filter ideas by project (use @ notation)
+  [yellow]-l, --link NOTE_ID[/yellow]  Filter ideas linked to note (can specify multiple)
 
 [bold]Create Mode Options:[/bold]
   [yellow]-t, --tag TAG[/yellow]       Add additional tags to the idea
-  [yellow]-l, --link NOTE_ID[/yellow]  Create a link to another note
+  [yellow]-l, --link NOTE_ID[/yellow]  Create link to note (can specify multiple)
   [yellow]--id CUSTOM_ID[/yellow]      Use a custom ID instead of auto-generated one
-  [yellow]@PROJECT_ID[/yellow]         Link to a project (use @ notation in content)
 
 [bold]Examples:[/bold]
   [cyan]# List Mode[/cyan]
   [blue]zettl idea[/blue]                   List active ideas
   [blue]zettl idea -a[/blue]                Show all ideas
-  [blue]zettl idea @my-project[/blue]       List ideas for a project
+  [blue]zettl idea -l my-project[/blue]     List ideas linked to a project
   [blue]zettl idea -t backend[/blue]        List backend ideas
 
   [cyan]# Create Mode[/cyan]
   [blue]zettl idea "Add caching layer for better performance"[/blue]
-  [blue]zettl idea "Redesign UI" @frontend-project[/blue]
-  [blue]zettl idea "Try new algorithm" @research --id algo-001[/blue]
+  [blue]zettl idea "Redesign UI" -l frontend-project[/blue]
+  [blue]zettl idea "Try new algorithm" -l research --id algo-001[/blue]
 """,
 
             "i": f"""
@@ -251,25 +249,24 @@ See 'zettl idea --help' for full documentation.
   [yellow]-a, --all[/yellow]           Show all notes (active, done, and canceled)
   [yellow]-c, --cancel[/yellow]        Show canceled notes
   [yellow]-t, --tag TAG[/yellow]       Filter notes by additional tag (can specify multiple)
-  [yellow]@PROJECT_ID[/yellow]         Filter notes by project (use @ notation)
+  [yellow]-l, --link NOTE_ID[/yellow]  Filter notes linked to note (can specify multiple)
 
 [bold]Create Mode Options:[/bold]
   [yellow]-t, --tag TAG[/yellow]       Add additional tags to the note
-  [yellow]-l, --link NOTE_ID[/yellow]  Create a link to another note
+  [yellow]-l, --link NOTE_ID[/yellow]  Create link to note (can specify multiple)
   [yellow]--id CUSTOM_ID[/yellow]      Use a custom ID instead of auto-generated one
-  [yellow]@PROJECT_ID[/yellow]         Link to a project (use @ notation in content)
 
 [bold]Examples:[/bold]
   [cyan]# List Mode[/cyan]
   [blue]zettl note[/blue]                   List active notes
   [blue]zettl note -a[/blue]                Show all notes
-  [blue]zettl note @my-project[/blue]       List notes for a project
+  [blue]zettl note -l my-project[/blue]     List notes linked to a project
   [blue]zettl note -t meeting[/blue]        List meeting notes
 
   [cyan]# Create Mode[/cyan]
   [blue]zettl note "Meeting notes from standup"[/blue]
-  [blue]zettl note "Architecture decisions" @dev-project[/blue]
-  [blue]zettl note "Research findings" @research --id research-001[/blue]
+  [blue]zettl note "Architecture decisions" -l dev-project[/blue]
+  [blue]zettl note "Research findings" -l research --id research-001[/blue]
 """,
 
             "n": f"""
@@ -282,15 +279,15 @@ See 'zettl note --help' for full documentation.
 [bold green]project [CONTENT][/bold green] - List/view/create projects (automatically tagged with 'project')
 
 [bold]THREE MODE COMMAND:[/bold]
-  • [bold]No content[/bold] = LIST MODE: Shows all projects with statistics
-  • [bold]@project_id[/bold] = DETAIL MODE: Shows project with categorized linked notes
-  • [bold]Content (no @)[/bold] = CREATE MODE: Creates a new project
+  • [bold]No content and no -l[/bold] = LIST MODE: Shows all projects with statistics
+  • [bold]-l project_id[/bold] = DETAIL MODE: Shows project with categorized linked notes
+  • [bold]Content[/bold] = CREATE MODE: Creates a new project
 
 [bold]List Mode:[/bold]
   [blue]zettl project[/blue]                Shows all projects with active todo/idea/note counts
 
-[bold]Detail Mode (requires @):[/bold]
-  [blue]zettl project @project_id[/blue]   View project detail with categorized notes
+[bold]Detail Mode (requires -l):[/bold]
+  [blue]zettl project -l project_id[/blue]  View project detail with categorized notes
 
   [bold]Options:[/bold]
   [yellow]-a, --all[/yellow]           Show all linked notes (active, done, and canceled)
@@ -299,28 +296,24 @@ See 'zettl note --help' for full documentation.
 
 [bold]Create Mode Options:[/bold]
   [yellow]-t, --tag TAG[/yellow]       Add additional tags to the project
-  [yellow]-l, --link NOTE_ID[/yellow]  Create a link to another note
   [yellow]--id CUSTOM_ID[/yellow]      Use a custom, memorable ID (recommended for projects)
 
 [bold]Examples:[/bold]
   [cyan]# List Mode[/cyan]
   [blue]zettl project[/blue]                List all projects with stats
 
-  [cyan]# Detail Mode (note the @ prefix)[/cyan]
-  [blue]zettl project @learn-rust[/blue]    View project detail with categorized notes
-  [blue]zettl project @learn-rust -f[/blue] View with full note content
-  [blue]zettl project @learn-rust -t backend[/blue]  Filter to backend-tagged notes
+  [cyan]# Detail Mode (note the -l flag)[/cyan]
+  [blue]zettl project -l learn-rust[/blue]    View project detail with categorized notes
+  [blue]zettl project -l learn-rust -f[/blue] View with full note content
+  [blue]zettl project -l learn-rust -t backend[/blue]  Filter to backend-tagged notes
 
   [cyan]# Create Mode[/cyan]
   [blue]zettl project "Learn Rust" --id learn-rust[/blue]
   [blue]zettl project "Q1 Planning" --id q1-2024[/blue]
   [blue]zettl project "Website Redesign" --id web-redesign -t urgent[/blue]
-  [blue]zettl project np[/blue]             Creates project "np" with random ID
 
 [bold]Note:[/bold] Projects serve as organizational containers. Use custom IDs to make
-them easy to reference when creating tasks, ideas, and notes with @project-id.
-The @ prefix is required for viewing project details, maintaining consistency
-with the todo/idea/note filtering behavior.
+them easy to reference when creating tasks, ideas, and notes with -l project-id.
 """,
 
             "p": f"""
@@ -462,7 +455,7 @@ Use [cyan]todo[/cyan] (with no content) instead.
   [cyan]zettl todo -a[/cyan]                 Show all todos (active, done, canceled)
   [cyan]zettl todo -dt[/cyan]                Show todos completed today
   [cyan]zettl todo -t work[/cyan]            Filter todos by tag
-  [cyan]zettl todo @project[/cyan]           Filter todos by project
+  [cyan]zettl todo -l project[/cyan]          Filter todos by linked note
 
 [bold]Examples:[/bold]
   [blue]zettl todo[/blue]                   (replaces: zettl todos)
