@@ -39,7 +39,7 @@ class CommandHelp:
     def get_main_help(cls):
         """Return the main help text."""
         help_text = f"""
-[bold green]zettl v0.7.0[/bold green] - A Zettelkasten-style note-taking tool
+[bold green]zettl v0.7.1[/bold green] - A Zettelkasten-style note-taking tool
 
 [bold]NOTE MANAGEMENT[/bold]
   [bold yellow]todo[/bold yellow] / [bold yellow]t[/bold yellow]            List todos OR create new todo (auto-tagged 'todo')
@@ -85,23 +85,19 @@ class CommandHelp:
     [blue]→[/blue] zettl delete 22a4b --keep-tags
 
 [bold]CONNECTIONS[/bold]
-  [bold yellow]link[/bold yellow]                Create link between notes
+  [bold yellow]link[/bold yellow]                Create or remove link between notes
     [blue]→[/blue] zettl link 22a4b 18c3d --context "Related concepts"
-
-  [bold yellow]unlink[/bold yellow]              Remove link between notes
-    [blue]→[/blue] zettl unlink 22a4b 18c3d
+    [blue]→[/blue] zettl link 22a4b 18c3d -r   # Remove link
 
   [bold yellow]graph[/bold yellow]               Export graph visualization data
     [blue]→[/blue] zettl graph 22a4b --output graph.json --depth 2
 
 [bold]ORGANIZATION[/bold]
-  [bold yellow]tags[/bold yellow]                List all tags, show/add note tags
+  [bold yellow]tags[/bold yellow]                List all tags, show/add/remove note tags
     [blue]→[/blue] zettl tags                  # List all tags
     [blue]→[/blue] zettl tags 22a4b            # Show note's tags
     [blue]→[/blue] zettl tags 22a4b "concept"  # Add tag to note
-
-  [bold yellow]untag[/bold yellow]               Remove tag from note
-    [blue]→[/blue] zettl untag 22a4b "concept"
+    [blue]→[/blue] zettl tags 22a4b "concept" -r  # Remove tag
 
 [bold]AI FEATURES[/bold]
   [bold yellow]llm[/bold yellow]                 AI-powered note analysis
@@ -380,17 +376,19 @@ This replaces the old 'related' command.
 """,
 
             "link": f"""
-[bold green]link SOURCE_ID TARGET_ID[/bold green] - Create link between notes
+[bold green]link SOURCE_ID TARGET_ID[/bold green] - Create or remove link between notes
 
 [bold]Usage:[/bold]
   zettl link SOURCE_ID TARGET_ID
 
 [bold]Options:[/bold]
   [yellow]-c, --context TEXT[/yellow]   Add context to the link
+  [yellow]-r, --remove[/yellow]         Remove the link instead of creating
 
 [bold]Examples:[/bold]
-  [blue]zettl link 22a4b 18c3d[/blue]
-  [blue]zettl link 22a4b 18c3d --context "These concepts are related"[/blue]
+  [blue]zettl link 22a4b 18c3d[/blue]                    Create link
+  [blue]zettl link 22a4b 18c3d --context "Related"[/blue] Create with context
+  [blue]zettl link 22a4b 18c3d -r[/blue]                 Remove link
 """,
 
             "related": f"""
@@ -428,20 +426,25 @@ See 'zettl show --help' for more information.
 """,
 
             "tags": f"""
-[bold green]tags [NOTE_ID] ["TAGS"][/bold green] - Show or add tags to a note
+[bold green]tags [NOTE_ID] ["TAGS"][/bold green] - Show, add, or remove tags from a note
 
 [bold]Usage:[/bold]
   zettl tags                          List all tags
   zettl tags NOTE_ID                  Show tags for a specific note
   zettl tags NOTE_ID "TAG"            Add a single tag to a note
-  zettl tags NOTE_ID "TAG1 TAG2..."  Add multiple tags to a note (space-separated in quotes)
+  zettl tags NOTE_ID "TAG1 TAG2..."  Add multiple tags (space-separated in quotes)
+  zettl tags NOTE_ID "TAG" -r         Remove tag(s) from a note
+
+[bold]Options:[/bold]
+  [yellow]-r, --remove[/yellow]   Remove the specified tag(s) instead of adding
 
 [bold]Examples:[/bold]
   [blue]zettl tags[/blue]                         List all tags with counts
   [blue]zettl tags 22a4b[/blue]                   Show tags for note 22a4b
-  [blue]zettl tags 22a4b concept[/blue]           Add "concept" tag to note 22a4b
-  [blue]zettl tags 22a4b "todo urgent"[/blue]     Add "todo" and "urgent" tags to note 22a4b
-  [blue]zettl tags xyz12 "tag1 tag2 tag3"[/blue] Add multiple tags at once
+  [blue]zettl tags 22a4b concept[/blue]           Add "concept" tag
+  [blue]zettl tags 22a4b "todo urgent"[/blue]     Add multiple tags
+  [blue]zettl tags 22a4b concept -r[/blue]        Remove "concept" tag
+  [blue]zettl tags 22a4b "todo urgent" -r[/blue]  Remove multiple tags
 """,
 
 "todos": f"""
@@ -488,23 +491,34 @@ See 'zettl todo --help' for full documentation.
 """,
 
             "untag": f"""
-[bold green]untag NOTE_ID TAG[/bold green] - Remove a tag from a note
+[bold green]untag[/bold green] - Remove a tag from a note
 
-[bold]Usage:[/bold]
-  zettl untag NOTE_ID TAG
+[bold yellow]DEPRECATED:[/bold yellow] This command has been merged into 'tags'.
+Use [cyan]tags -r[/cyan] instead.
+
+[bold]New Usage:[/bold]
+  [cyan]zettl tags NOTE_ID TAG -r[/cyan]
 
 [bold]Examples:[/bold]
-  [blue]zettl untag 22a4b "concept"[/blue]  Remove "concept" tag from note 22a4b
+  [blue]zettl tags 22a4b concept -r[/blue]        (replaces: zettl untag 22a4b concept)
+  [blue]zettl tags 22a4b "a b c" -r[/blue]        Remove multiple tags
+
+See 'zettl tags --help' for more information.
 """,
 
             "unlink": f"""
-[bold green]unlink SOURCE_ID TARGET_ID[/bold green] - Remove a link between two notes
+[bold green]unlink[/bold green] - Remove a link between two notes
 
-[bold]Usage:[/bold]
-  zettl unlink SOURCE_ID TARGET_ID
+[bold yellow]DEPRECATED:[/bold yellow] This command has been merged into 'link'.
+Use [cyan]link -r[/cyan] instead.
+
+[bold]New Usage:[/bold]
+  [cyan]zettl link SOURCE_ID TARGET_ID -r[/cyan]
 
 [bold]Examples:[/bold]
-  [blue]zettl unlink 22a4b 18c3d[/blue]  Remove link from note 22a4b to 18c3d
+  [blue]zettl link 22a4b 18c3d -r[/blue]  (replaces: zettl unlink 22a4b 18c3d)
+
+See 'zettl link --help' for more information.
 """,
 
             "append": f"""

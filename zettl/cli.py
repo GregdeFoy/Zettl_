@@ -1308,32 +1308,36 @@ def show(note_id, related, full):
 @click.argument('source_id')
 @click.argument('target_id')
 @click.option('--context', '-c', default="", help='Optional context for the link')
+@click.option('--remove', '-r', is_flag=True, help='Remove the link instead of creating')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def link(source_id, target_id, context):
-    """Create link between notes."""
+def link(source_id, target_id, context, remove):
+    """Create or remove a link between notes."""
     try:
-        get_notes_manager().create_link(source_id, target_id, context)
-        click.echo(f"Created link from #{source_id} to #{target_id}")
+        if remove:
+            get_notes_manager().delete_link(source_id, target_id)
+            console.print(ZettlFormatter.success(f"Removed link from note #{source_id} to note #{target_id}"))
+        else:
+            get_notes_manager().create_link(source_id, target_id, context)
+            click.echo(f"Created link from #{source_id} to #{target_id}")
     except Exception as e:
-        click.echo(f"Error creating link: {str(e)}", err=True)
+        console.print(ZettlFormatter.error(f"Error: {str(e)}"), err=True)
 
 @cli.command()
 @click.argument('note_id', required=False)
 @click.argument('tag_string', required=False)
+@click.option('--remove', '-r', is_flag=True, help='Remove the specified tag(s) instead of adding')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def tags(note_id, tag_string):
-    """Show or add tags to a note. If no note_id is provided, list all tags.
+def tags(note_id, tag_string, remove):
+    """Show, add, or remove tags from a note.
 
     Usage:
         zt tags                            - List all tags with their counts
         zt tags xyz12                      - Show all tags for note xyz12
         zt tags xyz12 "tag1"               - Add tag1 to note xyz12
-        zt tags xyz12 "tag1 tag2 tag3..." - Add multiple tags to note xyz12 (space-separated in quotes)
+        zt tags xyz12 "tag1 tag2" -r       - Remove tags from note xyz12
     """
     try:
-        # Handle different argument patterns
         if not note_id:
-            # No arguments - list all tags
             tags_with_counts = get_notes_manager().get_all_tags_with_counts()
             if tags_with_counts:
                 console.print(ZettlFormatter.header(f"All Tags (showing {len(tags_with_counts)})"))
@@ -1344,21 +1348,24 @@ def tags(note_id, tag_string):
                 console.print(ZettlFormatter.warning("No tags found."))
             return
 
-        # If tag_string was provided, parse and add tags
         if tag_string:
-            # Split the tag string by spaces to get individual tags
-            tags = tag_string.split()
+            tag_list = tag_string.split()
 
-            if len(tags) == 1:
-                # Single tag - use existing add_tag method
-                get_notes_manager().add_tag(note_id, tags[0])
-                click.echo(f"Added tag '{tags[0]}' to note #{note_id}")
+            if remove:
+                for tag in tag_list:
+                    get_notes_manager().delete_tag(note_id, tag)
+                if len(tag_list) == 1:
+                    console.print(ZettlFormatter.success(f"Removed tag '{tag_list[0]}' from note #{note_id}"))
+                else:
+                    console.print(ZettlFormatter.success(f"Removed {len(tag_list)} tags from note #{note_id}"))
             else:
-                # Multiple tags - use batch method
-                get_notes_manager().add_tags_batch(note_id, tags)
-                click.echo(f"Added {len(tags)} tags to note #{note_id}: {', '.join(tags)}")
+                if len(tag_list) == 1:
+                    get_notes_manager().add_tag(note_id, tag_list[0])
+                    click.echo(f"Added tag '{tag_list[0]}' to note #{note_id}")
+                else:
+                    get_notes_manager().add_tags_batch(note_id, tag_list)
+                    click.echo(f"Added {len(tag_list)} tags to note #{note_id}: {', '.join(tag_list)}")
 
-        # Show all tags for the note
         note_tags = get_notes_manager().get_tags(note_id)
         if note_tags:
             console.print(f"Tags for note #{note_id}: {', '.join([ZettlFormatter.tag(t) for t in note_tags])}")
@@ -1818,29 +1825,6 @@ def delete(note_id, force, keep_links, keep_tags):
     except Exception as e:
         console.print(ZettlFormatter.error(f"Error deleting note: {str(e)}"), err=True)
 
-@cli.command()
-@click.argument('note_id')
-@click.argument('tag')
-@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def untag(note_id, tag):
-    """Remove a tag from a note."""
-    try:
-        get_notes_manager().delete_tag(note_id, tag)
-        console.print(ZettlFormatter.success(f"Removed tag '{tag}' from note #{note_id}"))
-    except Exception as e:
-        console.print(ZettlFormatter.error(f"Error removing tag: {str(e)}"), err=True)
-
-@cli.command()
-@click.argument('source_id')
-@click.argument('target_id')
-@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def unlink(source_id, target_id):
-    """Remove a link between two notes."""
-    try:
-        get_notes_manager().delete_link(source_id, target_id)
-        console.print(ZettlFormatter.success(f"Removed link from note #{source_id} to note #{target_id}"))
-    except Exception as e:
-        console.print(ZettlFormatter.error(f"Error removing link: {str(e)}"), err=True)
 
 @cli.command()
 @click.argument('note_id', required=False)

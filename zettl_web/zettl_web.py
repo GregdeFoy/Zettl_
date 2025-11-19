@@ -2011,7 +2011,10 @@ def execute_command():
             # Usage: tags                       - List all tags
             #        tags note_id               - Show tags for note
             #        tags note_id "tag1"        - Add single tag
-            #        tags note_id "tag1 tag2..." - Add multiple tags (space-separated in quotes or as separate args)
+            #        tags note_id "tag1 tag2..." - Add multiple tags
+            #        tags note_id "tag1" -r     - Remove tag(s)
+            remove_mode = 'r' in flags or 'remove' in flags
+
             if not remaining_args:
                 # List all tags
                 tags_with_counts = notes_manager.get_all_tags_with_counts()
@@ -2030,24 +2033,30 @@ def execute_command():
                 # 2. Single quoted string: tags note_id "tag1 tag2 tag3"
                 if len(remaining_args) > 2:
                     # Multiple separate arguments
-                    tags_to_add = remaining_args[1:]
+                    tag_list = remaining_args[1:]
                 elif len(remaining_args) == 2:
                     # Could be single tag or space-separated tags in quotes
                     tag_string = remaining_args[1]
-                    tags_to_add = tag_string.split() if ' ' in tag_string else [tag_string]
+                    tag_list = tag_string.split() if ' ' in tag_string else [tag_string]
                 else:
-                    tags_to_add = []
+                    tag_list = []
 
-                # If tags were provided, add them
-                if tags_to_add:
-                    if len(tags_to_add) == 1:
-                        # Single tag - use existing add_tag method
-                        notes_manager.add_tag(note_id, tags_to_add[0])
-                        result = f"Added tag '{tags_to_add[0]}' to note #{note_id}\n"
+                # If tags were provided, add or remove them
+                if tag_list:
+                    if remove_mode:
+                        for tag in tag_list:
+                            notes_manager.delete_tag(note_id, tag)
+                        if len(tag_list) == 1:
+                            result = ZettlFormatter.success(f"Removed tag '{tag_list[0]}' from note #{note_id}") + "\n"
+                        else:
+                            result = ZettlFormatter.success(f"Removed {len(tag_list)} tags from note #{note_id}") + "\n"
                     else:
-                        # Multiple tags - use batch method
-                        notes_manager.add_tags_batch(note_id, tags_to_add)
-                        result = f"Added {len(tags_to_add)} tags to note #{note_id}: {', '.join(tags_to_add)}\n"
+                        if len(tag_list) == 1:
+                            notes_manager.add_tag(note_id, tag_list[0])
+                            result = f"Added tag '{tag_list[0]}' to note #{note_id}\n"
+                        else:
+                            notes_manager.add_tags_batch(note_id, tag_list)
+                            result = f"Added {len(tag_list)} tags to note #{note_id}: {', '.join(tag_list)}\n"
                 else:
                     result = ""
 
@@ -2059,14 +2068,19 @@ def execute_command():
                     result += f"No tags for note #{note_id}"
                 
         elif cmd == "link":
-            # Create a link between notes
+            # Create or remove a link between notes
             if len(remaining_args) >= 2:
                 source_id = remaining_args[0]
                 target_id = remaining_args[1]
-                context = options.get('context', options.get('c', ''))
-                
-                notes_manager.create_link(source_id, target_id, context)
-                result = f"Created link from #{source_id} to #{target_id}"
+                remove_mode = 'r' in flags or 'remove' in flags
+
+                if remove_mode:
+                    notes_manager.delete_link(source_id, target_id)
+                    result = ZettlFormatter.success(f"Removed link from note #{source_id} to note #{target_id}")
+                else:
+                    context = options.get('context', options.get('c', ''))
+                    notes_manager.create_link(source_id, target_id, context)
+                    result = f"Created link from #{source_id} to #{target_id}"
             else:
                 result = ZettlFormatter.error("Please provide source and target note IDs")
                 
@@ -2278,27 +2292,6 @@ def execute_command():
                 notes_manager.delete_note(note_id, cascade=cascade)
                 result += ZettlFormatter.success(f"Deleted note #{note_id}")
                 
-        elif cmd == "untag":
-            # Remove a tag from a note
-            if len(remaining_args) < 2:
-                result = ZettlFormatter.error("Please provide note ID and tag")
-            else:
-                note_id = remaining_args[0]
-                tag = remaining_args[1]
-                
-                notes_manager.delete_tag(note_id, tag)
-                result = ZettlFormatter.success(f"Removed tag '{tag}' from note #{note_id}")
-        
-        elif cmd == "unlink":
-            # Remove a link between notes
-            if len(remaining_args) < 2:
-                result = ZettlFormatter.error("Please provide source and target note IDs")
-            else:
-                source_id = remaining_args[0]
-                target_id = remaining_args[1]
-
-                notes_manager.delete_link(source_id, target_id)
-                result = ZettlFormatter.success(f"Removed link from note #{source_id} to note #{target_id}")
 
         elif cmd == "append":
             # Append text to the end of a note

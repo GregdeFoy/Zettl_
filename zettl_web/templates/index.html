@@ -1322,13 +1322,11 @@ document.addEventListener('DOMContentLoaded', function() {
         'p': ['-t', '--tag', '-l', '--link', '--id', '-a', '--all', '-f', '--full', '-h', '--help'],
         'show': ['-r', '--related', '-f', '--full', '-h', '--help'],
         'search': ['-t', '--tag', '+t', '--exclude-tag', '-f', '--full', '-h', '--help'],
-        'tags': ['-h', '--help'],
-        'link': ['-c', '--context', '-h', '--help'],
+        'tags': ['-r', '--remove', '-h', '--help'],
+        'link': ['-c', '--context', '-r', '--remove', '-h', '--help'],
         'graph': ['-o', '--output', '-d', '--depth', '-h', '--help'],
         'llm': ['-a', '--action', '-c', '--count', '-s', '--show-source', '-d', '--debug', '-h', '--help'],
         'delete': ['--keep-links', '--keep-tags', '-f', '--force', '-h', '--help'],
-        'untag': ['-h', '--help'],
-        'unlink': ['-h', '--help'],
         'merge': ['-f', '--force', '-h', '--help'],
         'append': ['-h', '--help'],
         'prepend': ['-h', '--help'],
@@ -1357,7 +1355,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Viewing
         'show', 'list', 'search',
         // Organization
-        'tags', 'untag', 'link', 'unlink', 'graph', 'merge',
+        'tags', 'link', 'graph', 'merge',
         // AI
         'llm',
         // Special Features
