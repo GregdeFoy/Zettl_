@@ -327,7 +327,16 @@ def idea_cmd(content, show_all, cancel, tag, link, custom_id):
                 # Create a combined category key from all tags
                 combined_category = " - ".join(sorted(categories))
 
-                if is_canceled:
+                # Double-check that category is not empty/whitespace after joining
+                if not combined_category or not combined_category.strip():
+                    # Treat as uncategorized
+                    if is_canceled:
+                        uncategorized_canceled.append(note)
+                    elif is_done:
+                        uncategorized_done.append(note)
+                    else:
+                        uncategorized_active.append(note)
+                elif is_canceled:
                     if combined_category not in canceled_ideas_by_category:
                         canceled_ideas_by_category[combined_category] = []
                     canceled_ideas_by_category[combined_category].append(note)
@@ -360,59 +369,75 @@ def idea_cmd(content, show_all, cancel, tag, link, custom_id):
 
             if category_dict:
                 for category, notes in sorted(category_dict.items()):
-                    # Check if this is a combined category with multiple tags
+                    # Format category header
                     if " - " in category:
                         # For combined categories, format each tag separately
-                        tags = category.split(" - ")
-                        formatted_tags = []
-                        for tag_name in tags:
-                            formatted_tags.append(ZettlFormatter.tag(tag_name))
+                        tags_list = category.split(" - ")
+                        formatted_tags = [ZettlFormatter.tag(t) for t in tags_list]
                         category_display = " - ".join(formatted_tags)
-                        console.print(f"\n{category_display} ({len(notes)})")
+                        console.print(f"\n{category_display}")
                     else:
                         # For single categories, use the original format
-                        console.print(f"\n{ZettlFormatter.tag(category)} ({len(notes)})")
+                        console.print(f"\n{ZettlFormatter.tag(category)}")
 
                     for note in notes:
+                        # Get non-category tags for this note
+                        note_tags = note.get('all_tags', [])
+                        excluded = ['todo', 'done', 'cancel', 'idea', 'note']
+                        # Exclude the category tags we're already showing
+                        category_tags_lower = [c.lower() for c in category.split(" - ")]
+                        display_tags = [t for t in note_tags if t.lower() not in excluded and t.lower() not in category_tags_lower]
+
+                        # Format on single line with pipe separator
                         formatted_id = ZettlFormatter.note_id(note['id'])
+                        content_first_line = note['content'].split('\n')[0]
 
-                        # Print note ID on its own line
-                        console.print(f"  {formatted_id}:")
+                        # Build the line: ID [tags] | content
+                        line_parts = [f"  {formatted_id}"]
+                        if display_tags:
+                            formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                            line_parts.append(' '.join(formatted_tags))
+                        line_parts.append(f"| {content_first_line}")
 
-                        # Render markdown content
-                        content = note['content']
-                        md = Markdown(content)
-                        console.print(md)
-                        console.print("")  # Add an empty line between notes
+                        console.print(' '.join(line_parts))
+                        console.print()  # Empty line between notes
 
             if uncategorized_list:
                 console.print("\nUncategorized")
                 for note in uncategorized_list:
+                    # Get non-system tags
+                    note_tags = note.get('all_tags', [])
+                    excluded = ['todo', 'done', 'cancel', 'idea', 'note']
+                    display_tags = [t for t in note_tags if t.lower() not in excluded]
+
+                    # Format on single line with pipe separator
                     formatted_id = ZettlFormatter.note_id(note['id'])
+                    content_first_line = note['content'].split('\n')[0]
 
-                    # Print note ID on its own line
-                    console.print(f"  {formatted_id}:")
+                    # Build the line: ID [tags] | content
+                    line_parts = [f"  {formatted_id}"]
+                    if display_tags:
+                        formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                        line_parts.append(' '.join(formatted_tags))
+                    line_parts.append(f"| {content_first_line}")
 
-                    # Render markdown content
-                    content = note['content']
-                    md = Markdown(content)
-                    console.print(md)
-                    console.print("")  # Add an empty line between notes
+                    console.print(' '.join(line_parts))
+                    console.print()  # Empty line between notes
 
         # Display active ideas first
         if active_ideas_by_category or uncategorized_active:
-            active_header = ZettlFormatter.header(f"Active {' '.join(header_parts)} ({len(unique_active_ids)} total)")
+            active_header = ZettlFormatter.header(f"ACTIVE {' '.join(header_parts).upper()} ({len(unique_active_ids)})")
             display_ideas_group(active_ideas_by_category, uncategorized_active, active_header)
 
         # Display all done ideas if requested
         if show_all and (done_ideas_by_category or uncategorized_done):
-            done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids)} total)")
+            done_header = ZettlFormatter.header(f"COMPLETED {' '.join(header_parts).upper()} ({len(unique_done_ids)})")
             console.print(f"\n{done_header}")
             display_ideas_group(done_ideas_by_category, uncategorized_done, "")
 
         # Display canceled ideas if requested
         if cancel and (canceled_ideas_by_category or uncategorized_canceled):
-            canceled_header = ZettlFormatter.header(f"Canceled {' '.join(header_parts)} ({len(unique_canceled_ids)} total)")
+            canceled_header = ZettlFormatter.header(f"CANCELED {' '.join(header_parts).upper()} ({len(unique_canceled_ids)})")
             console.print(f"\n{canceled_header}")
             display_ideas_group(canceled_ideas_by_category, uncategorized_canceled, "")
 
@@ -645,7 +670,16 @@ def note_cmd(content, show_all, cancel, tag, link, custom_id):
                 # Create a combined category key from all tags
                 combined_category = " - ".join(sorted(categories))
 
-                if is_canceled:
+                # Double-check that category is not empty/whitespace after joining
+                if not combined_category or not combined_category.strip():
+                    # Treat as uncategorized
+                    if is_canceled:
+                        uncategorized_canceled.append(note)
+                    elif is_done:
+                        uncategorized_done.append(note)
+                    else:
+                        uncategorized_active.append(note)
+                elif is_canceled:
                     if combined_category not in canceled_notes_by_category:
                         canceled_notes_by_category[combined_category] = []
                     canceled_notes_by_category[combined_category].append(note)
@@ -678,59 +712,75 @@ def note_cmd(content, show_all, cancel, tag, link, custom_id):
 
             if category_dict:
                 for category, notes in sorted(category_dict.items()):
-                    # Check if this is a combined category with multiple tags
+                    # Format category header
                     if " - " in category:
                         # For combined categories, format each tag separately
-                        tags = category.split(" - ")
-                        formatted_tags = []
-                        for tag_name in tags:
-                            formatted_tags.append(ZettlFormatter.tag(tag_name))
+                        tags_list = category.split(" - ")
+                        formatted_tags = [ZettlFormatter.tag(t) for t in tags_list]
                         category_display = " - ".join(formatted_tags)
-                        console.print(f"\n{category_display} ({len(notes)})")
+                        console.print(f"\n{category_display}")
                     else:
                         # For single categories, use the original format
-                        console.print(f"\n{ZettlFormatter.tag(category)} ({len(notes)})")
+                        console.print(f"\n{ZettlFormatter.tag(category)}")
 
                     for note in notes:
+                        # Get non-category tags for this note
+                        note_tags = note.get('all_tags', [])
+                        excluded = ['todo', 'done', 'cancel', 'idea', 'note']
+                        # Exclude the category tags we're already showing
+                        category_tags_lower = [c.lower() for c in category.split(" - ")]
+                        display_tags = [t for t in note_tags if t.lower() not in excluded and t.lower() not in category_tags_lower]
+
+                        # Format on single line with pipe separator
                         formatted_id = ZettlFormatter.note_id(note['id'])
+                        content_first_line = note['content'].split('\n')[0]
 
-                        # Print note ID on its own line
-                        console.print(f"  {formatted_id}:")
+                        # Build the line: ID [tags] | content
+                        line_parts = [f"  {formatted_id}"]
+                        if display_tags:
+                            formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                            line_parts.append(' '.join(formatted_tags))
+                        line_parts.append(f"| {content_first_line}")
 
-                        # Render markdown content
-                        content = note['content']
-                        md = Markdown(content)
-                        console.print(md)
-                        console.print("")  # Add an empty line between notes
+                        console.print(' '.join(line_parts))
+                        console.print()  # Empty line between notes
 
             if uncategorized_list:
                 console.print("\nUncategorized")
                 for note in uncategorized_list:
+                    # Get non-system tags
+                    note_tags = note.get('all_tags', [])
+                    excluded = ['todo', 'done', 'cancel', 'idea', 'note']
+                    display_tags = [t for t in note_tags if t.lower() not in excluded]
+
+                    # Format on single line with pipe separator
                     formatted_id = ZettlFormatter.note_id(note['id'])
+                    content_first_line = note['content'].split('\n')[0]
 
-                    # Print note ID on its own line
-                    console.print(f"  {formatted_id}:")
+                    # Build the line: ID [tags] | content
+                    line_parts = [f"  {formatted_id}"]
+                    if display_tags:
+                        formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                        line_parts.append(' '.join(formatted_tags))
+                    line_parts.append(f"| {content_first_line}")
 
-                    # Render markdown content
-                    content = note['content']
-                    md = Markdown(content)
-                    console.print(md)
-                    console.print("")  # Add an empty line between notes
+                    console.print(' '.join(line_parts))
+                    console.print()  # Empty line between notes
 
         # Display active notes first
         if active_notes_by_category or uncategorized_active:
-            active_header = ZettlFormatter.header(f"Active {' '.join(header_parts)} ({len(unique_active_ids)} total)")
+            active_header = ZettlFormatter.header(f"ACTIVE {' '.join(header_parts).upper()} ({len(unique_active_ids)})")
             display_notes_group(active_notes_by_category, uncategorized_active, active_header)
 
         # Display all done notes if requested
         if show_all and (done_notes_by_category or uncategorized_done):
-            done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids)} total)")
+            done_header = ZettlFormatter.header(f"COMPLETED {' '.join(header_parts).upper()} ({len(unique_done_ids)})")
             console.print(f"\n{done_header}")
             display_notes_group(done_notes_by_category, uncategorized_done, "")
 
         # Display canceled notes if requested
         if cancel and (canceled_notes_by_category or uncategorized_canceled):
-            canceled_header = ZettlFormatter.header(f"Canceled {' '.join(header_parts)} ({len(unique_canceled_ids)} total)")
+            canceled_header = ZettlFormatter.header(f"CANCELED {' '.join(header_parts).upper()} ({len(unique_canceled_ids)})")
             console.print(f"\n{canceled_header}")
             display_notes_group(canceled_notes_by_category, uncategorized_canceled, "")
 
@@ -824,15 +874,13 @@ def display_project_detail(project_note, project_id, notes_manager, show_all, fu
     console.print()
 
     # Project content
-    console.print(ZettlFormatter.format_note_display(project_note, notes_manager))
-
-    # Tags
     try:
-        tags = notes_manager.get_tags(project_id)
-        if tags:
-            click.echo(f"Tags: {', '.join(tags)}")
+        project_tags = notes_manager.get_tags(project_id)
     except Exception:
-        pass
+        project_tags = []
+
+    ZettlFormatter.format_note_full(project_note, tags=project_tags, notes_manager=notes_manager)
+    console.print()
 
     # Get linked notes (bidirectional)
     try:
@@ -957,39 +1005,60 @@ def display_project_detail(project_note, project_id, notes_manager, show_all, fu
                         console.print(f"  {ZettlFormatter.tag(category)} ({len(notes_in_cat)})")
 
                     for note in notes_in_cat:
+                        # Get non-category tags for this note
+                        note_tags = note.get('all_tags', [])
+                        category_tags_lower = [c.lower() for c in category.split(" - ")]
+                        display_tags = [t for t in note_tags if t.lower() not in exclude_tags and t.lower() not in category_tags_lower]
+
+                        # Format with indentation
                         formatted_id = ZettlFormatter.note_id(note['id'])
-                        console.print(f"    {formatted_id}:")
+                        if display_tags:
+                            formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                            console.print(f"    {formatted_id}  {' '.join(formatted_tags)}")
+                        else:
+                            console.print(f"    {formatted_id}")
 
                         if full:
-                            # Full content
-                            content = note['content']
-                            md = Markdown(content)
-                            console.print(md)
-                            click.echo()
+                            # Full content with indentation
+                            content = note['content'].rstrip('\n')
+                            for line in content.split('\n'):
+                                console.print(f"            {line}")
+                            console.print()
                         else:
-                            # Preview
-                            content_preview = note['content'][:60] + "..." if len(note['content']) > 60 else note['content']
-                            console.print(f"    {content_preview}")
-
-                    click.echo()
+                            # Preview - 2 lines
+                            preview = ZettlFormatter.truncate_content_by_lines(note['content'], 2)
+                            for line in preview.split('\n'):
+                                console.print(f"            {line}")
+                            console.print()
 
             # Display uncategorized
             if uncategorized:
                 console.print("  Uncategorized")
                 for note in uncategorized:
+                    # Get non-system tags
+                    note_tags = note.get('all_tags', [])
+                    display_tags = [t for t in note_tags if t.lower() not in exclude_tags]
+
+                    # Format with indentation
                     formatted_id = ZettlFormatter.note_id(note['id'])
-                    console.print(f"    {formatted_id}:")
+                    if display_tags:
+                        formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                        console.print(f"    {formatted_id}  {' '.join(formatted_tags)}")
+                    else:
+                        console.print(f"    {formatted_id}")
 
                     if full:
+                        # Full content with indentation
                         content = note['content']
-                        md = Markdown(content)
-                        console.print(md)
-                        click.echo()
+                        for line in content.split('\n'):
+                            console.print(f"            {line}")
+                        console.print()
                     else:
-                        content_preview = note['content'][:60] + "..." if len(note['content']) > 60 else note['content']
-                        console.print(f"    {content_preview}")
-
-                click.echo()
+                        # Preview - 2 lines
+                        preview = ZettlFormatter.truncate_content_by_lines(note['content'], 2)
+                        for line in preview.split('\n'):
+                            console.print(f"            {line}")
+                        console.print()
 
         # Helper function to display done/canceled sections
         def display_status_section(note_list, status_label):
@@ -999,9 +1068,13 @@ def display_project_detail(project_note, project_id, notes_manager, show_all, fu
             console.print(f"  ─ {status_label} ({len(note_list)}) ─")
             for note in note_list:
                 formatted_id = ZettlFormatter.note_id(note['id'])
-                content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
-                console.print(f"    {formatted_id}: {content_preview}")
-            click.echo()
+                console.print(f"    {formatted_id}")
+                # Show first line only
+                first_line = note['content'].split('\n')[0]
+                if len(first_line) > 60:
+                    first_line = first_line[:60] + '[...]'
+                console.print(f"            {first_line}")
+            console.print()
 
         # Display todos
         if todos_active or (show_all and (todos_done or todos_canceled)):
@@ -1123,7 +1196,7 @@ def project_cmd(content, show_all, full, tag, link, custom_id):
                 # Get content preview
                 content_preview = project['content'].split('\n')[0][:60]
                 if len(project['content']) > 60:
-                    content_preview += "..."
+                    content_preview += "[...]"
 
                 formatted_id = ZettlFormatter.note_id(project_id)
                 console.print(f"  {formatted_id} {stats}: {content_preview}")
@@ -1206,49 +1279,42 @@ def list(limit, full, compact):
             click.echo("No notes found.")
             return
 
-        console.print(ZettlFormatter.header(f"Recent Notes (showing {len(notes)} of {len(notes)})"))
+        console.print(ZettlFormatter.header(f"RECENT NOTES ({len(notes)})"))
+        console.print()  # Empty line after header
 
-        # If full mode, batch fetch all tags for all notes at once
+        # Batch fetch all tags for all notes at once
         notes_tags = {}
-        if full:
-            # Get all note IDs
-            note_ids = [note['id'] for note in notes]
-            # Batch fetch all tags for these notes
-            if note_ids:
-                try:
-                    all_tags = notes_manager.db.get_tags_for_notes(note_ids)
-                    # Group tags by note_id
-                    for tag_data in all_tags:
-                        note_id = tag_data['note_id']
-                        if note_id not in notes_tags:
-                            notes_tags[note_id] = []
-                        notes_tags[note_id].append(tag_data['tag'])
-                except Exception:
-                    pass  # Fall back to no tags if batch fetch fails
+        # Get all note IDs
+        note_ids = [note['id'] for note in notes]
+        # Batch fetch all tags for these notes
+        if note_ids:
+            try:
+                all_tags = notes_manager.db.get_tags_for_notes(note_ids)
+                # Group tags by note_id
+                for tag_data in all_tags:
+                    note_id = tag_data['note_id']
+                    if note_id not in notes_tags:
+                        notes_tags[note_id] = []
+                    notes_tags[note_id].append(tag_data['tag'])
+            except Exception:
+                pass  # Fall back to no tags if batch fetch fails
 
         for note in notes:
             note_id = note['id']
-            created_at = notes_manager.format_timestamp(note['created_at'])
+            tags = notes_tags.get(note_id, [])
 
             if compact:
                 # Very compact mode - just IDs
                 console.print(ZettlFormatter.note_id(note_id))
             elif full:
-                # Full content mode
-                console.print(ZettlFormatter.format_note_display(note, notes_manager))
-
-                # Add tags if there are any (already fetched)
-                tags = notes_tags.get(note_id, [])
-                if tags:
-                    console.print(f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}")
-
-                click.echo()  # Extra line between notes
+                # Full content mode with new indented format
+                ZettlFormatter.format_note_full(note, tags=tags, notes_manager=notes_manager)
+                console.print()  # Empty line between notes
             else:
-                # Default mode - ID, timestamp, and preview
-                formatted_id = ZettlFormatter.note_id(note_id)
-                formatted_time = ZettlFormatter.timestamp(created_at)
-                content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
-                console.print(f"{formatted_id} [{formatted_time}]: {content_preview}")
+                # Default mode - ID with tags and 3-line preview
+                preview = ZettlFormatter.format_note_preview(note, tags=tags, max_lines=3)
+                console.print(preview)
+                console.print()  # Empty line between notes
     except Exception as e:
         console.print(ZettlFormatter.error(str(e)))
 
@@ -1260,45 +1326,54 @@ def list(limit, full, compact):
 def show(note_id, related, full):
     """Display note content, optionally with related notes."""
     try:
-        note = get_notes_manager().get_note(note_id)
+        notes_manager = get_notes_manager()
+        note = notes_manager.get_note(note_id)
 
-        # If showing related notes, add a header for the source note
-        if related:
-            console.print(ZettlFormatter.header(f"Source Note"))
-
-        console.print(ZettlFormatter.format_note_display(note, get_notes_manager()))
-
-        # Show tags if any
+        # Get tags for this note
+        tags = []
         try:
-            tags = get_notes_manager().get_tags(note_id)
-            if tags:
-                click.echo(f"Tags: {', '.join(tags)}")
+            tags = notes_manager.get_tags(note_id)
         except Exception:
             pass
 
+        # If showing related notes, add a header for the source note
+        if related:
+            console.print(ZettlFormatter.header(f"SOURCE NOTE"))
+            console.print()
+
+        # Display note with new format
+        ZettlFormatter.format_note_full(note, tags=tags, notes_manager=notes_manager)
+
         # Show linked notes
         try:
-            linked_notes = get_notes_manager().get_related_notes(note_id)
+            linked_notes = notes_manager.get_related_notes(note_id)
             if linked_notes:
                 if related:
                     # Show full related notes with content
-                    click.echo("\n")  # Extra space after source note
-                    console.print(ZettlFormatter.header(f"Connected Notes ({len(linked_notes)} total)"))
+                    console.print()
+                    console.print(ZettlFormatter.header(f"CONNECTED NOTES ({len(linked_notes)})"))
+                    console.print()
 
-                    for note in linked_notes:
+                    for linked_note in linked_notes:
+                        # Get tags for linked note
+                        linked_tags = []
+                        try:
+                            linked_tags = notes_manager.get_tags(linked_note['id'])
+                        except Exception:
+                            pass
+
                         if full:
                             # Full content mode
-                            console.print(ZettlFormatter.format_note_display(note, get_notes_manager()))
-                            click.echo()  # Extra line between notes
+                            ZettlFormatter.format_note_full(linked_note, tags=linked_tags, notes_manager=notes_manager)
+                            console.print()  # Extra line between notes
                         else:
-                            # Preview mode
-                            content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
-                            formatted_id = ZettlFormatter.note_id(note['id'])
-                            console.print(f"{formatted_id}: {content_preview}")
+                            # Preview mode - show 2 lines
+                            preview = ZettlFormatter.format_note_preview(linked_note, tags=linked_tags, max_lines=2)
+                            console.print(preview)
+                            console.print()  # Extra line between notes
                 else:
-                    # Just show IDs (original behavior)
-                    linked_ids = [note['id'] for note in linked_notes]
-                    click.echo(f"Links: {', '.join(linked_ids)}")
+                    # Simple links display with arrow and first line
+                    ZettlFormatter.format_linked_notes(linked_notes, full=False)
         except Exception:
             pass
     except Exception as e:
@@ -1476,29 +1551,35 @@ def search(query, tag, exclude_tag, date, full):
             return
 
         for note in results:
-            if full:
-                # Full content mode
-                console.print(ZettlFormatter.format_note_display(note, get_notes_manager()))
-                
-                # Add tags if there are any
-                try:
-                    tags = get_notes_manager().get_tags(note['id'])
-                    if tags:
-                        console.print(f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}")
-                except Exception:
-                    pass
-                
-                click.echo()  # Extra line between notes
-            else:
-                # Preview mode
-                content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
-                if query:
-                    # Highlight the query in the preview with bold yellow
-                    pattern = re.compile(re.escape(query), re.IGNORECASE)
-                    content_preview = pattern.sub(r"[bold yellow]\g<0>[/bold yellow]", content_preview)
+            # Get tags for this note
+            try:
+                note_tags = get_notes_manager().get_tags(note['id'])
+            except Exception:
+                note_tags = []
 
+            if full:
+                # Full content mode with new format
+                ZettlFormatter.format_note_full(note, tags=note_tags, notes_manager=get_notes_manager())
+                console.print()  # Empty line between notes
+            else:
+                # Preview mode with new pipe separator format
                 formatted_id = ZettlFormatter.note_id(note['id'])
-                console.print(f"{formatted_id}: {content_preview}")
+                content_first_line = note['content'].split('\n')[0]
+
+                # Highlight the query if present
+                if query:
+                    pattern = re.compile(re.escape(query), re.IGNORECASE)
+                    content_first_line = pattern.sub(r"[bold yellow]\g<0>[/bold yellow]", content_first_line)
+
+                # Build the line: ID [tags] | content
+                line_parts = [formatted_id]
+                if note_tags:
+                    formatted_tags = [ZettlFormatter.tag(t) for t in note_tags]
+                    line_parts.append(' '.join(formatted_tags))
+                line_parts.append(f"| {content_first_line}")
+
+                console.print('  '.join(line_parts))
+                console.print()  # Empty line between notes
     except Exception as e:
         console.print(ZettlFormatter.error(str(e)))
 
@@ -1576,7 +1657,7 @@ def llm(note_id, action, count, show_source):
                 # Try to show a preview of the connected note
                 try:
                     conn_note = get_notes_manager().get_note(conn_id)
-                    content_preview = conn_note['content'][:100] + "..." if len(conn_note['content']) > 100 else conn_note['content']
+                    content_preview = conn_note['content'][:100] + "[...]" if len(conn_note['content']) > 100 else conn_note['content']
                     console.print(f"  [cyan]Preview:[/cyan] {content_preview}")
 
                     # Add option to link notes
@@ -1783,7 +1864,7 @@ def delete(note_id, force, keep_links, keep_tags):
                 
             # Show preview of what will be deleted
             console.print(ZettlFormatter.header(f"Note to delete: #{note_id}"))
-            content_preview = note['content'][:100] + "..." if len(note['content']) > 100 else note['content']
+            content_preview = note['content'][:100] + "[...]" if len(note['content']) > 100 else note['content']
             click.echo(f"Content: {content_preview}")
             click.echo(f"Associated tags: {tag_count}")
             click.echo(f"Connected notes: {link_count}")
@@ -1970,7 +2051,7 @@ def merge(note_ids, force):
         for note_id in note_ids:
             try:
                 note = notes_manager.get_note(note_id)
-                content_preview = note['content'][:100] + "..." if len(note['content']) > 100 else note['content']
+                content_preview = note['content'][:100] + "[...]" if len(note['content']) > 100 else note['content']
                 formatted_id = ZettlFormatter.note_id(note_id)
                 console.print(f"\n{formatted_id}")
                 click.echo(f"  {content_preview}")
@@ -2206,59 +2287,89 @@ def todo_cmd(content, donetoday, show_all, cancel, tag, link, custom_id):
 
             if category_dict:
                 for category, notes in sorted(category_dict.items()):
-                    # Check if this is a combined category with multiple tags
+                    if not category or not category.strip():
+                        continue
+
                     if " - " in category:
                         # For combined categories, format each tag separately
-                        tags = category.split(" - ")
+                        tags_list = [t.strip() for t in category.split(" - ") if t.strip()]
+                        if not tags_list:
+                            continue
                         formatted_tags = []
-                        for tag_name in tags:
-                            formatted_tags.append(ZettlFormatter.tag(tag_name))
+                        for tag_name in tags_list:
+                            if tag_name and tag_name.strip():  # Additional safety check
+                                formatted_tags.append(ZettlFormatter.tag(tag_name))
+                        if not formatted_tags:  # Skip if all tags filtered out
+                            continue
                         category_display = " - ".join(formatted_tags)
-                        console.print(f"\n{category_display} ({len(notes)})")
+                        console.print(f"\n{category_display}")
                     else:
                         # For single categories, use the original format
-                        console.print(f"\n{ZettlFormatter.tag(category)} ({len(notes)})")
+                        if category and category.strip():  # Only print if non-empty
+                            console.print(f"\n{ZettlFormatter.tag(category)}")
 
                     for note in notes:
+                        # Get non-category tags for this note
+                        note_tags = note.get('all_tags', [])
+                        excluded = ['todo', 'done', 'cancel', 'idea', 'note']
+                        if tag:
+                            excluded.extend([f.lower() for f in tag])
+                        # Exclude the category tags we're already showing
+                        category_tags_lower = [c.lower() for c in category.split(" - ")]
+                        display_tags = [t for t in note_tags if t.lower() not in excluded and t.lower() not in category_tags_lower]
+
+                        # Format on single line with pipe separator
                         formatted_id = ZettlFormatter.note_id(note['id'])
+                        content_first_line = note['content'].split('\n')[0]
 
-                        # Print note ID on its own line
-                        console.print(f"  {formatted_id}:")
+                        # Build the line: ID [tags] | content
+                        line_parts = [f"  {formatted_id}"]
+                        if display_tags:
+                            formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                            line_parts.append(' '.join(formatted_tags))
+                        line_parts.append(f"| {content_first_line}")
 
-                        # Render markdown content
-                        content = note['content']
-                        md = Markdown(content)
-                        console.print(md)
-                        console.print("")  # Add an empty line between notes
+                        console.print(' '.join(line_parts))
+                        console.print()  # Empty line between notes
 
             if uncategorized_list:
                 console.print("\nUncategorized")
                 for note in uncategorized_list:
+                    # Get non-system tags
+                    note_tags = note.get('all_tags', [])
+                    excluded = ['todo', 'done', 'cancel', 'idea', 'note']
+                    if tag:
+                        excluded.extend([f.lower() for f in tag])
+                    display_tags = [t for t in note_tags if t.lower() not in excluded]
+
+                    # Format with indentation
                     formatted_id = ZettlFormatter.note_id(note['id'])
+                    if display_tags:
+                        formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                        console.print(f"  {formatted_id}  {' '.join(formatted_tags)}")
+                    else:
+                        console.print(f"  {formatted_id}")
 
-                    # Print note ID on its own line
-                    console.print(f"  {formatted_id}:")
-
-                    # Render markdown content
+                    # Render markdown content with indentation
                     content = note['content']
-                    md = Markdown(content)
-                    console.print(md)
-                    console.print("")  # Add an empty line between notes
+                    for line in content.split('\n'):
+                        console.print(f"          {line}")
+                    console.print()  # Empty line between notes
 
         # Display active todos first
         if active_todos_by_category or uncategorized_active:
-            active_header = ZettlFormatter.header(f"Active {' '.join(header_parts)} ({len(unique_active_ids)} total)")
+            active_header = ZettlFormatter.header(f"ACTIVE {' '.join(header_parts).upper()} ({len(unique_active_ids)})")
             display_todos_group(active_todos_by_category, uncategorized_active, active_header)
 
         # Display all done todos if requested
         if (show_all or donetoday) and (done_todos_by_category or uncategorized_done):
-            done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids)} total)")
+            done_header = ZettlFormatter.header(f"COMPLETED {' '.join(header_parts).upper()} ({len(unique_done_ids)})")
             console.print(f"\n{done_header}")
             display_todos_group(done_todos_by_category, uncategorized_done, "")
 
         # Display canceled todos if requested
         if cancel and (canceled_todos_by_category or uncategorized_canceled):
-            canceled_header = ZettlFormatter.header(f"Canceled {' '.join(header_parts)} ({len(unique_canceled_ids)} total)")
+            canceled_header = ZettlFormatter.header(f"CANCELED {' '.join(header_parts).upper()} ({len(unique_canceled_ids)})")
             console.print(f"\n{canceled_header}")
             display_todos_group(canceled_todos_by_category, uncategorized_canceled, "")
 
@@ -2451,59 +2562,79 @@ def t_cmd(content, donetoday, show_all, cancel, tag, link, custom_id):
 
             if category_dict:
                 for category, notes in sorted(category_dict.items()):
-                    # Check if this is a combined category with multiple tags
+                    # Format category header
                     if " - " in category:
                         # For combined categories, format each tag separately
-                        tags = category.split(" - ")
-                        formatted_tags = []
-                        for tag_name in tags:
-                            formatted_tags.append(ZettlFormatter.tag(tag_name))
+                        tags_list = category.split(" - ")
+                        formatted_tags = [ZettlFormatter.tag(t) for t in tags_list]
                         category_display = " - ".join(formatted_tags)
-                        console.print(f"\n{category_display} ({len(notes)})")
+                        console.print(f"\n{category_display}")
                     else:
                         # For single categories, use the original format
-                        console.print(f"\n{ZettlFormatter.tag(category)} ({len(notes)})")
+                        console.print(f"\n{ZettlFormatter.tag(category)}")
 
                     for note in notes:
+                        # Get non-category tags for this note
+                        note_tags = note.get('all_tags', [])
+                        excluded = ['todo', 'done', 'cancel', 'idea', 'note']
+                        if tag:
+                            excluded.extend([f.lower() for f in tag])
+                        # Exclude the category tags we're already showing
+                        category_tags_lower = [c.lower() for c in category.split(" - ")]
+                        display_tags = [t for t in note_tags if t.lower() not in excluded and t.lower() not in category_tags_lower]
+
+                        # Format on single line with pipe separator
                         formatted_id = ZettlFormatter.note_id(note['id'])
+                        content_first_line = note['content'].split('\n')[0]
 
-                        # Print note ID on its own line
-                        console.print(f"  {formatted_id}:")
+                        # Build the line: ID [tags] | content
+                        line_parts = [f"  {formatted_id}"]
+                        if display_tags:
+                            formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                            line_parts.append(' '.join(formatted_tags))
+                        line_parts.append(f"| {content_first_line}")
 
-                        # Render markdown content
-                        content = note['content']
-                        md = Markdown(content)
-                        console.print(md)
-                        console.print("")  # Add an empty line between notes
+                        console.print(' '.join(line_parts))
+                        console.print()  # Empty line between notes
 
             if uncategorized_list:
                 console.print("\nUncategorized")
                 for note in uncategorized_list:
+                    # Get non-system tags
+                    note_tags = note.get('all_tags', [])
+                    excluded = ['todo', 'done', 'cancel', 'idea', 'note']
+                    if tag:
+                        excluded.extend([f.lower() for f in tag])
+                    display_tags = [t for t in note_tags if t.lower() not in excluded]
+
+                    # Format with indentation
                     formatted_id = ZettlFormatter.note_id(note['id'])
+                    if display_tags:
+                        formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                        console.print(f"  {formatted_id}  {' '.join(formatted_tags)}")
+                    else:
+                        console.print(f"  {formatted_id}")
 
-                    # Print note ID on its own line
-                    console.print(f"  {formatted_id}:")
-
-                    # Render markdown content
+                    # Render markdown content with indentation
                     content = note['content']
-                    md = Markdown(content)
-                    console.print(md)
-                    console.print("")  # Add an empty line between notes
+                    for line in content.split('\n'):
+                        console.print(f"          {line}")
+                    console.print()  # Empty line between notes
 
         # Display active todos first
         if active_todos_by_category or uncategorized_active:
-            active_header = ZettlFormatter.header(f"Active {' '.join(header_parts)} ({len(unique_active_ids)} total)")
+            active_header = ZettlFormatter.header(f"ACTIVE {' '.join(header_parts).upper()} ({len(unique_active_ids)})")
             display_todos_group(active_todos_by_category, uncategorized_active, active_header)
 
         # Display all done todos if requested
         if (show_all or donetoday) and (done_todos_by_category or uncategorized_done):
-            done_header = ZettlFormatter.header(f"Completed {' '.join(header_parts)} ({len(unique_done_ids)} total)")
+            done_header = ZettlFormatter.header(f"COMPLETED {' '.join(header_parts).upper()} ({len(unique_done_ids)})")
             console.print(f"\n{done_header}")
             display_todos_group(done_todos_by_category, uncategorized_done, "")
 
         # Display canceled todos if requested
         if cancel and (canceled_todos_by_category or uncategorized_canceled):
-            canceled_header = ZettlFormatter.header(f"Canceled {' '.join(header_parts)} ({len(unique_canceled_ids)} total)")
+            canceled_header = ZettlFormatter.header(f"CANCELED {' '.join(header_parts).upper()} ({len(unique_canceled_ids)})")
             console.print(f"\n{canceled_header}")
             display_todos_group(canceled_todos_by_category, uncategorized_canceled, "")
 
