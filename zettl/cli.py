@@ -190,8 +190,9 @@ def show_help_callback(ctx, param, value):
 @click.option('--tag', '-t', multiple=True, help='Filter ideas by tag (list mode) or add tags (create mode)')
 @click.option('--link', '-l', multiple=True, help='Note ID to link to (create mode) or filter by (list mode)')
 @click.option('--id', 'custom_id', help='Custom ID for the idea (create mode only, must be unique)')
+@click.option('--full', '-f', is_flag=True, help='Show full content with markdown rendering (list mode only)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def idea_cmd(content, show_all, cancel, tag, link, custom_id):
+def idea_cmd(content, show_all, cancel, tag, link, custom_id, full):
     """Create or list ideas.
 
     CREATE MODE (when content provided):
@@ -388,18 +389,12 @@ def idea_cmd(content, show_all, cancel, tag, link, custom_id):
                         category_tags_lower = [c.lower() for c in category.split(" - ")]
                         display_tags = [t for t in note_tags if t.lower() not in excluded and t.lower() not in category_tags_lower]
 
-                        # Format on single line with pipe separator
-                        formatted_id = ZettlFormatter.note_id(note['id'])
-                        content_first_line = note['content'].split('\n')[0]
-
-                        # Build the line: ID [tags] | content
-                        line_parts = [f"  {formatted_id}"]
-                        if display_tags:
-                            formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
-                            line_parts.append(' '.join(formatted_tags))
-                        line_parts.append(f"| {content_first_line}")
-
-                        console.print(' '.join(line_parts))
+                        # Render note with indentation
+                        console.print("  ", end="")
+                        if full:
+                            ZettlFormatter.render_note(note, tags=display_tags, mode='full')
+                        else:
+                            ZettlFormatter.render_note(note, tags=display_tags, mode='preview')
                         console.print()  # Empty line between notes
 
             if uncategorized_list:
@@ -410,18 +405,12 @@ def idea_cmd(content, show_all, cancel, tag, link, custom_id):
                     excluded = ['todo', 'done', 'cancel', 'idea', 'note']
                     display_tags = [t for t in note_tags if t.lower() not in excluded]
 
-                    # Format on single line with pipe separator
-                    formatted_id = ZettlFormatter.note_id(note['id'])
-                    content_first_line = note['content'].split('\n')[0]
-
-                    # Build the line: ID [tags] | content
-                    line_parts = [f"  {formatted_id}"]
-                    if display_tags:
-                        formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
-                        line_parts.append(' '.join(formatted_tags))
-                    line_parts.append(f"| {content_first_line}")
-
-                    console.print(' '.join(line_parts))
+                    # Render note with indentation
+                    console.print("  ", end="")
+                    if full:
+                        ZettlFormatter.render_note(note, tags=display_tags, mode='full')
+                    else:
+                        ZettlFormatter.render_note(note, tags=display_tags, mode='preview')
                     console.print()  # Empty line between notes
 
         # Display active ideas first
@@ -455,8 +444,9 @@ cli.add_command(cli.commands['idea'], name='i')
 @click.option('--tag', '-t', multiple=True, help='Filter notes by tag (list mode) or add tags (create mode)')
 @click.option('--link', '-l', multiple=True, help='Note ID to link to (create mode) or filter by (list mode)')
 @click.option('--id', 'custom_id', help='Custom ID for the note (create mode only, must be unique)')
+@click.option('--full', '-f', is_flag=True, help='Show full content with markdown rendering (list mode only)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def note_cmd(content, show_all, cancel, tag, link, custom_id):
+def note_cmd(content, show_all, cancel, tag, link, custom_id, full):
     """Create or list notes.
 
     CREATE MODE (when content provided):
@@ -653,18 +643,12 @@ def note_cmd(content, show_all, cancel, tag, link, custom_id):
                         category_tags_lower = [c.lower() for c in category.split(" - ")]
                         display_tags = [t for t in note_tags if t.lower() not in excluded and t.lower() not in category_tags_lower]
 
-                        # Format on single line with pipe separator
-                        formatted_id = ZettlFormatter.note_id(note['id'])
-                        content_first_line = note['content'].split('\n')[0]
-
-                        # Build the line: ID [tags] | content
-                        line_parts = [f"  {formatted_id}"]
-                        if display_tags:
-                            formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
-                            line_parts.append(' '.join(formatted_tags))
-                        line_parts.append(f"| {content_first_line}")
-
-                        console.print(' '.join(line_parts))
+                        # Render note with indentation
+                        console.print("  ", end="")
+                        if full:
+                            ZettlFormatter.render_note(note, tags=display_tags, mode='full')
+                        else:
+                            ZettlFormatter.render_note(note, tags=display_tags, mode='preview')
                         console.print()  # Empty line between notes
 
             if uncategorized_list:
@@ -675,18 +659,12 @@ def note_cmd(content, show_all, cancel, tag, link, custom_id):
                     excluded = ['todo', 'done', 'cancel', 'idea', 'note']
                     display_tags = [t for t in note_tags if t.lower() not in excluded]
 
-                    # Format on single line with pipe separator
-                    formatted_id = ZettlFormatter.note_id(note['id'])
-                    content_first_line = note['content'].split('\n')[0]
-
-                    # Build the line: ID [tags] | content
-                    line_parts = [f"  {formatted_id}"]
-                    if display_tags:
-                        formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
-                        line_parts.append(' '.join(formatted_tags))
-                    line_parts.append(f"| {content_first_line}")
-
-                    console.print(' '.join(line_parts))
+                    # Render note with indentation
+                    console.print("  ", end="")
+                    if full:
+                        ZettlFormatter.render_note(note, tags=display_tags, mode='full')
+                    else:
+                        ZettlFormatter.render_note(note, tags=display_tags, mode='preview')
                     console.print()  # Empty line between notes
 
         # Display active notes first
@@ -726,7 +704,7 @@ def display_project_detail(project_note, project_id, notes_manager, show_all, fu
     except Exception:
         project_tags = []
 
-    ZettlFormatter.format_note_full(project_note, tags=project_tags, notes_manager=notes_manager)
+    ZettlFormatter.render_note(project_note, tags=project_tags, mode='full')
     console.print()
 
     # Get linked notes (bidirectional)
@@ -857,26 +835,13 @@ def display_project_detail(project_note, project_id, notes_manager, show_all, fu
                         category_tags_lower = [c.lower() for c in category.split(" - ")]
                         display_tags = [t for t in note_tags if t.lower() not in exclude_tags and t.lower() not in category_tags_lower]
 
-                        # Format with indentation
-                        formatted_id = ZettlFormatter.note_id(note['id'])
-                        if display_tags:
-                            formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
-                            console.print(f"    {formatted_id}  {' '.join(formatted_tags)}")
-                        else:
-                            console.print(f"    {formatted_id}")
-
+                        # Render note with indentation
+                        console.print("    ", end="")
                         if full:
-                            # Full content with indentation
-                            content = note['content'].rstrip('\n')
-                            for line in content.split('\n'):
-                                console.print(f"            {line}")
-                            console.print()
+                            ZettlFormatter.render_note(note, tags=display_tags, mode='full')
                         else:
-                            # Preview - 2 lines
-                            preview = ZettlFormatter.truncate_content_by_lines(note['content'], 2)
-                            for line in preview.split('\n'):
-                                console.print(f"            {line}")
-                            console.print()
+                            ZettlFormatter.render_note(note, tags=display_tags, mode='preview')
+                        console.print()
 
             # Display uncategorized
             if uncategorized:
@@ -886,26 +851,13 @@ def display_project_detail(project_note, project_id, notes_manager, show_all, fu
                     note_tags = note.get('all_tags', [])
                     display_tags = [t for t in note_tags if t.lower() not in exclude_tags]
 
-                    # Format with indentation
-                    formatted_id = ZettlFormatter.note_id(note['id'])
-                    if display_tags:
-                        formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
-                        console.print(f"    {formatted_id}  {' '.join(formatted_tags)}")
-                    else:
-                        console.print(f"    {formatted_id}")
-
+                    # Render note with indentation
+                    console.print("    ", end="")
                     if full:
-                        # Full content with indentation
-                        content = note['content']
-                        for line in content.split('\n'):
-                            console.print(f"            {line}")
-                        console.print()
+                        ZettlFormatter.render_note(note, tags=display_tags, mode='full')
                     else:
-                        # Preview - 2 lines
-                        preview = ZettlFormatter.truncate_content_by_lines(note['content'], 2)
-                        for line in preview.split('\n'):
-                            console.print(f"            {line}")
-                        console.print()
+                        ZettlFormatter.render_note(note, tags=display_tags, mode='preview')
+                    console.print()
 
         # Helper function to display done/canceled sections
         def display_status_section(note_list, status_label):
@@ -1100,16 +1052,12 @@ def list(limit, full, compact):
             tags = notes_tags.get(note_id, [])
 
             if compact:
-                # Very compact mode - just IDs
-                console.print(ZettlFormatter.note_id(note_id))
+                ZettlFormatter.render_note(note, mode='compact')
             elif full:
-                # Full content mode with new indented format
-                ZettlFormatter.format_note_full(note, tags=tags, notes_manager=notes_manager)
+                ZettlFormatter.render_note(note, tags=tags, mode='full')
                 console.print()  # Empty line between notes
             else:
-                # Default mode - ID with tags and 3-line preview
-                preview = ZettlFormatter.format_note_preview(note, tags=tags, max_lines=3)
-                console.print(preview)
+                ZettlFormatter.render_note(note, tags=tags, mode='preview')
                 console.print()  # Empty line between notes
     except Exception as e:
         console.print(ZettlFormatter.error(str(e)))
@@ -1137,8 +1085,8 @@ def show(note_id, related, full):
             console.print(ZettlFormatter.header(f"SOURCE NOTE"))
             console.print()
 
-        # Display note with new format
-        ZettlFormatter.format_note_full(note, tags=tags, notes_manager=notes_manager)
+        # Display note
+        ZettlFormatter.render_note(note, tags=tags, mode='full')
 
         # Show linked notes
         try:
@@ -1159,17 +1107,20 @@ def show(note_id, related, full):
                             pass
 
                         if full:
-                            # Full content mode
-                            ZettlFormatter.format_note_full(linked_note, tags=linked_tags, notes_manager=notes_manager)
+                            ZettlFormatter.render_note(linked_note, tags=linked_tags, mode='full')
                             console.print()  # Extra line between notes
                         else:
-                            # Preview mode - show 2 lines
-                            preview = ZettlFormatter.format_note_preview(linked_note, tags=linked_tags, max_lines=2)
-                            console.print(preview)
+                            ZettlFormatter.render_note(linked_note, tags=linked_tags, mode='preview')
                             console.print()  # Extra line between notes
                 else:
-                    # Simple links display with arrow and first line
-                    ZettlFormatter.format_linked_notes(linked_notes, full=False)
+                    # Simple links display with arrow
+                    console.print(f"\n[bright_black]Links:[/bright_black]")
+                    for linked_note in linked_notes:
+                        formatted_id = ZettlFormatter.note_id(linked_note['id'])
+                        first_line = linked_note['content'].split('\n')[0]
+                        if len(first_line) > 60:
+                            first_line = first_line[:60] + '[...]'
+                        console.print(f"  [bright_blue]→[/bright_blue] {formatted_id}  {first_line}")
         except Exception:
             pass
     except Exception as e:
@@ -1355,7 +1306,7 @@ def search(query, tag, exclude_tag, date, full):
 
             if full:
                 # Full content mode with new format
-                ZettlFormatter.format_note_full(note, tags=note_tags, notes_manager=get_notes_manager())
+                ZettlFormatter.render_note(note, tags=note_tags, mode='full')
                 console.print()  # Empty line between notes
             else:
                 # Preview mode with new pipe separator format
@@ -1410,7 +1361,7 @@ def llm(note_id, action, count, show_source):
             try:
                 source_note = get_notes_manager().get_note(note_id)
                 console.print(ZettlFormatter.header("Source Note"))
-                console.print(ZettlFormatter.format_note_display(source_note, get_notes_manager()))
+                ZettlFormatter.render_note(source_note, mode='full')
                 click.echo("\n")  # Extra space after source note
             except Exception as e:
                 console.print(ZettlFormatter.warning(f"Could not display source note: {str(e)}"))
@@ -1896,8 +1847,9 @@ def merge(note_ids, force):
 @click.option('--tag', '-t', multiple=True, help='Filter todos by tag (list mode) or add tags (create mode)')
 @click.option('--link', '-l', multiple=True, help='Note ID to link to (create mode) or filter by (list mode)')
 @click.option('--id', 'custom_id', help='Custom ID for the todo (create mode only, must be unique)')
+@click.option('--full', '-f', is_flag=True, help='Show full content with markdown rendering (list mode only)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def todo_cmd(content, donetoday, show_all, cancel, tag, link, custom_id):
+def todo_cmd(content, donetoday, show_all, cancel, tag, link, custom_id, full):
     """Create or list todos.
 
     CREATE MODE (when content provided):
@@ -2114,18 +2066,12 @@ def todo_cmd(content, donetoday, show_all, cancel, tag, link, custom_id):
                         category_tags_lower = [c.lower() for c in category.split(" - ")]
                         display_tags = [t for t in note_tags if t.lower() not in excluded and t.lower() not in category_tags_lower]
 
-                        # Format on single line with pipe separator
-                        formatted_id = ZettlFormatter.note_id(note['id'])
-                        content_first_line = note['content'].split('\n')[0]
-
-                        # Build the line: ID [tags] | content
-                        line_parts = [f"  {formatted_id}"]
-                        if display_tags:
-                            formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
-                            line_parts.append(' '.join(formatted_tags))
-                        line_parts.append(f"| {content_first_line}")
-
-                        console.print(' '.join(line_parts))
+                        # Render note with indentation
+                        console.print("  ", end="")
+                        if full:
+                            ZettlFormatter.render_note(note, tags=display_tags, mode='full')
+                        else:
+                            ZettlFormatter.render_note(note, tags=display_tags, mode='preview')
                         console.print()  # Empty line between notes
 
             if uncategorized_list:
@@ -2138,18 +2084,12 @@ def todo_cmd(content, donetoday, show_all, cancel, tag, link, custom_id):
                         excluded.extend([f.lower() for f in tag])
                     display_tags = [t for t in note_tags if t.lower() not in excluded]
 
-                    # Format with indentation
-                    formatted_id = ZettlFormatter.note_id(note['id'])
-                    if display_tags:
-                        formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
-                        console.print(f"  {formatted_id}  {' '.join(formatted_tags)}")
+                    # Render note with indentation
+                    console.print("  ", end="")
+                    if full:
+                        ZettlFormatter.render_note(note, tags=display_tags, mode='full')
                     else:
-                        console.print(f"  {formatted_id}")
-
-                    # Render markdown content with indentation
-                    content = note['content']
-                    for line in content.split('\n'):
-                        console.print(f"          {line}")
+                        ZettlFormatter.render_note(note, tags=display_tags, mode='preview')
                     console.print()  # Empty line between notes
 
         # Display active todos first

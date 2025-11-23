@@ -95,131 +95,49 @@ class ZettlFormatter:
             return f"[cyan]{text}[/cyan]"
 
     @classmethod
-    def format_note_display(cls, note, notes_manager, render_markdown=True):
-        """Format a full note for display."""
-        note_id = note['id']
-        created_at = notes_manager.format_timestamp(note['created_at'])
-
-        formatted_id = cls.note_id(note_id)
-        formatted_time = cls.timestamp(created_at)
-
-        header_line = f"{formatted_id} [{formatted_time}]"
-        separator = "-" * 40
-
-        # Print header and separator
-        console.print(header_line)
-        console.print(separator)
-
-        # Render markdown content if enabled
-        if render_markdown:
-            cls.render_markdown(note['content'])
-        else:
-            console.print(note['content'])
-
-        # Return empty string since we're printing directly
-        return ""
-
-    @classmethod
-    def render_markdown(cls, content):
-        """Render markdown content using rich (CLI only)."""
-        md = Markdown(content)
-        console.print(md)
-
-    @classmethod
-    def truncate_content_by_lines(cls, content, max_lines=3):
-        """Truncate content to max_lines, adding ellipsis if truncated."""
-        lines = content.split('\n')
-        if len(lines) > max_lines:
-            truncated_lines = lines[:max_lines]
-            # Add ellipsis to last line
-            truncated_lines[-1] = truncated_lines[-1].rstrip() + '[...]'
-            return '\n'.join(truncated_lines)
-        return content
-
-    @classmethod
-    def format_note_preview(cls, note, tags=None, max_lines=3):
-        """Format a note in preview mode with pipe separator.
+    def render_note(cls, note, tags=None, mode='full'):
+        """Unified note rendering function.
 
         Args:
             note: Note dictionary with 'id' and 'content'
             tags: Optional list of tag strings
-            max_lines: Maximum lines of content to show (default 3)
+            mode: Display mode - 'full', 'preview', or 'compact'
+                  - 'full': Show ID, tags, and full markdown content
+                  - 'preview': Show ID, tags | first line of content
+                  - 'compact': Show only ID
         """
         note_id = note['id']
         content = note['content']
-
-        # Format ID and tags, then pipe, then first line of content
         formatted_id = cls.note_id(note_id)
-        content_first_line = content.split('\n')[0]
 
-        # Build the line: ID [tags] | content
-        line_parts = [formatted_id]
-        if tags:
-            formatted_tags = [cls.tag(t) for t in tags]
-            line_parts.append(" ".join(formatted_tags))
-        line_parts.append(f"| {content_first_line}")
+        if mode == 'compact':
+            # Just show the ID
+            console.print(formatted_id)
 
-        return "  ".join(line_parts)
+        elif mode == 'preview':
+            # ID [tags] | first line
+            line_parts = [formatted_id]
+            if tags:
+                formatted_tags = [cls.tag(t) for t in tags]
+                line_parts.append(" ".join(formatted_tags))
 
-    @classmethod
-    def format_note_full(cls, note, tags=None, notes_manager=None):
-        """Format a note with full content and indented layout.
+            first_line = content.split('\n')[0]
+            line_parts.append(f"| {first_line}")
+            console.print("  ".join(line_parts))
 
-        Args:
-            note: Note dictionary with 'id' and 'content'
-            tags: Optional list of tag strings
-            notes_manager: Optional notes manager for markdown rendering
-        """
-        note_id = note['id']
-        content = note['content']
+        else:  # mode == 'full'
+            # ID and tags on first line
+            id_line = formatted_id
+            if tags:
+                formatted_tags = [cls.tag(t) for t in tags]
+                id_line += "  " + " ".join(formatted_tags)
 
-        # Format ID and tags on first line
-        formatted_id = cls.note_id(note_id)
-        id_line = formatted_id
+            console.print(id_line)
+            console.print()  # Empty line after header
 
-        if tags:
-            formatted_tags = [cls.tag(t) for t in tags]
-            id_line += "  " + " ".join(formatted_tags)
-
-        console.print(id_line)
-
-        # Render markdown content with indentation
-        # We'll indent by printing with proper spacing
-        content_lines = content.split('\n')
-        for line in content_lines:
-            console.print(f"        {line}")
-
-        return ""  # Already printed
-
-    @classmethod
-    def format_linked_notes(cls, linked_notes, full=False):
-        """Format linked notes display.
-
-        Args:
-            linked_notes: List of linked note dictionaries
-            full: If True, show full content preview; if False, show brief preview
-        """
-        if not linked_notes:
-            return
-
-        console.print(f"\n[bright_black]Links:[/bright_black]")
-
-        for note in linked_notes:
-            note_id = note['id']
-            content = note['content']
-
-            formatted_id = cls.note_id(note_id)
-
-            if full:
-                # Show first 2 lines of content
-                preview = cls.truncate_content_by_lines(content, 2)
-                console.print(f"  [bright_blue]→[/bright_blue] {formatted_id}")
-                for line in preview.split('\n'):
-                    console.print(f"            {line}")
-                console.print()  # Empty line between linked notes
+            # Render content as markdown
+            if cls._mode == 'cli':
+                md = Markdown(content)
+                console.print(md)
             else:
-                # Show first line only, inline
-                first_line = content.split('\n')[0]
-                if len(first_line) > 60:
-                    first_line = first_line[:60] + '[...]'
-                console.print(f"  [bright_blue]→[/bright_blue] {formatted_id}  {first_line}")
+                console.print(content)

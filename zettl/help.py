@@ -1,5 +1,6 @@
 # help.py
 import re
+from zettl import __version__
 
 class CommandHelp:
     """Centralized help system for Zettl commands."""
@@ -39,35 +40,34 @@ class CommandHelp:
     def get_main_help(cls):
         """Return the main help text."""
         help_text = f"""
-[bold green]zettl v0.7.1[/bold green] - A Zettelkasten-style note-taking tool
+[bold green]zettl v{__version__}[/bold green] - A Zettelkasten-style note-taking tool
 
 [bold]NOTE MANAGEMENT[/bold]
-  [bold yellow]todo[/bold yellow] / [bold yellow]t[/bold yellow]            List todos OR create new todo (auto-tagged 'todo')
+  [bold yellow]todo[/bold yellow]                List todos OR create new todo
     [blue]→[/blue] zettl todo                  # List active todos
-    [blue]→[/blue] zettl t "Call dentist" -l health-project
+    [blue]→[/blue] zettl todo "Call dentist" -l health-project
 
-  [bold yellow]idea[/bold yellow] / [bold yellow]i[/bold yellow]            List ideas OR create new idea (auto-tagged 'idea')
+  [bold yellow]idea[/bold yellow]                List ideas OR create new idea
     [blue]→[/blue] zettl idea                  # List active ideas
-    [blue]→[/blue] zettl i "Add caching layer" -l dev-project
+    [blue]→[/blue] zettl idea "Add caching" -l dev-project
 
-  [bold yellow]note[/bold yellow] / [bold yellow]n[/bold yellow]            List notes OR create new note (auto-tagged 'note')
+  [bold yellow]note[/bold yellow]                List notes OR create new note
     [blue]→[/blue] zettl note                  # List active notes
-    [blue]→[/blue] zettl n "Meeting notes" -l work-project
+    [blue]→[/blue] zettl note "Meeting notes" -l work-project
 
-  [bold yellow]project[/bold yellow] / [bold yellow]p[/bold yellow]         List/view/create projects (auto-tagged 'project')
+  [bold yellow]project[/bold yellow]             List/view/create projects
     [blue]→[/blue] zettl project               # List all projects with stats
     [blue]→[/blue] zettl project -l learn-rust # View project detail
     [blue]→[/blue] zettl project "New Project" --id my-proj
 
   [bold yellow]show[/bold yellow]                Display note content and related notes
-    [blue]→[/blue] zettl show 22a4b
-    [blue]→[/blue] zettl show 22a4b -r         # Show with related notes
+    [blue]→[/blue] zettl show 22a4b -r
 
   [bold yellow]list[/bold yellow]                List recent notes
-    [blue]→[/blue] zettl list --limit 10 --full
+    [blue]→[/blue] zettl list --limit 10
 
   [bold yellow]search[/bold yellow]              Search by text, tag, or date
-    [blue]→[/blue] zettl search "concept" -t work +t done --full
+    [blue]→[/blue] zettl search "concept" -t work
 
   [bold yellow]edit[/bold yellow]                Edit note in default text editor
     [blue]→[/blue] zettl edit 22a4b
@@ -79,34 +79,34 @@ class CommandHelp:
     [blue]→[/blue] zettl prepend 22a4b "IMPORTANT: "
 
   [bold yellow]merge[/bold yellow]               Combine multiple notes into one
-    [blue]→[/blue] zettl merge 22a4b 18c3d --force
+    [blue]→[/blue] zettl merge 22a4b 18c3d
 
   [bold yellow]delete[/bold yellow]              Delete note and associated data
-    [blue]→[/blue] zettl delete 22a4b --keep-tags
+    [blue]→[/blue] zettl delete 22a4b
 
 [bold]CONNECTIONS[/bold]
   [bold yellow]link[/bold yellow]                Create or remove link between notes
-    [blue]→[/blue] zettl link 22a4b 18c3d --context "Related concepts"
+    [blue]→[/blue] zettl link 22a4b 18c3d
     [blue]→[/blue] zettl link 22a4b 18c3d -r   # Remove link
 
   [bold yellow]graph[/bold yellow]               Export graph visualization data
-    [blue]→[/blue] zettl graph 22a4b --output graph.json --depth 2
+    [blue]→[/blue] zettl graph 22a4b --depth 2
 
 [bold]ORGANIZATION[/bold]
-  [bold yellow]tags[/bold yellow]                List all tags, show/add/remove note tags
+  [bold yellow]tags[/bold yellow]                List all tags or manage note tags
     [blue]→[/blue] zettl tags                  # List all tags
     [blue]→[/blue] zettl tags 22a4b            # Show note's tags
-    [blue]→[/blue] zettl tags 22a4b "concept"  # Add tag to note
+    [blue]→[/blue] zettl tags 22a4b "concept"  # Add tag
     [blue]→[/blue] zettl tags 22a4b "concept" -r  # Remove tag
 
 [bold]AI FEATURES[/bold]
   [bold yellow]llm[/bold yellow]                 AI-powered note analysis
     [blue]→[/blue] zettl llm 22a4b --action summarize
-    [blue]→[/blue] zettl llm 22a4b --action tags | connect | expand | concepts | questions | critique
+    [blue]→[/blue] zettl llm 22a4b --action tags
 
-[bold]SPECIALIZED FEATURES[/bold]
+[bold]SPECIALIZED[/bold]
   [bold yellow]rules[/bold yellow]               Display random rule from notes
-    [blue]→[/blue] zettl rules --source
+    [blue]→[/blue] zettl rules
 
 [bold]SYSTEM[/bold]
   [bold yellow]auth setup[/bold yellow]          Configure API key authentication
@@ -115,19 +115,11 @@ class CommandHelp:
   [bold yellow]auth status[/bold yellow]         Check authentication status
     [blue]→[/blue] zettl auth status
 
-  [bold yellow]help[/bold yellow]                Show this help or command help
-    [blue]→[/blue] zettl help
-    [blue]→[/blue] zettl COMMAND --help
-
 [bold]GETTING STARTED[/bold]
   1. Set up authentication:     [cyan]zettl auth setup[/cyan]
   2. Create a project:          [cyan]zettl project "My Project" --id my-project[/cyan]
   3. Add tasks to project:      [cyan]zettl todo "First task" -l my-project[/cyan]
-  4. Capture ideas:            [cyan]zettl idea "Great idea!" -l my-project[/cyan]
-  5. List your notes:          [cyan]zettl list[/cyan]
-  6. View todos:               [cyan]zettl todo[/cyan]
-  7. View project stats:       [cyan]zettl project[/cyan]
-  8. Get AI suggestions:       [cyan]zettl llm NOTE_ID --action tags[/cyan]
+  4. List your notes:           [cyan]zettl list[/cyan]
 
 For detailed help on any command: [cyan]zettl COMMAND --help[/cyan]
 """
@@ -144,51 +136,43 @@ For detailed help on any command: [cyan]zettl COMMAND --help[/cyan]
 [bold green]auth[/bold green] - Authentication management
 
 [bold]Subcommands:[/bold]
-  [yellow]setup[/yellow]   Configure API key authentication for CLI access
-  [yellow]status[/yellow]  Check current authentication status
+  [yellow]setup[/yellow]   Configure API key
+  [yellow]status[/yellow]  Check authentication status
 
-[bold]Usage:[/bold]
-  zettl auth setup    # Set up authentication
-  zettl auth status   # Check authentication status
+[bold]Examples:[/bold]
+  [blue]zettl auth setup[/blue]
+  [blue]zettl auth status[/blue]
 
 [bold]Description:[/bold]
-  The auth command manages your API key authentication. You need to set up
-  authentication before using most zettl commands. Get your API key from
-  the Zettl web interface.
+  Configure authentication before using zettl. Get your API key from the web interface.
 """,
 
             "todo": f"""
-[bold green]todo [CONTENT][/bold green] - List todos OR create new todo (automatically tagged with 'todo')
+[bold green]todo [CONTENT][/bold green] - List todos OR create new todo
 
-[bold]DUAL MODE COMMAND:[/bold]
-  • [bold]No content[/bold] = LIST MODE: Shows active todos (like old 'todos' command)
-  • [bold]With content[/bold] = CREATE MODE: Creates a new todo
+[bold]Usage:[/bold]
+  zettl todo                   # List active todos
+  zettl todo "Task to do"      # Create new todo
 
-[bold]List Mode Options:[/bold]
-  [yellow]-a, --all[/yellow]           Show all todos (active, done, and canceled)
+[bold]List Mode:[/bold]
+  [yellow]-a, --all[/yellow]           Show all todos (active, done, canceled)
   [yellow]-dt, --donetoday[/yellow]    Show todos completed today
-  [yellow]-c, --cancel[/yellow]        Show canceled todos
-  [yellow]-t, --tag TAG[/yellow]       Filter todos by additional tag (can specify multiple)
-  [yellow]-l, --link NOTE_ID[/yellow]  Filter todos linked to note (can specify multiple)
+  [yellow]-c, --cancel[/yellow]        Show canceled todos only
+  [yellow]-t, --tag TAG[/yellow]       Filter by additional tag
+  [yellow]-l, --link NOTE_ID[/yellow]  Filter by linked note
 
-[bold]Create Mode Options:[/bold]
-  [yellow]-t, --tag TAG[/yellow]       Add additional tags to the todo
-  [yellow]-l, --link NOTE_ID[/yellow]  Create link to note (can specify multiple)
-  [yellow]--id CUSTOM_ID[/yellow]      Use a custom ID instead of auto-generated one
+[bold]Create Mode:[/bold]
+  [yellow]-t, --tag TAG[/yellow]       Add additional tags
+  [yellow]-l, --link NOTE_ID[/yellow]  Link to note
+  [yellow]--id CUSTOM_ID[/yellow]      Use custom ID
 
 [bold]Examples:[/bold]
-  [cyan]# List Mode[/cyan]
   [blue]zettl todo[/blue]                   List active todos
   [blue]zettl todo -a[/blue]                Show all todos
-  [blue]zettl todo -l my-project[/blue]     List todos linked to a project
-  [blue]zettl todo -t urgent[/blue]         List urgent todos
-  [blue]zettl todo -dt[/blue]               Show todos completed today
-
-  [cyan]# Create Mode[/cyan]
-  [blue]zettl todo "Review pull request"[/blue]
+  [blue]zettl todo -l my-project[/blue]     Filter by project
+  [blue]zettl todo -dt[/blue]               Completed today
+  [blue]zettl todo "Review PR"[/blue]       Create todo
   [blue]zettl todo "Call dentist" -l health-project[/blue]
-  [blue]zettl todo "Fix bug #123" -l dev --id bug-123[/blue]
-  [blue]zettl todo "Write tests" -t urgent[/blue]
 """,
 
             "t": f"""
@@ -198,34 +182,29 @@ See 'zettl todo --help' for full documentation.
 """,
 
             "idea": f"""
-[bold green]idea [CONTENT][/bold green] - List ideas OR create new idea (automatically tagged with 'idea')
+[bold green]idea [CONTENT][/bold green] - List ideas OR create new idea
 
-[bold]DUAL MODE COMMAND:[/bold]
-  • [bold]No content[/bold] = LIST MODE: Shows active ideas
-  • [bold]With content[/bold] = CREATE MODE: Creates a new idea
+[bold]Usage:[/bold]
+  zettl idea                   # List active ideas
+  zettl idea "New idea"        # Create new idea
 
-[bold]List Mode Options:[/bold]
-  [yellow]-a, --all[/yellow]           Show all ideas (active, done, and canceled)
-  [yellow]-c, --cancel[/yellow]        Show canceled ideas
-  [yellow]-t, --tag TAG[/yellow]       Filter ideas by additional tag (can specify multiple)
-  [yellow]-l, --link NOTE_ID[/yellow]  Filter ideas linked to note (can specify multiple)
+[bold]List Mode:[/bold]
+  [yellow]-a, --all[/yellow]           Show all ideas (active, done, canceled)
+  [yellow]-c, --cancel[/yellow]        Show canceled ideas only
+  [yellow]-t, --tag TAG[/yellow]       Filter by additional tag
+  [yellow]-l, --link NOTE_ID[/yellow]  Filter by linked note
 
-[bold]Create Mode Options:[/bold]
-  [yellow]-t, --tag TAG[/yellow]       Add additional tags to the idea
-  [yellow]-l, --link NOTE_ID[/yellow]  Create link to note (can specify multiple)
-  [yellow]--id CUSTOM_ID[/yellow]      Use a custom ID instead of auto-generated one
+[bold]Create Mode:[/bold]
+  [yellow]-t, --tag TAG[/yellow]       Add additional tags
+  [yellow]-l, --link NOTE_ID[/yellow]  Link to note
+  [yellow]--id CUSTOM_ID[/yellow]      Use custom ID
 
 [bold]Examples:[/bold]
-  [cyan]# List Mode[/cyan]
   [blue]zettl idea[/blue]                   List active ideas
   [blue]zettl idea -a[/blue]                Show all ideas
-  [blue]zettl idea -l my-project[/blue]     List ideas linked to a project
-  [blue]zettl idea -t backend[/blue]        List backend ideas
-
-  [cyan]# Create Mode[/cyan]
-  [blue]zettl idea "Add caching layer for better performance"[/blue]
+  [blue]zettl idea -l my-project[/blue]     Filter by project
+  [blue]zettl idea "Add caching layer"[/blue]
   [blue]zettl idea "Redesign UI" -l frontend-project[/blue]
-  [blue]zettl idea "Try new algorithm" -l research --id algo-001[/blue]
 """,
 
             "i": f"""
@@ -235,34 +214,29 @@ See 'zettl idea --help' for full documentation.
 """,
 
             "note": f"""
-[bold green]note [CONTENT][/bold green] - List notes OR create new note (automatically tagged with 'note')
+[bold green]note [CONTENT][/bold green] - List notes OR create new note
 
-[bold]DUAL MODE COMMAND:[/bold]
-  • [bold]No content[/bold] = LIST MODE: Shows active notes
-  • [bold]With content[/bold] = CREATE MODE: Creates a new note
+[bold]Usage:[/bold]
+  zettl note                   # List active notes
+  zettl note "New note"        # Create new note
 
-[bold]List Mode Options:[/bold]
-  [yellow]-a, --all[/yellow]           Show all notes (active, done, and canceled)
-  [yellow]-c, --cancel[/yellow]        Show canceled notes
-  [yellow]-t, --tag TAG[/yellow]       Filter notes by additional tag (can specify multiple)
-  [yellow]-l, --link NOTE_ID[/yellow]  Filter notes linked to note (can specify multiple)
+[bold]List Mode:[/bold]
+  [yellow]-a, --all[/yellow]           Show all notes (active, done, canceled)
+  [yellow]-c, --cancel[/yellow]        Show canceled notes only
+  [yellow]-t, --tag TAG[/yellow]       Filter by additional tag
+  [yellow]-l, --link NOTE_ID[/yellow]  Filter by linked note
 
-[bold]Create Mode Options:[/bold]
-  [yellow]-t, --tag TAG[/yellow]       Add additional tags to the note
-  [yellow]-l, --link NOTE_ID[/yellow]  Create link to note (can specify multiple)
-  [yellow]--id CUSTOM_ID[/yellow]      Use a custom ID instead of auto-generated one
+[bold]Create Mode:[/bold]
+  [yellow]-t, --tag TAG[/yellow]       Add additional tags
+  [yellow]-l, --link NOTE_ID[/yellow]  Link to note
+  [yellow]--id CUSTOM_ID[/yellow]      Use custom ID
 
 [bold]Examples:[/bold]
-  [cyan]# List Mode[/cyan]
   [blue]zettl note[/blue]                   List active notes
   [blue]zettl note -a[/blue]                Show all notes
-  [blue]zettl note -l my-project[/blue]     List notes linked to a project
-  [blue]zettl note -t meeting[/blue]        List meeting notes
-
-  [cyan]# Create Mode[/cyan]
-  [blue]zettl note "Meeting notes from standup"[/blue]
+  [blue]zettl note -l my-project[/blue]     Filter by project
+  [blue]zettl note "Meeting notes"[/blue]
   [blue]zettl note "Architecture decisions" -l dev-project[/blue]
-  [blue]zettl note "Research findings" -l research --id research-001[/blue]
 """,
 
             "n": f"""
@@ -272,51 +246,36 @@ See 'zettl note --help' for full documentation.
 """,
 
             "project": f"""
-[bold green]project [CONTENT][/bold green] - List/view/create projects (automatically tagged with 'project')
+[bold green]project [CONTENT][/bold green] - List/view/create projects
 
-[bold]THREE MODE COMMAND:[/bold]
-  • [bold]No content and no -l[/bold] = LIST MODE: Shows all projects with statistics
-  • [bold]-l project_id[/bold] = DETAIL MODE: Shows project with categorized linked notes
-  • [bold]Content[/bold] = CREATE MODE: Creates a new project
+[bold]Usage:[/bold]
+  zettl project                # List all projects with stats
+  zettl project -l PROJECT_ID  # View project detail
+  zettl project "New Project"  # Create project
 
 [bold]List Mode:[/bold]
-  [blue]zettl project[/blue]                Shows all projects with active todo/idea/note counts
+  Shows all projects with active todo/idea/note counts
 
-[bold]Detail Mode (requires -l):[/bold]
-  [blue]zettl project -l project_id[/blue]  View project detail with categorized notes
+[bold]Detail Mode (-l required):[/bold]
+  [yellow]-l, --link PROJECT_ID[/yellow]  View project detail
+  [yellow]-a, --all[/yellow]              Show all notes (active, done, canceled)
+  [yellow]-f, --full[/yellow]             Show full content
+  [yellow]-t, --tag TAG[/yellow]          Filter by additional tag
 
-  [bold]Options:[/bold]
-  [yellow]-a, --all[/yellow]           Show all linked notes (active, done, and canceled)
-  [yellow]-f, --full[/yellow]          Show full content instead of previews
-  [yellow]-t, --tag TAG[/yellow]       Filter linked notes by additional tag
-
-[bold]Create Mode Options:[/bold]
-  [yellow]-t, --tag TAG[/yellow]       Add additional tags to the project
-  [yellow]--id CUSTOM_ID[/yellow]      Use a custom, memorable ID (recommended for projects)
+[bold]Create Mode:[/bold]
+  [yellow]-t, --tag TAG[/yellow]       Add additional tags
+  [yellow]--id CUSTOM_ID[/yellow]      Use custom ID (recommended)
 
 [bold]Examples:[/bold]
-  [cyan]# List Mode[/cyan]
-  [blue]zettl project[/blue]                List all projects with stats
-
-  [cyan]# Detail Mode (note the -l flag)[/cyan]
-  [blue]zettl project -l learn-rust[/blue]    View project detail with categorized notes
-  [blue]zettl project -l learn-rust -f[/blue] View with full note content
-  [blue]zettl project -l learn-rust -t backend[/blue]  Filter to backend-tagged notes
-
-  [cyan]# Create Mode[/cyan]
+  [blue]zettl project[/blue]                List all projects
+  [blue]zettl project -l learn-rust[/blue]    View project detail
+  [blue]zettl project -l learn-rust -f[/blue] View with full content
   [blue]zettl project "Learn Rust" --id learn-rust[/blue]
-  [blue]zettl project "Q1 Planning" --id q1-2024[/blue]
-  [blue]zettl project "Website Redesign" --id web-redesign -t urgent[/blue]
-
-[bold]Note:[/bold] Projects serve as organizational containers. Use custom IDs to make
-them easy to reference when creating tasks, ideas, and notes with -l project-id.
+  [blue]zettl project "Website Redesign" --id web-redesign[/blue]
 """,
 
             "p": f"""
-[bold green]p [CONTENT][/bold green] - Shortcut for 'project' command (detail/create only)
-
-[bold]Note:[/bold] The 'p' shortcut works for detail view and create mode, but not list mode.
-For listing all projects, use the full command: [cyan]zettl project[/cyan]
+[bold green]p [CONTENT][/bold green] - Shortcut for 'project' command
 
 See 'zettl project --help' for full documentation.
 """,
@@ -325,365 +284,246 @@ See 'zettl project --help' for full documentation.
 [bold green]list[/bold green] - List recent notes
 
 [bold]Options:[/bold]
-  [yellow]-l, --limit NUMBER[/yellow]  Number of notes to display (default: 10)
-  [yellow]-f, --full[/yellow]          Show full content of notes
-  [yellow]-c, --compact[/yellow]       Show very compact list (IDs only)
+  [yellow]-l, --limit NUMBER[/yellow]  Number of notes (default: 10)
+  [yellow]-f, --full[/yellow]          Show full content
+  [yellow]-c, --compact[/yellow]       Show IDs only
 
 [bold]Examples:[/bold]
-  [blue]zettl list[/blue]                  Show 10 most recent notes
-  [blue]zettl list --limit 5[/blue]        Show 5 most recent notes
-  [blue]zettl list --full[/blue]           Show full content of recent notes
-  [blue]zettl list -c[/blue]               Show compact list of note IDs
+  [blue]zettl list[/blue]
+  [blue]zettl list --limit 20[/blue]
+  [blue]zettl list --full[/blue]
 """,
 
             "show": f"""
-[bold green]show NOTE_ID[/bold green] - Display note content and optionally related notes
+[bold green]show NOTE_ID[/bold green] - Display note content and related notes
 
 [bold]Options:[/bold]
-  [yellow]-r, --related[/yellow]       Also show all notes linked to this note (bidirectional)
-  [yellow]-f, --full[/yellow]          Show full content of related notes (requires -r)
+  [yellow]-r, --related[/yellow]       Show linked notes (bidirectional)
+  [yellow]-f, --full[/yellow]          Show full content of related notes
 
 [bold]Examples:[/bold]
-  [blue]zettl show 22a4b[/blue]          Show content of note with ID 22a4b
-  [blue]zettl show 22a4b -r[/blue]       Show note and all related notes
-  [blue]zettl show 22a4b -r -f[/blue]    Show note and related notes with full content
-
-[bold]Note:[/bold] The -r flag shows bidirectional links (both incoming and outgoing).
-This replaces the old 'related' command.
+  [blue]zettl show 22a4b[/blue]
+  [blue]zettl show 22a4b -r[/blue]
+  [blue]zettl show 22a4b -r -f[/blue]
 """,
 
             "search": f"""
-[bold green]search [QUERY][/bold green] - Search for notes containing text, with tags, or by date
+[bold green]search [QUERY][/bold green] - Search notes by text, tags, or date
 
 [bold]Options:[/bold]
-  [yellow]-t, --tag TAG[/yellow]        Include notes with this tag (can specify multiple, must have ALL)
-  [yellow]+t, --exclude-tag TAG[/yellow] Exclude notes with this tag (can specify multiple, excludes ANY)
-  [yellow]-d, --date DATE[/yellow]      Search for notes created on a specific date (YYYY-MM-DD)
-  [yellow]-f, --full[/yellow]           Show full content of matching notes
-
-[bold]Tag Logic:[/bold]
-  • Multiple [cyan]-t[/cyan] tags: Note must have ALL specified tags (AND logic)
-  • Multiple [cyan]+t[/cyan] tags: Note must not have ANY specified tags (OR logic)
-  • Combining both: Must match includes AND not match excludes
+  [yellow]-t, --tag TAG[/yellow]        Must have tag (AND with multiple)
+  [yellow]+t, --exclude-tag TAG[/yellow] Must not have tag (OR with multiple)
+  [yellow]-d, --date DATE[/yellow]      Created on date (YYYY-MM-DD)
+  [yellow]-f, --full[/yellow]           Show full content
 
 [bold]Examples:[/bold]
-  [blue]zettl search "keyword"[/blue]                 Search notes containing "keyword"
-  [blue]zettl search -t work -t urgent[/blue]         Notes with BOTH "work" AND "urgent" tags
-  [blue]zettl search -t project +t done[/blue]        "project" tags but NOT "done"
-  [blue]zettl search +t todo +t done[/blue]           Exclude notes with "todo" OR "done" tags
-  [blue]zettl search -t work -t urgent +t done[/blue] "work" AND "urgent" but NOT "done"
-  [blue]zettl search -d 2025-04-07 -t work[/blue]     Created on date AND has "work" tag
+  [blue]zettl search "keyword"[/blue]
+  [blue]zettl search -t work -t urgent[/blue]    Has work AND urgent
+  [blue]zettl search -t project +t done[/blue]   Has project, not done
+  [blue]zettl search -d 2025-04-07 -t work[/blue]
 """,
 
             "link": f"""
 [bold green]link SOURCE_ID TARGET_ID[/bold green] - Create or remove link between notes
 
-[bold]Usage:[/bold]
-  zettl link SOURCE_ID TARGET_ID
-
 [bold]Options:[/bold]
-  [yellow]-c, --context TEXT[/yellow]   Add context to the link
-  [yellow]-r, --remove[/yellow]         Remove the link instead of creating
+  [yellow]-c, --context TEXT[/yellow]   Add context
+  [yellow]-r, --remove[/yellow]         Remove link
 
 [bold]Examples:[/bold]
-  [blue]zettl link 22a4b 18c3d[/blue]                    Create link
-  [blue]zettl link 22a4b 18c3d --context "Related"[/blue] Create with context
-  [blue]zettl link 22a4b 18c3d -r[/blue]                 Remove link
+  [blue]zettl link 22a4b 18c3d[/blue]
+  [blue]zettl link 22a4b 18c3d --context "Related"[/blue]
+  [blue]zettl link 22a4b 18c3d -r[/blue]
 """,
 
             "related": f"""
-[bold green]related NOTE_ID[/bold green] - Show notes connected to this note
+[bold green]related NOTE_ID[/bold green] - Show connected notes
 
-[bold yellow]DEPRECATED:[/bold yellow] This functionality has been merged into the 'show' command.
-Use [cyan]show -r[/cyan] instead.
-
-[bold]New Usage:[/bold]
-  [cyan]zettl show NOTE_ID -r[/cyan]         Show note and all related notes
-  [cyan]zettl show NOTE_ID -r -f[/cyan]      Show with full content of related notes
+[bold yellow]DEPRECATED:[/bold yellow] Use [cyan]show -r[/cyan] instead.
 
 [bold]Examples:[/bold]
-  [blue]zettl show 22a4b -r[/blue]          (replaces: zettl related 22a4b)
-  [blue]zettl show 22a4b -r -f[/blue]       (replaces: zettl related 22a4b --full)
-
-See 'zettl show --help' for more information.
+  [blue]zettl show 22a4b -r[/blue]          Show note and related notes
+  [blue]zettl show 22a4b -r -f[/blue]       Show with full content
 """,
 
             "graph": f"""
-[bold green]graph [NOTE_ID][/bold green] - Generate a graph visualization of notes
-
-[bold]Usage:[/bold]
-  zettl graph [NOTE_ID]
+[bold green]graph [NOTE_ID][/bold green] - Export graph visualization data
 
 [bold]Options:[/bold]
-  [yellow]-o, --output FILENAME[/yellow]  Output file for graph data (default: zettl_graph.json)
-  [yellow]-d, --depth NUMBER[/yellow]     Depth of connections to include (default: 2)
+  [yellow]-o, --output FILE[/yellow]  Output file (default: zettl_graph.json)
+  [yellow]-d, --depth NUMBER[/yellow]  Connection depth (default: 2)
 
 [bold]Examples:[/bold]
-  [blue]zettl graph[/blue]                         Graph all notes
-  [blue]zettl graph 22a4b[/blue]                  Graph centered on note 22a4b
-  [blue]zettl graph 22a4b --output my_graph.json[/blue]
-  [blue]zettl graph 22a4b --depth 3[/blue]        Include notes up to 3 links away
+  [blue]zettl graph[/blue]                    All notes
+  [blue]zettl graph 22a4b[/blue]              Centered on note
+  [blue]zettl graph 22a4b --depth 3[/blue]    3 links deep
 """,
 
             "tags": f"""
-[bold green]tags [NOTE_ID] ["TAGS"][/bold green] - Show, add, or remove tags from a note
+[bold green]tags [NOTE_ID] ["TAGS"][/bold green] - List all tags or manage note tags
 
 [bold]Usage:[/bold]
-  zettl tags                          List all tags
-  zettl tags NOTE_ID                  Show tags for a specific note
-  zettl tags NOTE_ID "TAG"            Add a single tag to a note
-  zettl tags NOTE_ID "TAG1 TAG2..."  Add multiple tags (space-separated in quotes)
-  zettl tags NOTE_ID "TAG" -r         Remove tag(s) from a note
+  zettl tags                  List all tags
+  zettl tags NOTE_ID          Show note's tags
+  zettl tags NOTE_ID "TAG"    Add tag
+  zettl tags NOTE_ID "TAG" -r Remove tag
 
 [bold]Options:[/bold]
-  [yellow]-r, --remove[/yellow]   Remove the specified tag(s) instead of adding
+  [yellow]-r, --remove[/yellow]   Remove tag instead of adding
 
 [bold]Examples:[/bold]
-  [blue]zettl tags[/blue]                         List all tags with counts
-  [blue]zettl tags 22a4b[/blue]                   Show tags for note 22a4b
-  [blue]zettl tags 22a4b concept[/blue]           Add "concept" tag
-  [blue]zettl tags 22a4b "todo urgent"[/blue]     Add multiple tags
-  [blue]zettl tags 22a4b concept -r[/blue]        Remove "concept" tag
-  [blue]zettl tags 22a4b "todo urgent" -r[/blue]  Remove multiple tags
+  [blue]zettl tags[/blue]
+  [blue]zettl tags 22a4b[/blue]
+  [blue]zettl tags 22a4b concept[/blue]
+  [blue]zettl tags 22a4b "todo urgent"[/blue]
+  [blue]zettl tags 22a4b concept -r[/blue]
 """,
 
 "todos": f"""
-[bold green]todos[/bold green] - List all notes tagged with 'todo'
+[bold green]todos[/bold green] - List todos
 
-[bold yellow]DEPRECATED:[/bold yellow] This command has been unified with the 'todo' command.
-Use [cyan]todo[/cyan] (with no content) instead.
-
-[bold]New Usage:[/bold]
-  [cyan]zettl todo[/cyan]                    List active todos
-  [cyan]zettl todo -a[/cyan]                 Show all todos (active, done, canceled)
-  [cyan]zettl todo -dt[/cyan]                Show todos completed today
-  [cyan]zettl todo -t work[/cyan]            Filter todos by tag
-  [cyan]zettl todo -l project[/cyan]          Filter todos by linked note
+[bold yellow]DEPRECATED:[/bold yellow] Use [cyan]todo[/cyan] instead.
 
 [bold]Examples:[/bold]
-  [blue]zettl todo[/blue]                   (replaces: zettl todos)
-  [blue]zettl todo -a[/blue]                (replaces: zettl todos -a)
-  [blue]zettl todo -dt[/blue]               (replaces: zettl todos -dt)
-  [blue]zettl todo -t work[/blue]           (replaces: zettl todos -t work)
-
-[bold]Note:[/bold] The 'todo' command now has dual modes:
-  • No content = List todos (old 'todos' command)
-  • With content = Create todo (old 'task' command)
-
-See 'zettl todo --help' for full documentation.
+  [blue]zettl todo[/blue]      List active todos
+  [blue]zettl todo -a[/blue]   Show all todos
 """,
 
             "delete": f"""
-[bold green]delete NOTE_ID[/bold green] - Delete a note and its associated data
-
-[bold]Usage:[/bold]
-  zettl delete NOTE_ID
+[bold green]delete NOTE_ID[/bold green] - Delete a note
 
 [bold]Options:[/bold]
-  [yellow]-f, --force[/yellow]         Skip confirmation prompt
-  [yellow]--keep-links[/yellow]        Keep links to and from this note
-  [yellow]--keep-tags[/yellow]         Keep tags associated with this note
+  [yellow]-f, --force[/yellow]      Skip confirmation
+  [yellow]--keep-links[/yellow]     Keep links
+  [yellow]--keep-tags[/yellow]      Keep tags
 
 [bold]Examples:[/bold]
   [blue]zettl delete 22a4b[/blue]
-  [blue]zettl delete 22a4b --force[/blue]     Delete without confirmation
-  [blue]zettl delete 22a4b --keep-tags[/blue] Delete note but keep its tags
+  [blue]zettl delete 22a4b --force[/blue]
+  [blue]zettl delete 22a4b --keep-tags[/blue]
 """,
 
             "untag": f"""
-[bold green]untag[/bold green] - Remove a tag from a note
+[bold green]untag[/bold green] - Remove tag from note
 
-[bold yellow]DEPRECATED:[/bold yellow] This command has been merged into 'tags'.
-Use [cyan]tags -r[/cyan] instead.
+[bold yellow]DEPRECATED:[/bold yellow] Use [cyan]tags -r[/cyan] instead.
 
-[bold]New Usage:[/bold]
-  [cyan]zettl tags NOTE_ID TAG -r[/cyan]
-
-[bold]Examples:[/bold]
-  [blue]zettl tags 22a4b concept -r[/blue]        (replaces: zettl untag 22a4b concept)
-  [blue]zettl tags 22a4b "a b c" -r[/blue]        Remove multiple tags
-
-See 'zettl tags --help' for more information.
+[bold]Example:[/bold]
+  [blue]zettl tags 22a4b concept -r[/blue]
 """,
 
             "unlink": f"""
-[bold green]unlink[/bold green] - Remove a link between two notes
+[bold green]unlink[/bold green] - Remove link between notes
 
-[bold yellow]DEPRECATED:[/bold yellow] This command has been merged into 'link'.
-Use [cyan]link -r[/cyan] instead.
+[bold yellow]DEPRECATED:[/bold yellow] Use [cyan]link -r[/cyan] instead.
 
-[bold]New Usage:[/bold]
-  [cyan]zettl link SOURCE_ID TARGET_ID -r[/cyan]
-
-[bold]Examples:[/bold]
-  [blue]zettl link 22a4b 18c3d -r[/blue]  (replaces: zettl unlink 22a4b 18c3d)
-
-See 'zettl link --help' for more information.
+[bold]Example:[/bold]
+  [blue]zettl link 22a4b 18c3d -r[/blue]
 """,
 
             "append": f"""
-[bold green]append NOTE_ID TEXT[/bold green] - Append text to the end of a note
-
-[bold]Usage:[/bold]
-  zettl append NOTE_ID "Text to append"
-
-[bold]Description:[/bold]
-  Adds the provided text to the end of an existing note.
-  A newline is automatically added between the existing content and new text.
+[bold green]append NOTE_ID TEXT[/bold green] - Add text to end of note
 
 [bold]Examples:[/bold]
-  [blue]zettl append 22a4b "Additional thoughts on this topic"[/blue]
-  [blue]zettl append 22a4b "Follow-up: new research findings"[/blue]
-
-[bold]Use cases:[/bold]
-  • Adding new information to existing notes
-  • Appending updates or follow-ups
-  • Building notes incrementally over time
+  [blue]zettl append 22a4b "Additional thoughts"[/blue]
+  [blue]zettl append 22a4b "Follow-up: new findings"[/blue]
 """,
 
             "prepend": f"""
-[bold green]prepend NOTE_ID TEXT[/bold green] - Prepend text to the beginning of a note
-
-[bold]Usage:[/bold]
-  zettl prepend NOTE_ID "Text to prepend"
-
-[bold]Description:[/bold]
-  Adds the provided text to the beginning of an existing note.
-  A newline is automatically added between the new text and existing content.
+[bold green]prepend NOTE_ID TEXT[/bold green] - Add text to beginning of note
 
 [bold]Examples:[/bold]
   [blue]zettl prepend 22a4b "UPDATE: "[/blue]
-  [blue]zettl prepend 22a4b "IMPORTANT: This has been revised"[/blue]
-
-[bold]Use cases:[/bold]
-  • Adding status updates at the top of notes
-  • Inserting important context before original content
-  • Marking notes with time-sensitive information
+  [blue]zettl prepend 22a4b "IMPORTANT: Revised"[/blue]
 """,
 
             "edit": f"""
-[bold green]edit NOTE_ID[/bold green] - Edit a note in your default text editor
-
-[bold]Usage:[/bold]
-  zettl edit NOTE_ID
+[bold green]edit NOTE_ID[/bold green] - Edit note in default text editor
 
 [bold]Description:[/bold]
-  Opens the note in your system's default text editor for full editing.
-
-  [bold]Platform-specific behavior:[/bold]
-  • [cyan]Linux/Mac:[/cyan] Uses $EDITOR or $VISUAL environment variable (defaults to nano)
-  • [cyan]Windows:[/cyan] Uses notepad or $EDITOR environment variable
+  Opens note in $EDITOR (defaults to nano on Linux/Mac, notepad on Windows).
 
 [bold]Examples:[/bold]
-  [blue]zettl edit 22a4b[/blue]                  # Edit note 22a4b
-  [blue]export EDITOR=vim && zettl edit 22a4b[/blue]  # Use vim (Linux/Mac)
-  [blue]set EDITOR=code && zettl edit 22a4b[/blue]    # Use VS Code (Windows)
-
-[bold]Tips:[/bold]
-  • Set your preferred editor: export EDITOR=vim (or nano, emacs, etc.)
-  • Changes are saved when you exit the editor
-  • If no changes are made, the note remains unchanged
+  [blue]zettl edit 22a4b[/blue]
+  [blue]export EDITOR=vim && zettl edit 22a4b[/blue]
 """,
 
             "merge": f"""
-[bold green]merge NOTE_ID1 NOTE_ID2 [NOTE_ID3 ...][/bold green] - Merge multiple notes into a single note
+[bold green]merge NOTE_ID1 NOTE_ID2 [...][/bold green] - Combine multiple notes into one
 
-[bold]Usage:[/bold]
-  zettl merge NOTE_ID1 NOTE_ID2 [NOTE_ID3 ...]
-
-[bold]What it does:[/bold]
-  • Combines content from all notes (ordered by creation date)
-  • Collects all unique tags from all notes
-  • Preserves external links (updates them to point to new note)
-  • Deletes the old notes after successful merge
+[bold]Description:[/bold]
+  Combines content, tags, and links. Deletes old notes after merge.
 
 [bold]Options:[/bold]
-  [yellow]-f, --force[/yellow]  Skip confirmation prompt
+  [yellow]-f, --force[/yellow]  Skip confirmation
 
 [bold]Examples:[/bold]
-  [blue]zettl merge 22a4b 18c3d[/blue]            Merge two notes
-  [blue]zettl merge 22a4b 18c3d 45f6g[/blue]       Merge three notes
-  [blue]zettl merge 22a4b 18c3d --force[/blue]     Merge without confirmation
-
-[bold]Note:[/bold]
-  This is useful for consolidating related notes or combining duplicates.
-  All tags and external links are preserved in the new merged note.
+  [blue]zettl merge 22a4b 18c3d[/blue]
+  [blue]zettl merge 22a4b 18c3d 45f6g[/blue]
+  [blue]zettl merge 22a4b 18c3d --force[/blue]
 """,
 
             "llm": f"""
-[bold green]llm NOTE_ID[/bold green] - Use Claude AI to analyze and enhance notes
+[bold green]llm NOTE_ID[/bold green] - AI-powered note analysis
 
 [bold]Actions:[/bold]
-  [yellow]summarize[/yellow]   Generate a concise summary of the note
-  [yellow]connect[/yellow]     Find potential connections to other notes
-  [yellow]tags[/yellow]        Suggest relevant tags for the note
-  [yellow]expand[/yellow]      Create an expanded version of the note
-  [yellow]concepts[/yellow]    Extract key concepts from the note
-  [yellow]questions[/yellow]   Generate thought-provoking questions
-  [yellow]critique[/yellow]    Provide constructive feedback on the note
+  [yellow]summarize[/yellow]   Generate summary (default)
+  [yellow]connect[/yellow]     Find connections to other notes
+  [yellow]tags[/yellow]        Suggest tags
+  [yellow]expand[/yellow]      Create expanded version
+  [yellow]concepts[/yellow]    Extract key concepts
+  [yellow]questions[/yellow]   Generate questions
+  [yellow]critique[/yellow]    Provide feedback
 
 [bold]Options:[/bold]
-  [yellow]-a, --action ACTION[/yellow]  LLM action to perform (see above)
-  [yellow]-c, --count NUMBER[/yellow]   Number of results to return (default: 3)
-  [yellow]-s, --show-source[/yellow]    Show the source note before analysis
-  [yellow]-d, --debug[/yellow]          Show debug information for troubleshooting
+  [yellow]-a, --action ACTION[/yellow]  Action to perform
+  [yellow]-c, --count NUMBER[/yellow]   Number of results (default: 3)
+  [yellow]-s, --show-source[/yellow]    Show source note
+  [yellow]-d, --debug[/yellow]          Show debug info
 
 [bold]Examples:[/bold]
-  [blue]zettl llm 22a4b[/blue]                 Summarize note 22a4b (default action)
-  [blue]zettl llm 22a4b -a tags[/blue]         Suggest tags for note 22a4b
-  [blue]zettl llm 22a4b -a connect -c 5[/blue] Find 5 related notes to note 22a4b
-  [blue]zettl llm 22a4b -a expand[/blue]       Create an expanded version of the note
-  [blue]zettl llm 22a4b -a concepts[/blue]     Extract key concepts from the note
-  [blue]zettl llm 22a4b -a questions[/blue]    Generate questions based on the note
-  [blue]zettl llm 22a4b -a critique[/blue]     Get constructive feedback on the note
+  [blue]zettl llm 22a4b[/blue]
+  [blue]zettl llm 22a4b -a tags[/blue]
+  [blue]zettl llm 22a4b -a connect -c 5[/blue]
+  [blue]zettl llm 22a4b -a expand[/blue]
 """,
 
             "api-key": f"""
-[bold green]api-key[/bold green] - Manage API keys for CLI access
+[bold green]api-key[/bold green] - Manage API keys
 
 [bold]Usage:[/bold]
-  api-key                    # List your existing API keys
-  api-key generate           # Generate new API key with default name
-  api-key generate "My Key"  # Generate new API key with custom name
-
-[bold]Description:[/bold]
-  API keys allow you to authenticate with the Zettl CLI from the command line.
-  Each key can have a custom name to help you identify its purpose.
+  api-key                    List existing keys
+  api-key generate           Generate new key
+  api-key generate "Name"    Generate with custom name
 
 [bold]Examples:[/bold]
-  api-key generate "Development Key"  # Create key for development
-  api-key                           # View all your keys
+  [blue]api-key generate "Development Key"[/blue]
+  [blue]api-key[/blue]
 
-[bold]Notes:[/bold]
-  - API keys are only shown once when generated
-  - Copy and save them immediately
-  - Configure with CLI: zettl auth setup
+[bold]Note:[/bold] Keys are only shown once. Configure with: zettl auth setup
 """,
 
             "rules": f"""
-[bold green]rules[/bold green] - Display a random rule from notes tagged with 'rules'
-
-[bold]Usage:[/bold]
-  zettl rules
+[bold green]rules[/bold green] - Display random rule from notes
 
 [bold]Options:[/bold]
-  [yellow]-s, --source[/yellow]  Show the source note ID
+  [yellow]-s, --source[/yellow]  Show source note ID
 
 [bold]Examples:[/bold]
   [blue]zettl rules[/blue]
-  [blue]zettl rules --source[/blue]  # Show the source note ID
+  [blue]zettl rules --source[/blue]
 """,
 
             "help": f"""
 [bold green]help[/bold green] - Show help information
 
 [bold]Usage:[/bold]
-  zettl help              Show general help
-  zettl COMMAND --help    Show help for a specific command
+  zettl help              General help
+  zettl COMMAND --help    Command-specific help
 
 [bold]Examples:[/bold]
   [blue]zettl help[/blue]
-  [blue]zettl search --help[/blue]
+  [blue]zettl todo --help[/blue]
 """
         }
         
