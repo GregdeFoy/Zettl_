@@ -89,9 +89,6 @@ class CommandHelp:
     [blue]→[/blue] zettl link 22a4b 18c3d
     [blue]→[/blue] zettl link 22a4b 18c3d -r   # Remove link
 
-  [bold yellow]graph[/bold yellow]               Export graph visualization data
-    [blue]→[/blue] zettl graph 22a4b --depth 2
-
 [bold]ORGANIZATION[/bold]
   [bold yellow]tags[/bold yellow]                List all tags or manage note tags
     [blue]→[/blue] zettl tags                  # List all tags
@@ -344,19 +341,6 @@ See 'zettl project --help' for full documentation.
 [bold]Examples:[/bold]
   [blue]zettl show 22a4b -r[/blue]          Show note and related notes
   [blue]zettl show 22a4b -r -f[/blue]       Show with full content
-""",
-
-            "graph": f"""
-[bold green]graph [NOTE_ID][/bold green] - Export graph visualization data
-
-[bold]Options:[/bold]
-  [yellow]-o, --output FILE[/yellow]  Output file (default: zettl_graph.json)
-  [yellow]-d, --depth NUMBER[/yellow]  Connection depth (default: 2)
-
-[bold]Examples:[/bold]
-  [blue]zettl graph[/blue]                    All notes
-  [blue]zettl graph 22a4b[/blue]              Centered on note
-  [blue]zettl graph 22a4b --depth 3[/blue]    3 links deep
 """,
 
             "tags": f"""

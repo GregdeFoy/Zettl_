@@ -9,7 +9,6 @@ from datetime import datetime
 import time
 from typing import Optional
 from zettl.notes import Notes
-from zettl.graph import NoteGraph
 from zettl.llm import LLMHelper
 from zettl.config import APP_NAME, APP_VERSION
 from zettl.formatting import ZettlFormatter, console
@@ -28,10 +27,6 @@ def get_notes_manager():
     """Get an authenticated Notes manager."""
     api_key = zettl_auth.require_auth()
     return Notes(api_key=api_key)
-
-def get_graph_manager():
-    """Get a graph manager (doesn't need auth currently)."""
-    return NoteGraph()
 
 def get_llm_helper():
     """Get an authenticated LLM helper."""
@@ -1329,20 +1324,6 @@ def search(query, tag, exclude_tag, date, full):
                 console.print()  # Empty line between notes
     except Exception as e:
         console.print(ZettlFormatter.error(str(e)))
-
-@cli.command()
-@click.argument('note_id', required=False)
-@click.option('--output', '-o', default='zettl_graph.json', help='Output file for graph data')
-@click.option('--depth', '-d', default=2, help='How many levels of connections to include')
-@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def graph(note_id, output, depth):
-    """Generate a graph visualization of notes and their connections."""
-    try:
-        file_path = get_graph_manager().export_graph(output, note_id, depth)
-        click.echo(f"Graph data exported to {file_path}")
-        click.echo("You can visualize this data using a graph visualization tool.")
-    except Exception as e:
-        click.echo(f"Error generating graph: {str(e)}", err=True)
 
 @cli.command()
 @click.argument('note_id')

@@ -253,16 +253,6 @@ COMMAND_OPTIONS = {
             'remove': {'flag': True}
         }
     },
-    'graph': {
-        'short_opts': {
-            'o': {'name': 'output'},
-            'd': {'name': 'depth', 'type': int}
-        },
-        'long_opts': {
-            'output': {},
-            'depth': {'type': int}
-        }
-    },
     'delete': {
         'short_opts': {
             'f': {'name': 'force', 'flag': True}
@@ -2462,14 +2452,7 @@ def execute_command():
                             # Preview mode
                             content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
                             result += f"{ZettlFormatter.note_id(note['id'])}: {content_preview}\n"
-                
-        elif cmd == "graph":
-            # Generate graph - not fully implemented in web version
-            note_id = remaining_args[0] if remaining_args else None
-            output = options.get('output', options.get('o', 'zettl_graph.json'))
-            result = f"Graph feature not fully implemented in web version.\n"
-            result += f"On CLI, this would generate a graph visualization of notes and save to {output}"
-            
+
         elif cmd == "llm":
             # LLM commands
             if not remaining_args:
