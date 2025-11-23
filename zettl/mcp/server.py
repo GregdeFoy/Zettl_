@@ -64,6 +64,7 @@ class ZettlMCPServer:
 
             try:
                 # Route to appropriate tool method
+                # READ OPERATIONS
                 if name == "search_notes":
                     result = self.tools.search_notes(arguments.get("query", ""))
                 elif name == "get_note":
@@ -80,6 +81,33 @@ class ZettlMCPServer:
                     result = self.tools.get_related_notes(arguments.get("note_id"))
                 elif name == "search_notes_by_date":
                     result = self.tools.search_notes_by_date(arguments.get("date"))
+                # WRITE OPERATIONS
+                elif name == "create_note":
+                    result = self.tools.create_note(
+                        content=arguments.get("content"),
+                        tags=arguments.get("tags")
+                    )
+                elif name == "append_to_note":
+                    result = self.tools.append_to_note(
+                        note_id=arguments.get("note_id"),
+                        content=arguments.get("content")
+                    )
+                elif name == "add_tags_to_note":
+                    result = self.tools.add_tags_to_note(
+                        note_id=arguments.get("note_id"),
+                        tags=arguments.get("tags")
+                    )
+                elif name == "create_link_between_notes":
+                    result = self.tools.create_link_between_notes(
+                        source_id=arguments.get("source_id"),
+                        target_id=arguments.get("target_id"),
+                        context=arguments.get("context", "")
+                    )
+                elif name == "update_note_content":
+                    result = self.tools.update_note_content(
+                        note_id=arguments.get("note_id"),
+                        content=arguments.get("content")
+                    )
                 else:
                     result = {"error": f"Unknown tool: {name}"}
 
