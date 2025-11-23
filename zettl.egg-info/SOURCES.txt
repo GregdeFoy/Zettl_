@@ -8,7 +8,6 @@ zettl/completion.py
 zettl/config.py
 zettl/database.py
 zettl/formatting.py
-zettl/graph.py
 zettl/help.py
 zettl/llm.py
 zettl/notes.py

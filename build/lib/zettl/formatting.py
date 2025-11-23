@@ -31,8 +31,8 @@ class ZettlFormatter:
     def note_id(cls, note_id):
         """Format a note ID."""
         if cls._mode == 'web':
-            # Web: use backticks for monospace + emphasis
-            return f"`#{note_id}`"
+            # Web: use custom span with class for styling
+            return f'<span class="note-id-inline">#{note_id}</span>'
         else:
             # Bold bright cyan for excellent readability on black backgrounds
             return f"[bold bright_cyan]#{note_id}[/bold bright_cyan]"
@@ -51,8 +51,8 @@ class ZettlFormatter:
     def tag(cls, tag_text):
         """Format a tag."""
         if cls._mode == 'web':
-            # Web: use backticks for tags
-            return f"`#{tag_text}`"
+            # Web: use custom span with brackets and styling
+            return f'<span class="tag-inline">[{tag_text}]</span>'
         else:
             # Bright yellow with brackets for clear tag identification
             # Escape brackets to prevent rich from parsing them as markup
@@ -122,7 +122,10 @@ class ZettlFormatter:
                 line_parts.append(" ".join(formatted_tags))
 
             first_line = content.split('\n')[0]
-            line_parts.append(f"| {first_line}")
+            if cls._mode == 'web':
+                line_parts.append(f'<span class="pipe-sep">|</span> {first_line}')
+            else:
+                line_parts.append(f"| {first_line}")
             console.print("  ".join(line_parts))
 
         else:  # mode == 'full'
