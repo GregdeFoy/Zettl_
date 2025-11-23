@@ -3,6 +3,10 @@ import os
 import sys
 from setuptools import setup, find_packages
 
+# Import version from zettl package
+sys.path.insert(0, os.path.dirname(__file__))
+from zettl import __version__
+
 # Determine platform-specific dependencies
 if sys.platform == 'win32':
     platform_deps = ['pyreadline3', 'colorama']  # colorama for Windows color support
@@ -11,7 +15,7 @@ else:
 
 setup(
     name="zettl",
-    version="0.7.5",
+    version=__version__,
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
