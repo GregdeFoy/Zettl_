@@ -3,2433 +3,1255 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Zettl Web</title>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <title>Zettl</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/monokai.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             /* Neo-Brutalist Color Palette */
-            --bg-main: #FFF8E7;        /* Warm cream background */
-            --bg-dark: #1E1E1E;         /* Dark sections */
-            --primary: #FF5E5B;         /* Coral red */
-            --secondary: #FFCC00;       /* Bold yellow */
-            --accent: #00D9FF;          /* Electric cyan */
-            --success: #00FF88;         /* Neon green */
-            --text-dark: #1E1E1E;       /* Almost black */
-            --text-light: #FFF8E7;      /* Cream */
-            --border-dark: #1E1E1E;     /* Black borders */
-            --shadow-color: #1E1E1E;    /* Shadow color */
+            --cream: #FFF8E7;
+            --yellow: #FFCC00;
+            --coral: #FF5E5B;
+            --cyan: #00D9FF;
+            --green: #00FF88;
+            --black: #000000;
 
-            /* Legacy color mappings for compatibility */
-            --bg-color: var(--bg-main);
-            --header-bg: var(--secondary);
-            --terminal-text: var(--text-dark);
-            --primary-color: var(--primary);
-            --button-bg: var(--bg-main);
-            --button-hover: var(--accent);
-            --input-bg: var(--bg-main);
-            --input-border: var(--border-dark);
-            --green: var(--success);
-            --blue: var(--accent);
-            --yellow: var(--secondary);
-            --red: var(--primary);
-            --cyan: var(--accent);
+            /* Borders & Shadows */
+            --border: 4px;
+            --border-thick: 6px;
+            --shadow: 6px 6px 0 rgba(0, 0, 0, 0.3);
+            --shadow-lg: 8px 8px 0 rgba(0, 0, 0, 0.3);
 
-            /* Spacing & Borders */
-            --border-width: 4px;
-            --border-width-thick: 6px;
-            --shadow-offset: 6px;
-            --shadow-offset-lg: 10px;
+            /* Spacing */
+            --header-height: 70px;
+            --hint-bar-height: 50px;
         }
 
         * {
-            box-sizing: border-box;
             margin: 0;
             padding: 0;
-        }
-
-        html, body {
-            height: 100%;
-            overflow: hidden;
+            box-sizing: border-box;
         }
 
         body {
             font-family: 'JetBrains Mono', monospace;
-            background-color: var(--bg-color);
-            color: var(--terminal-text);
-            display: flex;
-            flex-direction: column;
+            background: var(--cream);
+            color: var(--black);
+            height: 100vh;
+            overflow: hidden;
             position: relative;
+            outline: none;
         }
 
-        /* Decorative background pattern */
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-image:
-                repeating-linear-gradient(
-                    45deg,
-                    transparent,
-                    transparent 100px,
-                    rgba(255, 94, 91, 0.03) 100px,
-                    rgba(255, 94, 91, 0.03) 200px
-                );
-            pointer-events: none;
-            z-index: 0;
+        body:focus {
+            outline: none;
         }
 
+        /* ===== HEADER ===== */
         #header {
-            background: var(--secondary);
-            border-bottom: var(--border-width-thick) solid var(--border-dark);
-            padding: 20px;
+            height: var(--header-height);
+            background: var(--yellow);
+            border-bottom: var(--border-thick) solid var(--black);
+            box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 var(--shadow-offset) 0 var(--shadow-color);
+            padding: 0 20px;
             position: relative;
-            z-index: 100;
+            z-index: 200;
         }
 
         .logo {
             font-family: 'Space Grotesk', sans-serif;
-            font-size: 36px;
+            font-size: 32px;
             font-weight: 700;
-            letter-spacing: -3px;
-            color: var(--text-dark);
-            background: var(--bg-main);
-            padding: 8px 20px;
-            border: var(--border-width) solid var(--border-dark);
-            box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--shadow-color);
             transform: rotate(-2deg);
-            display: inline-block;
-            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #mode-indicator {
+            padding: 8px 16px;
+            border: 3px solid var(--black);
+            font-weight: 700;
+            font-size: 14px;
+            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.2);
             transition: all 0.2s;
         }
 
-        .logo:hover {
-            transform: rotate(2deg) scale(1.05);
-            box-shadow: var(--shadow-offset-lg) var(--shadow-offset-lg) 0 var(--shadow-color);
+        .mode-normal {
+            background: var(--cyan);
+            color: var(--black);
         }
 
-        .username-badge {
-            background: var(--bg-main);
-            padding: 8px 16px;
-            border: 3px solid var(--border-dark);
-            font-weight: 700;
-            box-shadow: 3px 3px 0 var(--shadow-color);
+        .mode-insert {
+            background: var(--coral);
+            color: white;
         }
 
-        #header .actions {
+        .header-actions {
             display: flex;
-            gap: 10px;
+            gap: 12px;
+            align-items: center;
         }
 
-        #header .actions button {
-            background: var(--primary);
-            color: var(--text-light);
-            border: var(--border-width) solid var(--border-dark);
-            padding: 12px 20px;
+        .btn-header {
+            padding: 10px 16px;
+            background: var(--black);
+            color: white;
+            border: 3px solid var(--black);
+            font-family: 'JetBrains Mono', monospace;
             font-weight: 700;
-            text-transform: uppercase;
-            box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--shadow-color);
+            font-size: 14px;
             cursor: pointer;
-            transition: all 0.15s;
-            font-family: 'Space Grotesk', sans-serif;
-            letter-spacing: 0.5px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
         }
 
-        #header .actions button:hover {
+        .btn-header:hover {
             transform: translate(-2px, -2px);
-            box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0 var(--shadow-color);
+            box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.3);
         }
 
-        #header .actions button:active {
-            transform: translate(4px, 4px);
-            box-shadow: 2px 2px 0 var(--shadow-color);
+        .btn-header:active {
+            transform: translate(1px, 1px);
+            box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3);
         }
 
-        #app-container {
-            display: flex;
-            flex-direction: column;
-            height: calc(100% - 43px); /* Subtract header height */
-            position: relative;
-            overflow: hidden;
-        }
-
-        #terminal-output {
-            flex: 1 1 auto;
+        /* ===== MAIN CONTENT AREA ===== */
+        #main-content {
+            height: calc(100vh - var(--header-height) - var(--hint-bar-height));
             overflow-y: auto;
-            padding: 30px;
-            font-size: 16px;
-            line-height: 1.6;
-            background: var(--bg-main);
-            border-left: var(--border-width-thick) solid var(--border-dark);
-            border-right: var(--border-width-thick) solid var(--border-dark);
-            scrollbar-width: thick;
-            scrollbar-color: var(--primary) var(--bg-main);
-            -webkit-overflow-scrolling: touch;
+            padding: 20px;
             position: relative;
             z-index: 1;
         }
 
-        #terminal-output::-webkit-scrollbar {
-            width: 16px;
+        #output {
+            max-width: 900px;
+            margin: 0 auto;
+            padding-bottom: 40px;
         }
 
-        #terminal-output::-webkit-scrollbar-track {
-            background: var(--bg-main);
-            border-left: var(--border-width) solid var(--border-dark);
-        }
-
-        #terminal-output::-webkit-scrollbar-thumb {
-            background: var(--primary);
-            border: var(--border-width) solid var(--border-dark);
-        }
-
-        #terminal-output .output-line {
-            margin-bottom: 8px;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-
-        /* ASCII art logo handling */
-        #terminal-output .logo-container {
-            overflow-x: auto;
-            white-space: nowrap;
-            margin-bottom: 15px;
-            padding-bottom: 5px;
-            font-size: 0.9em;
-        }
-
-        /* Processing messages - new styling */
-        #terminal-output .processing-message {
-            padding: 8px 12px;
-            background-color: rgba(74, 74, 74, 0.3);
-            border-left: 3px solid var(--primary-color);
-            margin-bottom: 10px;
-            font-style: italic;
-            font-size: 0.9em;
-            opacity: 0.8;
-        }
-
-        /* Markdown styling for formatted output */
-        .markdown-content {
-            line-height: 1.6;
-        }
-
-        /* Headers rendered by markdown */
-        .markdown-content h1,
-        .markdown-content h2,
-        .markdown-content h3,
-        .markdown-content h4 {
-            color: var(--green);
-            font-weight: bold;
-            margin: 0.5em 0;
-        }
-
-        /* Code blocks and inline code (used for note IDs and tags) */
-        .markdown-content code {
-            color: var(--cyan);
-            background-color: rgba(255, 255, 255, 0.05);
-            padding: 2px 4px;
-            border-radius: 3px;
-            font-family: 'Courier New', monospace;
-        }
-
-        /* Emphasis (used for timestamps) */
-        .markdown-content em {
-            color: var(--blue);
-            font-style: italic;
-        }
-
-        /* Strong/bold (used for headers and emphasis) */
-        .markdown-content strong {
-            color: var(--green);
-            font-weight: bold;
-        }
-
-        /* Lists */
-        .markdown-content ul,
-        .markdown-content ol {
-            margin-left: 1.5em;
-            margin-bottom: 0.5em;
-        }
-
-        .markdown-content li {
-            margin-bottom: 0.25em;
-        }
-
-        /* Code blocks */
-        .markdown-content pre {
-            background-color: rgba(255, 255, 255, 0.05);
-            padding: 10px;
-            border-radius: 5px;
-            overflow-x: auto;
-            margin: 0.5em 0;
-        }
-
-        .markdown-content pre code {
-            background: none;
-            padding: 0;
-        }
-
-        #terminal-output .error,
-        .markdown-content .error {
-            color: var(--red);
-        }
-
-        #terminal-output .warning,
-        .markdown-content .warning {
-            color: var(--yellow);
-        }
-
-        #terminal-output .success,
-        .markdown-content .success {
-            color: var(--green);
-        }
-
-        #terminal-output .info,
-        .markdown-content .info {
-            color: var(--cyan);
-        }
-
-        #input-area {
-            flex: 0 0 auto;
-            background: var(--secondary);
-            border-top: var(--border-width-thick) solid var(--border-dark);
-            border-left: var(--border-width-thick) solid var(--border-dark);
-            border-right: var(--border-width-thick) solid var(--border-dark);
-            border-bottom: var(--border-width-thick) solid var(--border-dark);
+        .note-card {
+            background: white;
+            border: var(--border) solid var(--black);
+            box-shadow: var(--shadow);
             padding: 20px;
-            position: relative;
-            z-index: 100;
-            box-shadow: 0 -var(--shadow-offset) 0 var(--shadow-color);
+            margin-bottom: 20px;
+            transform: rotate(-0.5deg);
+            transition: all 0.2s;
         }
 
-        #shortcut-buttons {
+        .note-card:hover {
+            transform: rotate(0deg) translate(-2px, -2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .note-header {
             display: flex;
-            overflow-x: auto;
-            margin-bottom: 15px;
-            padding: 15px;
-            background: var(--accent);
-            border: var(--border-width) solid var(--border-dark);
-            scrollbar-width: none;
-            -webkit-overflow-scrolling: touch;
-            gap: 10px;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--black);
         }
 
-        #shortcut-buttons::-webkit-scrollbar {
-            display: none;
-        }
-
-        #shortcut-buttons button {
-            background: var(--bg-main);
-            color: var(--text-dark);
-            border: 3px solid var(--border-dark);
-            padding: 10px 16px;
-            font-weight: 600;
-            font-size: 13px;
-            box-shadow: 3px 3px 0 var(--shadow-color);
-            cursor: pointer;
-            transition: all 0.1s;
-            font-family: 'JetBrains Mono', monospace;
-            white-space: nowrap;
-            flex-shrink: 0;
-        }
-
-        #shortcut-buttons button:hover {
-            background: var(--secondary);
-            transform: translate(-1px, -1px);
-            box-shadow: 4px 4px 0 var(--shadow-color);
-        }
-
-        #shortcut-buttons button:active {
-            transform: translate(2px, 2px);
-            box-shadow: 1px 1px 0 var(--shadow-color);
-        }
-
-        #input-wrapper {
-            display: flex;
-            width: 100%;
-            position: relative;
-        }
-
-        #prompt-label {
-            position: relative;
-            background: var(--bg-main);
-            padding: 12px 18px;
-            border: 3px solid var(--border-dark);
-            box-shadow: 3px 3px 0 var(--shadow-color);
-            font-weight: 800;
-            font-size: 18px;
-            color: var(--text-dark);
-            user-select: none;
-            transform: rotate(-1deg);
-            margin-right: 10px;
-            flex-shrink: 0;
-        }
-
-        /* Style for sub-option buttons */
-        #shortcut-buttons button[data-subopt] {
-            background-color: #3a7a50;
-        }
-
-        #shortcut-buttons button[data-subopt]:hover {
-            background-color: #4a8a60;
-        }
-
-        /* Separators for button groups */
-        .button-separator {
-            border-left: 1px solid #555;
-            height: 24px;
-            margin: 0 8px;
-        }
-        #command-input {
-            flex-grow: 1;
-            background: var(--bg-main);
-            border: var(--border-width) solid var(--border-dark);
-            padding: 15px;
+        .note-id {
+            font-weight: 700;
+            color: var(--coral);
             font-size: 16px;
+        }
+
+        .note-timestamp {
+            font-size: 12px;
+            opacity: 0.6;
+        }
+
+        .note-content {
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .note-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .tag {
+            padding: 4px 12px;
+            background: var(--yellow);
+            border: 2px solid var(--black);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        /* ===== HINT BAR (collapsed state) ===== */
+        #hint-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: var(--hint-bar-height);
+            background: var(--cyan);
+            border-top: var(--border) solid var(--black);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 100;
+            transition: all 0.3s;
+        }
+
+        #hint-bar:hover {
+            background: var(--yellow);
+        }
+
+        #hint-bar-content {
+            font-size: 14px;
+            font-weight: 700;
+            opacity: 0.7;
+        }
+
+        /* ===== COMMAND SHEET (bottom sheet) ===== */
+        #command-sheet {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 75vh;
+            background: var(--cream);
+            border-top: var(--border-thick) solid var(--black);
+            box-shadow: 0 -8px 0 rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 300;
+            display: flex;
+            flex-direction: column;
+            border-radius: 24px 24px 0 0;
+        }
+
+        #command-sheet.hidden {
+            transform: translateY(100%);
+        }
+
+        #command-sheet.visible {
+            transform: translateY(0);
+        }
+
+        /* Dim overlay when sheet is open */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 250;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        #overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .sheet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 3px solid var(--black);
+            background: var(--yellow);
+        }
+
+        .sheet-mode {
+            font-weight: 700;
+            font-size: 16px;
+            text-transform: uppercase;
+        }
+
+        .btn-close {
+            padding: 8px 16px;
+            background: var(--coral);
+            color: white;
+            border: 3px solid var(--black);
+            font-weight: 700;
+            cursor: pointer;
             font-family: 'JetBrains Mono', monospace;
-            font-weight: 500;
-            color: var(--text-dark);
-            box-shadow: inset 3px 3px 0 rgba(30, 30, 30, 0.1);
-            outline: none;
-            position: relative;
-            resize: none; /* Disable manual resizing */
-            overflow-y: hidden; /* Hide scrollbar */
-            min-height: 50px; /* Minimum height for one line + padding */
-            max-height: 120px; /* Max height (approximately 4 lines) */
-            line-height: 1.4;
+            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .sheet-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        #command-input {
             width: 100%;
+            min-height: 120px;
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            border: var(--border) solid var(--black);
+            background: white;
+            resize: vertical;
+            box-shadow: inset 3px 3px 0 rgba(0, 0, 0, 0.1);
+            margin-bottom: 16px;
         }
 
         #command-input:focus {
-            background: var(--bg-main);
-            box-shadow: inset 0 0 0 3px var(--accent);
-        }
-
-        #submit-button {
-            background: var(--success);
-            color: var(--text-dark);
-            border: var(--border-width) solid var(--border-dark);
-            padding: 15px 24px;
-            margin-left: 10px;
-            font-weight: 700;
-            font-size: 16px;
-            text-transform: uppercase;
-            box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--shadow-color);
-            cursor: pointer;
-            transition: all 0.15s;
-            font-family: 'Space Grotesk', sans-serif;
-        }
-
-        #submit-button:hover {
-            transform: translate(-2px, -2px);
-            box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0 var(--shadow-color);
-        }
-
-        #submit-button:active {
-            transform: translate(4px, 4px);
-            box-shadow: 2px 2px 0 var(--shadow-color);
-        }
-
-        /* Clear input button - new */
-        #clear-input-button {
-            position: absolute;
-            right: 45px; /* Moved to the left of the submit button */
-            top: 9px; /* Aligned with first line */
-            background-color: var(--button-bg);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            opacity: 0.7;
-            z-index: 10;
-        }
-
-        #clear-input-button:hover {
-            opacity: 1;
-            background-color: var(--button-hover);
-        }
-
-        .loading-indicator {
-            display: inline-block;
-            margin-left: 10px;
-            animation: pulse 1s infinite;
-        }
-
-        /* Extra padding for safari to account for toolbar */
-        @supports (-webkit-touch-callout: none) {
-            #terminal-output {
-                padding-bottom: 70px;
-            }
-        }
-
-        @keyframes pulse {
-            0% { opacity: 0.5; }
-            50% { opacity: 1; }
-            100% { opacity: 0.5; }
-        }
-
-        /* Make sure we account for iOS safe areas */
-        @supports (padding-bottom: env(safe-area-inset-bottom)) {
-            #input-area {
-                padding-bottom: calc(10px + env(safe-area-inset-bottom));
-            }
-        }
-
-        /* Adjust for different screen sizes */
-        @media (min-width: 768px) {
-            #terminal-output {
-                font-size: 14px;
-            }
-
-            #command-input {
-                font-size: 14px;
-            }
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            animation: fadeIn 0.2s;
-        }
-
-        .modal.show {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        .modal-content {
-            background: var(--bg-main);
-            border: var(--border-width-thick) solid var(--border-dark);
-            box-shadow: var(--shadow-offset-lg) var(--shadow-offset-lg) 0 var(--shadow-color);
-            width: 90%;
-            max-width: 800px;
-            max-height: 90vh;
-            display: flex;
-            flex-direction: column;
-            animation: slideIn 0.3s;
-            transform: rotate(-0.5deg);
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateY(-50px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-
-        .modal-header {
-            padding: 15px 20px;
-            border-bottom: 1px solid #555;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-header h3 {
-            margin: 0;
-            color: var(--primary-color);
-            font-size: 18px;
-        }
-
-        .modal-header #modal-note-id {
-            color: var(--cyan);
-        }
-
-        .modal-close-btn {
-            background: none;
-            border: none;
-            color: var(--terminal-text);
-            font-size: 28px;
-            cursor: pointer;
-            padding: 0;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 4px;
-        }
-
-        .modal-close-btn:hover {
-            background-color: var(--button-hover);
-        }
-
-        .modal-body {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-        }
-
-        #modal-textarea {
-            width: 100%;
-            height: 400px;
-            background-color: var(--bg-color);
-            color: var(--terminal-text);
-            border: 1px solid var(--input-border);
-            border-radius: 4px;
-            padding: 12px;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            line-height: 1.5;
-            resize: vertical;
             outline: none;
+            box-shadow: inset 0 0 0 3px var(--cyan);
         }
 
-        #modal-textarea:focus {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 5px rgba(144, 238, 144, 0.3);
-        }
-
-        .modal-footer {
-            padding: 15px 20px;
-            border-top: 1px solid #555;
+        .option-pills {
             display: flex;
-            justify-content: flex-end;
-            gap: 10px;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
         }
 
-        .modal-btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            font-family: 'Courier New', monospace;
+        .pill {
+            padding: 8px 16px;
+            background: white;
+            border: 3px solid var(--black);
             font-size: 14px;
+            font-weight: 700;
             cursor: pointer;
-            font-weight: bold;
+            transition: all 0.2s;
+            font-family: 'JetBrains Mono', monospace;
         }
 
-        .modal-btn-cancel {
-            background-color: var(--button-bg);
-            color: white;
+        .pill:hover {
+            background: var(--cyan);
+            transform: translateY(-2px);
         }
 
-        .modal-btn-cancel:hover {
-            background-color: var(--button-hover);
+        .pill:active {
+            transform: translateY(0);
         }
 
-        .modal-btn-save {
-            background-color: var(--primary-color);
-            color: #000;
+        .section-title {
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            opacity: 0.6;
+            letter-spacing: 1px;
         }
 
-        .modal-btn-save:hover {
-            background-color: #a0ffa0;
+        #suggestions {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 2px solid var(--black);
         }
 
-        @media (max-width: 768px) {
-            .modal-content {
-                width: 95%;
-                max-height: 95vh;
-            }
-
-            #modal-textarea {
-                height: 300px;
-            }
-
-            .modal-header h3 {
-                font-size: 16px;
-            }
-        }
-
-        /* Markdown rendering styles */
-        .markdown-content h1,
-        .markdown-content h2,
-        .markdown-content h3,
-        .markdown-content h4,
-        .markdown-content h5,
-        .markdown-content h6 {
-            color: var(--primary-color);
-            margin-top: 1em;
-            margin-bottom: 0.5em;
-            font-weight: bold;
-        }
-
-        .markdown-content h1 { font-size: 1.8em; }
-        .markdown-content h2 { font-size: 1.5em; }
-        .markdown-content h3 { font-size: 1.3em; }
-        .markdown-content h4 { font-size: 1.1em; }
-
-        .markdown-content code {
-            background-color: rgba(255, 255, 255, 0.1);
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-family: 'Courier New', monospace;
-            color: var(--cyan);
-        }
-
-        .markdown-content pre {
-            background-color: rgba(0, 0, 0, 0.3);
+        .suggestion-item {
             padding: 12px;
-            border-radius: 4px;
-            overflow-x: auto;
-            margin: 10px 0;
+            background: white;
+            border: 2px solid var(--black);
+            margin-bottom: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
         }
 
-        .markdown-content pre code {
-            background-color: transparent;
-            padding: 0;
-            color: inherit;
+        .suggestion-item:hover {
+            background: var(--cyan);
+            transform: translateX(4px);
         }
 
-        .markdown-content ul,
-        .markdown-content ol {
-            margin: 10px 0;
-            padding-left: 30px;
-        }
-
-        .markdown-content li {
-            margin: 5px 0;
-        }
-
-        .markdown-content blockquote {
-            border-left: 3px solid var(--primary-color);
-            padding-left: 15px;
-            margin: 10px 0;
-            color: var(--yellow);
-            font-style: italic;
-        }
-
-        .markdown-content a {
-            color: var(--blue);
-            text-decoration: underline;
-        }
-
-        .markdown-content a:hover {
-            color: var(--cyan);
-        }
-
-        .markdown-content strong {
-            font-weight: bold;
-            color: var(--green);
-        }
-
-        .markdown-content em {
-            font-style: italic;
-            color: var(--yellow);
-        }
-
-        .markdown-content hr {
-            border: none;
-            border-top: 1px solid #555;
-            margin: 20px 0;
-        }
-
-        .markdown-content table {
-            border-collapse: collapse;
-            margin: 10px 0;
+        .btn-submit {
             width: 100%;
+            padding: 18px;
+            background: var(--green);
+            color: var(--black);
+            border: var(--border) solid var(--black);
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 18px;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: var(--shadow);
+            transition: all 0.2s;
+            margin-top: 16px;
         }
 
-        .markdown-content th,
-        .markdown-content td {
-            border: 1px solid #555;
-            padding: 8px;
-            text-align: left;
+        .btn-submit:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: var(--shadow-lg);
         }
 
-        .markdown-content th {
-            background-color: rgba(144, 238, 144, 0.2);
-            font-weight: bold;
+        .btn-submit:active {
+            transform: translate(2px, 2px);
+            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
         }
 
-        /* Chat Panel Styles */
-        .chat-panel {
+        .drag-handle {
+            text-align: center;
+            padding: 12px;
+            background: var(--yellow);
+            border-bottom: 3px solid var(--black);
+            font-size: 18px;
+            font-weight: 700;
+            cursor: grab;
+        }
+
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+
+        /* ===== KEYBOARD SHORTCUTS HELP ===== */
+        #shortcuts-help {
             position: fixed;
-            top: 0;
-            right: -450px;
-            width: 450px;
-            height: 100%;
-            background: var(--bg-main);
-            border-left: var(--border-width-thick) solid var(--border-dark);
-            box-shadow: -var(--shadow-offset-lg) 0 0 var(--shadow-color);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: var(--border-thick) solid var(--black);
+            box-shadow: var(--shadow-lg);
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            z-index: 400;
+            display: none;
+        }
+
+        #shortcuts-help.visible {
+            display: block;
+        }
+
+        .shortcuts-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 12px 20px;
+            margin-top: 20px;
+        }
+
+        .shortcut-key {
+            padding: 6px 12px;
+            background: var(--yellow);
+            border: 2px solid var(--black);
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .shortcut-desc {
+            display: flex;
+            align-items: center;
+        }
+
+        /* ===== CHAT PANEL ===== */
+        #chat-panel {
+            position: fixed;
+            right: -400px;
+            top: var(--header-height);
+            width: 400px;
+            height: calc(100vh - var(--header-height));
+            background: white;
+            border-left: var(--border-thick) solid var(--black);
+            box-shadow: -8px 0 0 rgba(0, 0, 0, 0.3);
+            transition: right 0.3s;
+            z-index: 150;
             display: flex;
             flex-direction: column;
-            transition: right 0.3s ease;
-            z-index: 1000;
-            min-width: 300px;
-            max-width: 80vw;
         }
 
-        .chat-panel.open {
+        #chat-panel.open {
             right: 0;
         }
 
-        .chat-panel.collapsed .chat-messages,
-        .chat-panel.collapsed .chat-input-container {
-            display: none;
-        }
-
-        .chat-resize-handle {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 5px;
-            height: 100%;
-            cursor: col-resize;
-            background-color: transparent;
-            z-index: 1001;
-        }
-
-        .chat-resize-handle:hover,
-        .chat-resize-handle.resizing {
-            background-color: #4a9eff;
-        }
-
-        .chat-minimize-btn {
-            background: none;
-            border: none;
-            color: #fff;
-            font-size: 24px;
-            cursor: pointer;
-            padding: 0 10px;
-            margin-left: 10px;
-        }
-
-        .chat-minimize-btn:hover {
-            color: #4a9eff;
-        }
-
         .chat-header {
-            background: var(--primary);
-            padding: 20px;
-            border-bottom: var(--border-width) solid var(--border-dark);
+            padding: 16px;
+            background: var(--coral);
+            color: white;
+            border-bottom: 3px solid var(--black);
+            font-weight: 700;
             display: flex;
             justify-content: space-between;
             align-items: center;
-        }
-
-        .chat-header h3 {
-            margin: 0;
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--text-light);
-            text-transform: uppercase;
-        }
-
-        .chat-close-btn {
-            background: none;
-            border: none;
-            color: var(--terminal-text);
-            font-size: 24px;
-            cursor: pointer;
-            padding: 0;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .chat-close-btn:hover {
-            color: var(--red);
         }
 
         .chat-messages {
             flex: 1;
             overflow-y: auto;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .chat-welcome {
-            background-color: rgba(144, 238, 144, 0.1);
-            border: 1px solid var(--green);
-            border-radius: 6px;
-            padding: 15px;
-            color: var(--green);
-            font-size: 14px;
-        }
-
-        .chat-welcome ul {
-            margin: 10px 0 0 20px;
-            padding: 0;
-        }
-
-        .chat-welcome li {
-            margin: 5px 0;
+            padding: 20px;
         }
 
         .chat-message {
+            margin-bottom: 16px;
             padding: 12px;
-            border: 3px solid var(--border-dark);
-            background: var(--bg-main);
-            box-shadow: 3px 3px 0 var(--shadow-color);
-            max-width: 85%;
-            word-wrap: break-word;
-            font-size: 14px;
-            line-height: 1.5;
-            margin-bottom: 15px;
+            border: 2px solid var(--black);
+            background: var(--cream);
         }
 
         .chat-message.user {
-            background: var(--accent);
-            align-self: flex-end;
-            margin-left: 30px;
-            color: var(--text-dark);
+            background: var(--cyan);
+            margin-left: 20px;
         }
 
         .chat-message.assistant {
-            background: var(--secondary);
-            align-self: flex-start;
-            margin-right: 30px;
-            color: var(--text-dark);
-        }
-
-        /* Markdown styling in assistant messages */
-        .chat-message.assistant h1,
-        .chat-message.assistant h2,
-        .chat-message.assistant h3,
-        .chat-message.assistant h4 {
-            color: #4a9eff;
-            margin: 8px 0 4px 0;
-            font-weight: bold;
-        }
-
-        .chat-message.assistant h1 { font-size: 1.3em; }
-        .chat-message.assistant h2 { font-size: 1.2em; }
-        .chat-message.assistant h3 { font-size: 1.1em; }
-        .chat-message.assistant h4 { font-size: 1.05em; }
-
-        .chat-message.assistant p {
-            margin: 8px 0;
-        }
-
-        .chat-message.assistant code {
-            background: rgba(0, 0, 0, 0.3);
-            color: #4a9eff;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9em;
-        }
-
-        .chat-message.assistant pre {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 8px;
-            border-radius: 4px;
-            overflow-x: auto;
-            margin: 8px 0;
-        }
-
-        .chat-message.assistant pre code {
-            background: none;
-            padding: 0;
-            color: #e0e0e0;
-        }
-
-        .chat-message.assistant ul,
-        .chat-message.assistant ol {
-            margin: 8px 0;
-            padding-left: 20px;
-        }
-
-        .chat-message.assistant li {
-            margin: 4px 0;
-        }
-
-        .chat-message.assistant strong {
-            color: #90ee90;
-            font-weight: bold;
-        }
-
-        .chat-message.assistant em {
-            color: #add8e6;
-            font-style: italic;
-        }
-
-        .chat-message.assistant hr {
-            border: none;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-            margin: 12px 0;
-        }
-
-        .chat-message.assistant blockquote {
-            border-left: 3px solid #4a9eff;
-            padding-left: 12px;
-            margin: 8px 0;
-            color: #888;
-            font-style: italic;
-        }
-
-        .chat-message.loading {
-            background-color: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            align-self: flex-start;
-            color: #999;
-            font-style: italic;
+            background: white;
+            margin-right: 20px;
         }
 
         .chat-input-area {
-            border-top: 2px solid #444;
-            padding: 15px;
-            display: flex;
-            gap: 10px;
-            background-color: #2a2a2a;
+            padding: 16px;
+            border-top: 3px solid var(--black);
         }
 
-        #chat-input {
-            flex: 1;
-            background-color: var(--input-bg);
-            color: var(--terminal-text);
-            border: 1px solid var(--input-border);
-            border-radius: 4px;
-            padding: 10px;
-            font-family: inherit;
-            font-size: 14px;
-            resize: none;
-            min-height: 44px;
+        .chat-input {
+            width: 100%;
+            min-height: 60px;
+            padding: 12px;
+            border: 3px solid var(--black);
+            font-family: 'JetBrains Mono', monospace;
+            resize: vertical;
         }
 
-        #chat-input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-        }
-
-        #send-chat-btn {
-            background-color: var(--primary-color);
-            color: #1a1a1a;
-            border: none;
-            padding: 0 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 14px;
-            transition: opacity 0.2s;
-        }
-
-        #send-chat-btn:hover {
-            opacity: 0.8;
-        }
-
-        #send-chat-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
+        /* ===== MOBILE RESPONSIVE ===== */
         @media (max-width: 768px) {
-            .chat-panel {
+            .logo {
+                font-size: 24px;
+            }
+
+            #mode-indicator {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+
+            .btn-header {
+                font-size: 12px;
+                padding: 8px 12px;
+            }
+
+            #command-sheet {
+                height: 85vh;
+            }
+
+            #chat-panel {
                 width: 100%;
                 right: -100%;
             }
+
+            #shortcuts-help {
+                width: 95%;
+                padding: 20px;
+            }
+        }
+
+        /* ===== LOADING INDICATOR ===== */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--black);
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ===== MARKDOWN RENDERING ===== */
+        .markdown-content h1, .markdown-content h2, .markdown-content h3 {
+            margin-top: 20px;
+            margin-bottom: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .markdown-content p {
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+
+        .markdown-content code {
+            background: var(--yellow);
+            padding: 2px 6px;
+            border: 1px solid var(--black);
+            font-size: 0.9em;
+        }
+
+        .markdown-content pre {
+            background: #1E1E1E;
+            color: white;
+            padding: 16px;
+            overflow-x: auto;
+            margin: 12px 0;
+            border: 3px solid var(--black);
+        }
+
+        .markdown-content pre code {
+            background: transparent;
+            border: none;
+            padding: 0;
+        }
+
+        .markdown-content ul, .markdown-content ol {
+            margin-left: 24px;
+            margin-bottom: 12px;
+        }
+
+        /* ===== CLEAN NOTE RENDERING (CLI-INSPIRED) ===== */
+        .note-id-inline {
+            color: #1E40AF;
+            font-weight: 700;
+            font-size: 14px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .tag-inline {
+            color: #92400E;
+            font-size: 13px;
+            font-weight: 400;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .pipe-sep {
+            color: #666;
+            font-weight: 400;
+            margin: 0 4px;
+        }
+
+        /* Override markdown code styling to not interfere with inline elements */
+        .markdown-content .note-id-inline,
+        .markdown-content .tag-inline,
+        .markdown-content .pipe-sep {
+            background: transparent;
+            padding: 0;
+            border: none;
+        }
+
+        /* Better line spacing for note lists */
+        .markdown-content p {
+            line-height: 1.5;
+            color: #1A1A1A;
+        }
+
+        .markdown-content li {
+            margin-bottom: 6px;
+        }
+
+        .markdown-content a {
+            color: var(--coral);
+            text-decoration: none;
+            border-bottom: 2px solid var(--coral);
+        }
+
+        .markdown-content a:hover {
+            background: var(--yellow);
+        }
+
+        .markdown-content blockquote {
+            border-left: 4px solid var(--black);
+            padding-left: 16px;
+            margin: 12px 0;
+            opacity: 0.8;
         }
     </style>
 </head>
-<body>
+<body tabindex="0">
+    <!-- Header -->
     <div id="header">
-        <span class="logo">ZETTL</span>
-        <div class="actions">
-            <button id="toggle-chat-btn" title="Toggle Chat (Ctrl+K)">CHAT</button>
-            <button onclick="window.location.href='/settings'" title="Settings">SETTINGS</button>
+        <div class="logo">ZETTL <span id="mode-indicator" class="mode-normal">NORMAL</span></div>
+        <div class="header-actions">
+            <button class="btn-header" onclick="toggleChat()">CHAT</button>
+            <button class="btn-header" onclick="window.location.href='/settings'">SETTINGS</button>
+            <button class="btn-header" onclick="logout()">LOGOUT</button>
         </div>
-        <span id="username" class="username-badge">{{ username }}</span>
     </div>
 
-    <div id="app-container">
-        <div id="terminal-output">
-            <!-- Terminal output will be inserted here -->
-        </div>
-        
-        <div id="input-area">
-            <div id="shortcut-buttons">
-                <!-- Dynamic buttons will be inserted here -->
-            </div>
-            <div id="input-wrapper">
-                <span id="prompt-label">zettl&gt;</span>
-                <textarea id="command-input" rows="1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
-                <button id="clear-input-button">×</button>
-                <button id="submit-button">↵</button>
+    <!-- Main Content -->
+    <div id="main-content">
+        <div id="output">
+            <!-- Notes and command output will be rendered here -->
+            <div class="note-card">
+                <div class="note-header">
+                    <div class="note-id">Welcome to Zettl</div>
+                </div>
+                <div class="note-content">
+                    <p>Press <strong>/</strong>, <strong>t</strong>, <strong>i</strong>, or <strong>n</strong> to start. Press <strong>?</strong> for help.</p>
+                </div>
             </div>
         </div>
+    </div>
+
+    <!-- Hint Bar (collapsed state) -->
+    <div id="hint-bar" onclick="openSheet('')">
+        <div id="hint-bar-content">&gt;_ Tap or press / to enter command</div>
+    </div>
+
+    <!-- Overlay (dims background when sheet is open) -->
+    <div id="overlay" onclick="closeSheet()"></div>
+
+    <!-- Command Sheet (bottom sheet) -->
+    <div id="command-sheet" class="hidden">
+        <div class="drag-handle" id="drag-handle">═══ Drag ═══</div>
+
+        <div class="sheet-header">
+            <span class="sheet-mode">INSERT</span>
+            <button class="btn-close" onclick="closeSheet()">✕ ESC</button>
+        </div>
+
+        <div class="sheet-body">
+            <textarea id="command-input" placeholder="Enter command..."></textarea>
+
+            <div class="section-title">Options</div>
+            <div id="option-pills" class="option-pills">
+                <!-- Dynamically populated based on command -->
+            </div>
+
+            <div class="section-title">Quick Commands</div>
+            <div class="option-pills">
+                <button class="pill" onclick="fillCommand('todo ')">todo</button>
+                <button class="pill" onclick="fillCommand('idea ')">idea</button>
+                <button class="pill" onclick="fillCommand('note ')">note</button>
+                <button class="pill" onclick="fillCommand('project ')">project</button>
+                <button class="pill" onclick="fillCommand('list ')">list</button>
+                <button class="pill" onclick="fillCommand('search ')">search</button>
+                <button class="pill" onclick="fillCommand('show ')">show</button>
+                <button class="pill" onclick="fillCommand('tags ')">tags</button>
+                <button class="pill" onclick="fillCommand('link ')">link</button>
+                <button class="pill" onclick="fillCommand('llm ')">llm</button>
+            </div>
+
+            <div id="suggestions">
+                <!-- Autocomplete suggestions will appear here -->
+            </div>
+
+            <button class="btn-submit" onclick="submitCommand()">⏎ SUBMIT</button>
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Help -->
+    <div id="shortcuts-help">
+        <h2 style="font-family: 'Space Grotesk', sans-serif; margin-bottom: 16px;">Keyboard Shortcuts</h2>
+        <div class="shortcuts-grid">
+            <div class="shortcut-key">t</div>
+            <div class="shortcut-desc">New todo</div>
+
+            <div class="shortcut-key">i</div>
+            <div class="shortcut-desc">New idea</div>
+
+            <div class="shortcut-key">n</div>
+            <div class="shortcut-desc">New note</div>
+
+            <div class="shortcut-key">p</div>
+            <div class="shortcut-desc">Project view</div>
+
+            <div class="shortcut-key">/</div>
+            <div class="shortcut-desc">Open command</div>
+
+            <div class="shortcut-key">l</div>
+            <div class="shortcut-desc">List notes</div>
+
+            <div class="shortcut-key">s</div>
+            <div class="shortcut-desc">Search</div>
+
+            <div class="shortcut-key">Esc</div>
+            <div class="shortcut-desc">Close sheet/help</div>
+
+            <div class="shortcut-key">?</div>
+            <div class="shortcut-desc">Toggle this help</div>
+        </div>
+        <button class="btn-submit" onclick="toggleHelp()" style="margin-top: 20px;">Close</button>
     </div>
 
     <!-- Chat Panel -->
-    <div id="chat-panel" class="chat-panel">
-        <div class="chat-resize-handle" id="chat-resize-handle"></div>
+    <div id="chat-panel">
         <div class="chat-header">
-            <h3>💬 Chat with Zettl</h3>
-            <div style="display: flex; align-items: center;">
-                <button id="minimize-chat-btn" class="chat-minimize-btn" title="Minimize">−</button>
-                <button id="close-chat-btn" class="chat-close-btn">&times;</button>
-            </div>
+            <span>AI Assistant</span>
+            <button class="btn-close" onclick="toggleChat()">✕</button>
         </div>
-        <div id="chat-messages" class="chat-messages">
-            <div class="chat-welcome">
-                Welcome! I can help you explore your notes. Try asking me to:
-                <ul>
-                    <li>Search for notes about a topic</li>
-                    <li>Find related notes</li>
-                    <li>Show recent notes</li>
-                    <li>Explore notes by tag</li>
-                </ul>
+        <div class="chat-messages" id="chat-messages">
+            <div class="chat-message assistant">
+                Hi! I can help you explore your notes, find connections, and answer questions about your knowledge base.
             </div>
         </div>
         <div class="chat-input-area">
-            <textarea id="chat-input" placeholder="Ask about your notes..." rows="2"></textarea>
-            <button id="send-chat-btn" title="Send (Ctrl+Enter)">Send ↑</button>
+            <textarea class="chat-input" id="chat-input" placeholder="Ask me anything..."></textarea>
+            <button class="btn-submit" onclick="sendChatMessage()" style="margin-top: 12px;">Send</button>
         </div>
     </div>
-
-    <!-- Edit Modal -->
-    <div id="edit-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Edit Note <span id="modal-note-id"></span></h3>
-                <button id="modal-close" class="modal-close-btn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <textarea id="modal-textarea" placeholder="Edit your note here..."></textarea>
-            </div>
-            <div class="modal-footer">
-                <button id="modal-cancel" class="modal-btn modal-btn-cancel">Cancel (Esc)</button>
-                <button id="modal-save" class="modal-btn modal-btn-save">Save (Ctrl+Enter)</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Marked.js for markdown rendering -->
-    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
-    <!-- Optional: highlight.js for syntax highlighting in code blocks -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/monokai.min.css">
-    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
 
     <script>
-// Configure marked to use highlight.js for syntax highlighting
-marked.setOptions({
-    highlight: function(code, lang) {
-        if (lang && hljs.getLanguage(lang)) {
+        // ===== STATE MANAGEMENT =====
+        let currentMode = 'NORMAL';
+        let commandHistory = [];
+        let currentConversationId = null;
+
+        // ===== MODE SWITCHING =====
+        function setMode(mode) {
+            currentMode = mode;
+            const indicator = document.getElementById('mode-indicator');
+            indicator.textContent = mode;
+            indicator.className = mode === 'NORMAL' ? 'mode-normal' : 'mode-insert';
+        }
+
+        // ===== SHEET CONTROLS =====
+        function openSheet(prefill = '') {
+            setMode('INSERT');
+
+            const sheet = document.getElementById('command-sheet');
+            const overlay = document.getElementById('overlay');
+            const hintBar = document.getElementById('hint-bar');
+
+            sheet.classList.remove('hidden');
+            sheet.classList.add('visible');
+            overlay.classList.add('visible');
+            hintBar.style.display = 'none';
+
+            const input = document.getElementById('command-input');
+            input.value = prefill;
+            input.focus();
+
+            updateOptionPills(prefill);
+        }
+
+        function closeSheet() {
+            setMode('NORMAL');
+
+            const sheet = document.getElementById('command-sheet');
+            const overlay = document.getElementById('overlay');
+            const hintBar = document.getElementById('hint-bar');
+
+            sheet.classList.remove('visible');
+            sheet.classList.add('hidden');
+            overlay.classList.remove('visible');
+            hintBar.style.display = 'flex';
+
+            // Return focus to body so keyboard shortcuts work immediately
+            document.body.focus();
+        }
+
+        // ===== KEYBOARD SHORTCUTS (VIM-STYLE) =====
+        let lastKey = '';
+
+        document.addEventListener('keydown', (e) => {
+            // Ignore if typing in an input/textarea
+            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+                if (currentMode === 'INSERT' && e.key === 'Escape') {
+                    closeSheet();
+                    return;
+                }
+
+                // Handle Enter key behavior
+                if (currentMode === 'INSERT' && e.key === 'Enter') {
+                    // Shift+Enter or Backslash+Enter: create newline
+                    if (e.shiftKey || lastKey === '\\') {
+                        // If it was backslash+Enter, remove the backslash
+                        if (lastKey === '\\') {
+                            const textarea = e.target;
+                            const cursorPos = textarea.selectionStart;
+                            const textBefore = textarea.value.substring(0, cursorPos - 1);
+                            const textAfter = textarea.value.substring(cursorPos);
+                            textarea.value = textBefore + '\n' + textAfter;
+                            textarea.selectionStart = textarea.selectionEnd = cursorPos;
+                            e.preventDefault();
+                        }
+                        // Shift+Enter: allow default newline behavior
+                        lastKey = '';
+                        return;
+                    }
+                    // Plain Enter: submit command
+                    e.preventDefault();
+                    submitCommand();
+                    lastKey = '';
+                    return;
+                }
+
+                // Track last key for backslash+Enter detection
+                lastKey = e.key;
+                return;
+            }
+
+            if (currentMode === 'NORMAL') {
+                switch(e.key) {
+                    case 't':
+                        e.preventDefault();
+                        openSheet('todo ');
+                        break;
+                    case 'i':
+                        e.preventDefault();
+                        openSheet('idea ');
+                        break;
+                    case 'n':
+                        e.preventDefault();
+                        openSheet('note ');
+                        break;
+                    case 'p':
+                        e.preventDefault();
+                        openSheet('project ');
+                        break;
+                    case '/':
+                        e.preventDefault();
+                        openSheet('');
+                        break;
+                    case 'l':
+                        e.preventDefault();
+                        openSheet('list ');
+                        break;
+                    case 's':
+                        e.preventDefault();
+                        openSheet('search ');
+                        break;
+                    case '?':
+                        e.preventDefault();
+                        toggleHelp();
+                        break;
+                }
+            }
+        });
+
+        // ===== COMMAND EXECUTION =====
+        function fillCommand(cmd) {
+            const input = document.getElementById('command-input');
+            input.value = cmd;
+            input.focus();
+            updateOptionPills(cmd);
+        }
+
+        async function submitCommand() {
+            const input = document.getElementById('command-input');
+            const command = input.value.trim();
+
+            if (!command) return;
+
+            // Show loading state
+            const output = document.getElementById('output');
+            const loadingCard = document.createElement('div');
+            loadingCard.className = 'note-card';
+            loadingCard.innerHTML = `
+                <div class="note-content">
+                    <div class="loading"></div> Processing: <code>${command}</code>
+                </div>
+            `;
+            output.appendChild(loadingCard);
+
+            // Scroll to bottom
+            document.getElementById('main-content').scrollTop = document.getElementById('main-content').scrollHeight;
+
             try {
-                return hljs.highlight(code, { language: lang }).value;
-            } catch (err) {}
-        }
-        return hljs.highlightAuto(code).value;
-    },
-    breaks: true,
-    gfm: true
-});
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Get DOM elements
-    const terminalOutput = document.getElementById('terminal-output');
-    const commandInput = document.getElementById('command-input');
-    const submitButton = document.getElementById('submit-button');
-    const shortcutButtons = document.getElementById('shortcut-buttons');
-    const clearTerminalButton = document.getElementById('clear-terminal');
-    const clearInputButton = document.getElementById('clear-input-button');
-    const logoutButton = document.getElementById('logout-button');
-
-    // Modal elements
-    const editModal = document.getElementById('edit-modal');
-    const modalNoteId = document.getElementById('modal-note-id');
-    const modalTextarea = document.getElementById('modal-textarea');
-    const modalClose = document.getElementById('modal-close');
-    const modalCancel = document.getElementById('modal-cancel');
-    const modalSave = document.getElementById('modal-save');
-
-    // Modal state
-    let currentEditNoteId = null;
-    let originalContent = '';
-
-    // Command history
-    let commandHistory = loadHistory();
-    let historyIndex = commandHistory.length;
-
-    // Initialize LLM actions array if not already defined
-    if (typeof llmActions === 'undefined') {
-        const llmActions = ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'];
-    }
-
-    // Project ID cache for autocomplete
-    let projectCache = [];
-    let projectCacheTime = 0;
-    const PROJECT_CACHE_TTL = 300000; // 5 minutes in ms
-
-    // Autocomplete state
-    let autocompleteActive = false;
-    let autocompleteIndex = 0;
-    let autocompleteStart = 0;
-
-    // Function to fetch and cache project IDs
-    async function fetchProjectIds() {
-        const now = Date.now();
-        if (projectCache.length > 0 && now - projectCacheTime < PROJECT_CACHE_TTL) {
-            return projectCache;
-        }
-
-        try {
-            const response = await fetch('/api/command', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ command: 'search -t project' })
-            });
-            const data = await response.json();
-
-            if (data.success && data.result) {
-                // Parse the result to extract project IDs
-                const projects = [];
-                const lines = data.result.split('\n');
-                lines.forEach(line => {
-                    // Match lines like "#project-id: content"
-                    const match = line.match(/#([^:]+):\s*(.+)/);
-                    if (match) {
-                        projects.push({
-                            id: match[1],
-                            content: match[2].substring(0, 50) // First 50 chars
-                        });
-                    }
+                const response = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ command })
                 });
-                projectCache = projects;
-                projectCacheTime = now;
-                return projects;
+
+                const data = await response.json();
+
+                // Remove loading card
+                loadingCard.remove();
+
+                // Render result
+                renderCommandResult(command, data.result);
+
+                // Close sheet
+                closeSheet();
+
+                // Clear input
+                input.value = '';
+
+                // Add to history
+                commandHistory.push(command);
+
+            } catch (error) {
+                loadingCard.remove();
+                renderError(`Error executing command: ${error.message}`);
             }
-        } catch (e) {
-            console.error('Failed to fetch project IDs:', e);
-        }
-        return [];
-    }
-
-    // Create autocomplete dropdown element
-    const autocompleteDropdown = document.createElement('div');
-    autocompleteDropdown.id = 'autocomplete-dropdown';
-    autocompleteDropdown.style.cssText = `
-        position: absolute;
-        display: none;
-        background: #2a2a2a;
-        border: 1px solid #555;
-        border-radius: 4px;
-        max-height: 200px;
-        overflow-y: auto;
-        z-index: 1000;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-    `;
-    document.body.appendChild(autocompleteDropdown);
-
-    // Function to show autocomplete dropdown
-    function showAutocomplete(projects, searchTerm) {
-        if (projects.length === 0) return;
-
-        const rect = commandInput.getBoundingClientRect();
-        autocompleteDropdown.style.left = rect.left + 'px';
-        autocompleteDropdown.style.top = (rect.bottom + 2) + 'px';
-        autocompleteDropdown.style.width = Math.min(400, rect.width) + 'px';
-        autocompleteDropdown.innerHTML = '';
-
-        // Filter projects based on search term
-        const filtered = projects.filter(p =>
-            p.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.content.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-
-        if (filtered.length === 0) {
-            hideAutocomplete();
-            return;
         }
 
-        filtered.forEach((project, index) => {
-            const item = document.createElement('div');
-            item.style.cssText = `
-                padding: 8px 12px;
-                cursor: pointer;
-                color: #f0f0f0;
-                ${index === autocompleteIndex ? 'background: #444;' : ''}
+        function renderCommandResult(command, result) {
+            const output = document.getElementById('output');
+
+            const resultCard = document.createElement('div');
+            resultCard.className = 'note-card';
+
+            // Parse markdown if result contains markdown
+            const htmlContent = marked.parse(result);
+
+            resultCard.innerHTML = `
+                <div class="note-header">
+                    <div class="note-id">&gt; ${command}</div>
+                </div>
+                <div class="note-content markdown-content">
+                    ${htmlContent}
+                </div>
             `;
-            item.innerHTML = `
-                <code style="color: #4a9eff; font-weight: bold;">${escapeHtml(project.id)}</code>
-                <span style="color: #888; font-size: 0.9em; margin-left: 8px;">${escapeHtml(project.content)}...</span>
+
+            output.appendChild(resultCard);
+
+            // Scroll to bottom
+            document.getElementById('main-content').scrollTop = document.getElementById('main-content').scrollHeight;
+
+            // Highlight code blocks
+            resultCard.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+            });
+        }
+
+        function renderError(message) {
+            const output = document.getElementById('output');
+
+            const errorCard = document.createElement('div');
+            errorCard.className = 'note-card';
+            errorCard.style.background = 'var(--coral)';
+            errorCard.style.color = 'white';
+
+            errorCard.innerHTML = `
+                <div class="note-content">
+                    <strong>Error:</strong> ${message}
+                </div>
             `;
-            item.addEventListener('click', () => selectAutocomplete(project.id));
-            item.addEventListener('mouseenter', () => {
-                autocompleteIndex = index;
-                updateAutocompleteHighlight();
+
+            output.appendChild(errorCard);
+
+            document.getElementById('main-content').scrollTop = document.getElementById('main-content').scrollHeight;
+        }
+
+        // ===== OPTION PILLS (CONTEXT-AWARE) =====
+        function updateOptionPills(command) {
+            const pillsContainer = document.getElementById('option-pills');
+            pillsContainer.innerHTML = '';
+
+            const cmd = command.trim().split(' ')[0];
+
+            const optionsMap = {
+                'todo': ['-l', '-t', '-a', '-c', '-f', '-dt', '--id'],
+                'idea': ['-l', '-t', '-a', '-c', '-f', '--id'],
+                'note': ['-l', '-t', '-a', '-c', '-f', '--id'],
+                'project': ['-l', '-t', '-a', '-f', '--id'],
+                'list': ['--limit', '--full', '--compact'],
+                'search': ['-t', '+t', '-d', '--full'],
+                'show': ['-r', '--full'],
+                'link': ['-c', '-r'],
+                'tags': ['-r'],
+                'graph': ['-o', '-d'],
+                'delete': ['-f', '--keep-links', '--keep-tags'],
+                'llm': ['-a summarize', '-a tags', '-a connect', '-a expand', '-c']
+            };
+
+            const options = optionsMap[cmd] || [];
+
+            options.forEach(opt => {
+                const pill = document.createElement('button');
+                pill.className = 'pill';
+                pill.textContent = opt;
+                pill.onclick = () => insertOption(opt);
+                pillsContainer.appendChild(pill);
             });
-            autocompleteDropdown.appendChild(item);
-        });
-
-        autocompleteDropdown.style.display = 'block';
-        autocompleteActive = true;
-    }
-
-    // Function to hide autocomplete
-    function hideAutocomplete() {
-        autocompleteDropdown.style.display = 'none';
-        autocompleteActive = false;
-        autocompleteIndex = 0;
-    }
-
-    // Function to select autocomplete item
-    function selectAutocomplete(projectId) {
-        const text = commandInput.value;
-        const beforeAt = text.substring(0, autocompleteStart);
-        const afterCursor = text.substring(commandInput.selectionStart);
-        commandInput.value = beforeAt + '@' + projectId + ' ' + afterCursor.replace(/^[^\s]*/, '');
-        commandInput.selectionStart = commandInput.selectionEnd = beforeAt.length + projectId.length + 2;
-        hideAutocomplete();
-        commandInput.focus();
-        autoResizeTextarea();
-        updateShortcutButtons();
-    }
-
-    // Function to update autocomplete highlight
-    function updateAutocompleteHighlight() {
-        const items = autocompleteDropdown.querySelectorAll('div');
-        items.forEach((item, index) => {
-            item.style.background = index === autocompleteIndex ? '#444' : 'transparent';
-        });
-    }
-
-    // Command to options mapping - for dynamic buttons
-    const commandOptions = {
-        'list': ['-l', '--limit', '-f', '--full', '-c', '--compact', '-h', '--help'],
-        'todo': ['-t', '--tag', '-l', '--link', '--id', '-dt', '--donetoday', '-a', '--all', '-c', '--cancel', '-h', '--help'],
-        't': ['-t', '--tag', '-l', '--link', '--id', '-dt', '--donetoday', '-a', '--all', '-c', '--cancel', '-h', '--help'],
-        'idea': ['-t', '--tag', '-l', '--link', '--id', '-a', '--all', '-c', '--cancel', '-h', '--help'],
-        'i': ['-t', '--tag', '-l', '--link', '--id', '-a', '--all', '-c', '--cancel', '-h', '--help'],
-        'note': ['-t', '--tag', '-l', '--link', '--id', '-a', '--all', '-c', '--cancel', '-h', '--help'],
-        'n': ['-t', '--tag', '-l', '--link', '--id', '-a', '--all', '-c', '--cancel', '-h', '--help'],
-        'project': ['-t', '--tag', '-l', '--link', '--id', '-a', '--all', '-f', '--full', '-h', '--help'],
-        'p': ['-t', '--tag', '-l', '--link', '--id', '-a', '--all', '-f', '--full', '-h', '--help'],
-        'show': ['-r', '--related', '-f', '--full', '-h', '--help'],
-        'search': ['-t', '--tag', '+t', '--exclude-tag', '-f', '--full', '-h', '--help'],
-        'tags': ['-r', '--remove', '-h', '--help'],
-        'link': ['-c', '--context', '-r', '--remove', '-h', '--help'],
-        'graph': ['-o', '--output', '-d', '--depth', '-h', '--help'],
-        'llm': ['-a', '--action', '-c', '--count', '-s', '--show-source', '-d', '--debug', '-h', '--help'],
-        'delete': ['--keep-links', '--keep-tags', '-f', '--force', '-h', '--help'],
-        'merge': ['-f', '--force', '-h', '--help'],
-        'append': ['-h', '--help'],
-        'prepend': ['-h', '--help'],
-        'edit': ['-h', '--help'],
-        'help': ['-h', '--help'],
-        'api-key': ['-g', '--generate', '-l', '--list', '-h', '--help'],
-    };
-
-    // For commands that need auto-quotes
-    const autoQuoteCommands = ['t', 'todo', 'i', 'idea', 'n', 'note', 'p', 'project'];
-
-    // Sub-options for commands like llm
-    const subOptions = {
-        'llm': {
-            '-a': ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'],
-            '--action': ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'],
-            '-c': ['3', '5', '10'],
-            '--count': ['3', '5', '10']
-        }
-    };
-
-    // Top-level commands for initial buttons (organized by category)
-    const topLevelCommands = [
-        // Note Creation/Editing
-        'todo', 'idea', 'note', 'project', 'edit', 'append', 'prepend', 'delete',
-        // Viewing
-        'show', 'list', 'search',
-        // Organization
-        'tags', 'link', 'graph', 'merge',
-        // AI
-        'llm',
-        // Special Features
-        'rules',
-        // System
-        'api-key', 'help', 'clear', 'settings', 'logout'
-    ];
-
-    // Hidden buttons (loaded from settings)
-    let hiddenButtons = [];
-
-    // Function to get visible top-level commands
-    function getVisibleCommands() {
-        return topLevelCommands.filter(cmd => !hiddenButtons.includes(cmd));
-    }
-
-    // Load button preferences from settings
-    async function loadButtonPreferences() {
-        try {
-            const response = await fetch('/api/settings/data');
-            const data = await response.json();
-            if (data.success && data.data.hidden_buttons) {
-                hiddenButtons = data.data.hidden_buttons;
-                // Update buttons after loading preferences
-                updateShortcutButtons();
-            }
-        } catch (e) {
-            console.error('Error loading button preferences:', e);
-        }
-    }
-
-    // Helper function to render markdown
-    function renderMarkdown(content) {
-        try {
-            return marked.parse(content);
-        } catch (e) {
-            console.error('Markdown parsing error:', e);
-            return content;
-        }
-    }
-
-    // Helper function to escape HTML
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    // Helper function to format tool results intelligently
-    function formatToolResult(result) {
-        // Check if it's an error
-        if (result.error) {
-            return `<div style="color: #ff6b6b; padding: 8px; background: rgba(255, 107, 107, 0.1); border-radius: 4px;">
-                <strong>Error:</strong> ${escapeHtml(result.error)}
-            </div>`;
         }
 
-        // Check if it's a success message (from write operations)
-        if (result.success && result.message) {
-            return `<div style="color: #4ade80; padding: 8px; background: rgba(74, 222, 128, 0.1); border-radius: 4px;">
-                <strong>✓ Success:</strong> ${escapeHtml(result.message)}
-                ${result.note_id ? `<br><span style="color: #888; font-size: 0.9em;">Note ID: <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px;">${escapeHtml(result.note_id)}</code></span>` : ''}
-            </div>`;
+        function insertOption(option) {
+            const input = document.getElementById('command-input');
+            const cursorPos = input.selectionStart;
+            const textBefore = input.value.substring(0, cursorPos);
+            const textAfter = input.value.substring(cursorPos);
+
+            input.value = textBefore + ' ' + option + ' ' + textAfter;
+            input.focus();
+            input.selectionStart = input.selectionEnd = cursorPos + option.length + 2;
         }
 
-        // Check if it's a list of notes
-        if (Array.isArray(result) && result.length > 0 && result[0].id && result[0].content) {
-            let html = `<div style="color: #888; margin-bottom: 8px;">Found ${result.length} note${result.length !== 1 ? 's' : ''}:</div>`;
-
-            result.forEach(note => {
-                html += '<div style="margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,0.2); border-left: 2px solid #4a9eff; border-radius: 3px;">';
-
-                // Note header with ID and timestamp
-                html += '<div style="margin-bottom: 6px;">';
-                html += `<code style="color: #4a9eff; background: rgba(74, 158, 255, 0.1); padding: 2px 6px; border-radius: 3px; font-weight: bold;">#${escapeHtml(note.id)}</code>`;
-                if (note.created_at) {
-                    html += ` <span style="color: #888; font-size: 0.85em; font-style: italic;">[${escapeHtml(note.created_at)}]</span>`;
-                }
-                html += '</div>';
-
-                // Note content
-                html += `<div style="color: #e0e0e0; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(note.content)}</div>`;
-
-                // Tags if present
-                if (note.tags && note.tags.length > 0) {
-                    html += '<div style="margin-top: 6px; font-size: 0.85em;">';
-                    html += '<span style="color: #888;">Tags:</span> ';
-                    note.tags.forEach(tag => {
-                        html += `<code style="background: rgba(74, 158, 255, 0.15); color: #4a9eff; padding: 2px 6px; border-radius: 3px; margin-right: 4px;">#${escapeHtml(tag)}</code>`;
-                    });
-                    html += '</div>';
-                }
-
-                // Linked notes if present
-                if (note.linked_notes && note.linked_notes.length > 0) {
-                    html += '<div style="margin-top: 6px; font-size: 0.85em; color: #888;">';
-                    html += `Links to: ${note.linked_notes.map(id => `<code style="background: rgba(0,0,0,0.3); padding: 2px 4px; border-radius: 3px;">#${escapeHtml(id)}</code>`).join(', ')}`;
-                    html += '</div>';
-                }
-
-                html += '</div>';
-            });
-
-            return html;
+        // ===== CHAT PANEL =====
+        function toggleChat() {
+            const chatPanel = document.getElementById('chat-panel');
+            chatPanel.classList.toggle('open');
         }
 
-        // Check if it's a single note object
-        if (result.id && result.content) {
-            let html = '<div style="padding: 10px; background: rgba(0,0,0,0.2); border-left: 2px solid #4a9eff; border-radius: 3px;">';
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
 
-            // Note header
-            html += '<div style="margin-bottom: 6px;">';
-            html += `<code style="color: #4a9eff; background: rgba(74, 158, 255, 0.1); padding: 2px 6px; border-radius: 3px; font-weight: bold;">#${escapeHtml(result.id)}</code>`;
-            if (result.created_at) {
-                html += ` <span style="color: #888; font-size: 0.85em; font-style: italic;">[${escapeHtml(result.created_at)}]</span>`;
-            }
-            html += '</div>';
+            if (!message) return;
 
-            // Content
-            html += `<div style="color: #e0e0e0; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(result.content)}</div>`;
-
-            // Tags
-            if (result.tags && result.tags.length > 0) {
-                html += '<div style="margin-top: 6px; font-size: 0.85em;">';
-                html += '<span style="color: #888;">Tags:</span> ';
-                result.tags.forEach(tag => {
-                    html += `<code style="background: rgba(74, 158, 255, 0.15); color: #4a9eff; padding: 2px 6px; border-radius: 3px; margin-right: 4px;">#${escapeHtml(tag)}</code>`;
-                });
-                html += '</div>';
-            }
-
-            html += '</div>';
-            return html;
-        }
-
-        // Check if it's an empty array
-        if (Array.isArray(result) && result.length === 0) {
-            return '<div style="color: #888; font-style: italic; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px;">No results found</div>';
-        }
-
-        // For other data types, show formatted JSON
-        return `<pre style="margin: 0; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 4px; overflow-x: auto; color: #e0e0e0; line-height: 1.4;">${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
-    }
-
-    // Define function for appending output to the terminal
-    // Everything is treated as HTML that may contain markdown-content divs
-    window.appendOutput = function(content, isHTML = true) {
-        const line = document.createElement('div');
-        line.className = 'output-line';
-
-        if (isHTML) {
-            line.innerHTML = content;
-        } else {
-            line.textContent = content;
-        }
-
-        terminalOutput.appendChild(line);
-
-        // Post-process any markdown-content divs
-        const markdownDivs = line.querySelectorAll('.markdown-content');
-        markdownDivs.forEach(div => {
-            const content = div.textContent;
-            div.innerHTML = renderMarkdown(content);
-        });
-
-        terminalOutput.scrollTop = terminalOutput.scrollHeight;
-    };
-    
-    // Create a container for the logo to handle overflow better
-    const logoContainer = document.createElement('div');
-    logoContainer.className = 'logo-container';
-    logoContainer.innerHTML = `
-<pre>
-████████ ████████ ████████ ████████ ██
-      ██ ██          ██       ██    ██
-   ██    ████████    ██       ██    ██
-██       ██          ██       ██    ██
-████████ ████████    ██       ██    ████████</pre>`;
-    
-    // Add the logo container to the terminal output
-    terminalOutput.appendChild(logoContainer);
-
-    // Add the welcome text
-    appendOutput("Welcome to Zettl Web Terminal.");
-    appendOutput("Type 'help' for commands. Type 'settings' for settings. Type 'clear' to clear terminal.");
-    
-    // Function to resize textarea based on content
-    function autoResizeTextarea() {
-        const textarea = commandInput;
-        
-        // Reset height to auto to get the correct scrollHeight
-        textarea.style.height = 'auto';
-        
-        // Set height to scrollHeight (content height)
-        const newHeight = Math.min(textarea.scrollHeight, 120); // Max 120px (about 4 lines)
-        textarea.style.height = newHeight + 'px';
-    }
-    
-    // Auto-resize the textarea whenever input changes
-    commandInput.addEventListener('input', function(e) {
-        autoResizeTextarea();
-
-        // Check for @ symbol to trigger project autocomplete
-        const text = commandInput.value;
-        const cursorPos = commandInput.selectionStart;
-
-        // Find if there's an @ symbol before the cursor
-        let atIndex = -1;
-        for (let i = cursorPos - 1; i >= 0; i--) {
-            if (text[i] === '@') {
-                atIndex = i;
-                break;
-            } else if (text[i] === ' ' || text[i] === '\n') {
-                break;
-            }
-        }
-
-        if (atIndex >= 0) {
-            // Extract the search term after @
-            const searchTerm = text.substring(atIndex + 1, cursorPos);
-            if (!searchTerm.includes(' ')) {
-                autocompleteStart = atIndex;
-                fetchProjectIds().then(projects => {
-                    showAutocomplete(projects, searchTerm);
-                });
-            } else {
-                hideAutocomplete();
-            }
-        } else {
-            hideAutocomplete();
-        }
-    });
-    
-    // Load button preferences from settings
-    loadButtonPreferences();
-
-    // Initialize buttons
-    updateShortcutButtons();
-
-    // Focus the input field
-    setTimeout(() => {
-        commandInput.focus();
-        autoResizeTextarea();
-    }, 300);
-
-    // Hide autocomplete when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!commandInput.contains(e.target) && !autocompleteDropdown.contains(e.target)) {
-            hideAutocomplete();
-        }
-    });
-    
-    // Handle keyboard events for command input - updated for textarea
-    commandInput.addEventListener('keydown', function(e) {
-        // Handle autocomplete navigation
-        if (autocompleteActive) {
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                const items = autocompleteDropdown.querySelectorAll('div');
-                autocompleteIndex = Math.min(autocompleteIndex + 1, items.length - 1);
-                updateAutocompleteHighlight();
-                return;
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                autocompleteIndex = Math.max(autocompleteIndex - 1, 0);
-                updateAutocompleteHighlight();
-                return;
-            } else if (e.key === 'Enter' || e.key === 'Tab') {
-                e.preventDefault();
-                const items = autocompleteDropdown.querySelectorAll('div');
-                if (items[autocompleteIndex]) {
-                    const projectId = projectCache.filter(p =>
-                        p.id.toLowerCase().includes(commandInput.value.substring(autocompleteStart + 1, commandInput.selectionStart).toLowerCase()) ||
-                        p.content.toLowerCase().includes(commandInput.value.substring(autocompleteStart + 1, commandInput.selectionStart).toLowerCase())
-                    )[autocompleteIndex]?.id;
-                    if (projectId) {
-                        selectAutocomplete(projectId);
-                    }
-                }
-                return;
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                hideAutocomplete();
-                return;
-            }
-        }
-
-        // Enter key submits command (without Shift)
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            executeCommand(commandInput.value);
-        }
-        // Up arrow for previous command - only when textarea is on first line
-        else if (e.key === 'ArrowUp' && commandInput.selectionStart === 0 && !autocompleteActive) {
-            e.preventDefault();
-            if (historyIndex > 0) {
-                historyIndex--;
-                commandInput.value = commandHistory[historyIndex];
-                // Move cursor to end of input
-                setTimeout(() => {
-                    commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
-                    updateShortcutButtons();
-                    autoResizeTextarea();
-                }, 0);
-            }
-        }
-        // Down arrow for next command - only when textarea is on last line
-        else if (e.key === 'ArrowDown' && commandInput.selectionStart === commandInput.value.length && !autocompleteActive) {
-            e.preventDefault();
-            if (historyIndex < commandHistory.length) {
-                historyIndex++;
-                commandInput.value = historyIndex === commandHistory.length ? '' : commandHistory[historyIndex];
-                // Move cursor to end of input
-                setTimeout(() => {
-                    commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
-                    updateShortcutButtons();
-                    autoResizeTextarea();
-                }, 0);
-            }
-        }
-        // Tab for shortcuts 
-        else if (e.key === 'Tab') {
-            e.preventDefault();
-            const currentCmd = commandInput.value.trim().split(' ')[0];
-            const shortcuts = Object.keys(commandOptions);
-            
-            if (currentCmd) {
-                const matches = shortcuts.filter(cmd => cmd.startsWith(currentCmd));
-                if (matches.length === 1) {
-                    commandInput.value = matches[0] + ' ';
-                    updateShortcutButtons();
-                    autoResizeTextarea();
-                }
-            }
-        }
-    });
-    
-    // Update shortcut buttons when input changes
-    commandInput.addEventListener('input', updateShortcutButtons);
-
-    // Handle submit button click
-    submitButton.addEventListener('click', function() {
-        executeCommand(commandInput.value);
-    });
-
-    // Handle the clear input button
-    clearInputButton.addEventListener('click', function() {
-        commandInput.value = '';
-        commandInput.focus();
-        autoResizeTextarea();
-        updateShortcutButtons();
-    });
-
-    // Handle iOS focus issues
-    commandInput.addEventListener('focus', function() {
-        // Ensure keyboard doesn't push content around
-        setTimeout(() => {
-            window.scrollTo(0, 0);
-            document.body.scrollTop = 0;
-        }, 50);
-    });
-
-    // Execute the command
-    function executeCommand(command) {
-        const cmd = command.trim();
-        if (!cmd) return;
-
-        // Handle built-in commands locally
-        if (cmd === 'clear') {
-            // Clear terminal output but keep logo
-            terminalOutput.innerHTML = '';
-            terminalOutput.appendChild(logoContainer);
-            appendOutput("Terminal cleared. Type 'help' for commands.");
+            // Add user message to UI
+            const messagesContainer = document.getElementById('chat-messages');
+            const userMsg = document.createElement('div');
+            userMsg.className = 'chat-message user';
+            userMsg.textContent = message;
+            messagesContainer.appendChild(userMsg);
 
             // Clear input
-            commandInput.value = '';
-            autoResizeTextarea();
-            updateShortcutButtons();
-            commandInput.focus();
-            return;
-        }
+            input.value = '';
 
-        if (cmd === 'settings') {
-            window.location.href = '/settings';
-            return;
-        }
+            // Scroll to bottom
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-        if (cmd === 'logout') {
-            if (confirm('Are you sure you want to logout?')) {
-                fetch('/api/logout', {
+            // Show loading
+            const loadingMsg = document.createElement('div');
+            loadingMsg.className = 'chat-message assistant';
+            loadingMsg.innerHTML = '<div class="loading"></div> Thinking...';
+            messagesContainer.appendChild(loadingMsg);
+
+            try {
+                const response = await fetch('/api/chat/message', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
-                })
-                .then(() => {
-                    window.location.href = '/login';
-                })
-                .catch(() => {
-                    window.location.href = '/login';
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        conversation_id: currentConversationId,
+                        message: message
+                    })
                 });
+
+                const data = await response.json();
+
+                // Remove loading
+                loadingMsg.remove();
+
+                // Add assistant response
+                const assistantMsg = document.createElement('div');
+                assistantMsg.className = 'chat-message assistant';
+                assistantMsg.innerHTML = marked.parse(data.response);
+                messagesContainer.appendChild(assistantMsg);
+
+                // Update conversation ID
+                if (data.conversation_id) {
+                    currentConversationId = data.conversation_id;
+                }
+
+                // Scroll to bottom
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            } catch (error) {
+                loadingMsg.remove();
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'chat-message assistant';
+                errorMsg.style.background = 'var(--coral)';
+                errorMsg.style.color = 'white';
+                errorMsg.textContent = 'Error: ' + error.message;
+                messagesContainer.appendChild(errorMsg);
             }
-            return;
         }
 
-        // Echo command with prompt
-        appendOutput(`zettl> ${cmd}`);
+        // ===== HELP TOGGLE =====
+        function toggleHelp() {
+            const help = document.getElementById('shortcuts-help');
+            const overlay = document.getElementById('overlay');
 
-        // Add to history if not duplicate of most recent
-        if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== cmd) {
-            commandHistory.push(cmd);
-            saveHistory(commandHistory);
+            if (help.classList.contains('visible')) {
+                help.classList.remove('visible');
+                overlay.classList.remove('visible');
+            } else {
+                help.classList.add('visible');
+                overlay.classList.add('visible');
+            }
         }
 
-        // Reset history index
-        historyIndex = commandHistory.length;
-
-        // Clear input and resize
-        commandInput.value = '';
-        autoResizeTextarea();
-        updateShortcutButtons();
-        
-        // Show loading indicator with a unique ID
-        const loadingId = `loading-${Date.now()}`;
-        const processingElement = document.createElement('div');
-        processingElement.className = 'processing-message';
-        processingElement.id = loadingId;
-        processingElement.innerHTML = 'Processing command... <span class="loading-indicator">⏳</span>';
-        terminalOutput.appendChild(processingElement);
-        
-        // Scroll to the processing message
-        terminalOutput.scrollTop = terminalOutput.scrollHeight;
-        
-        // Send command to server
-        fetch('/api/command', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ command: cmd })
-        })
-        .then(response => response.json())
-        .then(data => {
-            // Remove loading indicator
-            const loadingElement = document.getElementById(loadingId);
-            if (loadingElement) {
-                loadingElement.remove();
+        // ===== LOGOUT =====
+        async function logout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/login';
+            } catch (error) {
+                console.error('Logout error:', error);
+                window.location.href = '/login';
             }
+        }
 
-            // Check if this is an edit command response
-            if (data.edit_modal) {
-                openEditModal(data.note_id, data.content);
+        // ===== INITIAL LOAD =====
+        window.addEventListener('DOMContentLoaded', () => {
+            // Load recent notes
+            openSheet('list --limit 5');
+            setTimeout(() => {
+                submitCommand();
+            }, 500);
+        });
+
+        // ===== MOBILE: Chat input enter key =====
+        let chatLastKey = '';
+        document.getElementById('chat-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                // Shift+Enter or Backslash+Enter: create newline
+                if (e.shiftKey || chatLastKey === '\\') {
+                    // If it was backslash+Enter, remove the backslash
+                    if (chatLastKey === '\\') {
+                        const textarea = e.target;
+                        const cursorPos = textarea.selectionStart;
+                        const textBefore = textarea.value.substring(0, cursorPos - 1);
+                        const textAfter = textarea.value.substring(cursorPos);
+                        textarea.value = textBefore + '\n' + textAfter;
+                        textarea.selectionStart = textarea.selectionEnd = cursorPos;
+                        e.preventDefault();
+                    }
+                    // Shift+Enter: allow default newline behavior
+                    chatLastKey = '';
+                    return;
+                }
+                // Plain Enter: send message
+                e.preventDefault();
+                sendChatMessage();
+                chatLastKey = '';
                 return;
             }
-
-            // Append result
-            appendOutput(data.result, true);
-
-            // Scroll to bottom
-            terminalOutput.scrollTop = terminalOutput.scrollHeight;
-        })
-        .catch(error => {
-            // Remove loading indicator
-            const loadingElement = document.getElementById(loadingId);
-            if (loadingElement) {
-                loadingElement.remove();
-            }
-            
-            // Show error
-            appendOutput(`<span class="red">Error: ${error.message || 'Connection failed'}</span>`);
-            
-            // Scroll to bottom
-            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+            // Track last key for backslash+Enter detection
+            chatLastKey = e.key;
         });
-        
-        // Focus input again
-        commandInput.focus();
-    }
-    
-    
-    // Function to update shortcut buttons
-    function updateShortcutButtons() {
-        // Clear existing buttons
-        shortcutButtons.innerHTML = '';
-        
-        const currentText = commandInput.value.trim();
-        const cmdParts = currentText.split(/\s+/);
-        const currentCmd = cmdParts[0];
-        
-        // Track the last option mentioned to show relevant sub-options
-        let lastOption = null;
-        if (cmdParts.length > 1) {
-            const possibleOption = cmdParts[cmdParts.length - 1];
-            if (possibleOption.startsWith('-')) {
-                lastOption = possibleOption;
+
+        // ===== DRAG HANDLE FOR SHEET RESIZING =====
+        let isDragging = false;
+        let startY = 0;
+        let startHeight = 0;
+
+        const dragHandle = document.getElementById('drag-handle');
+        const sheet = document.getElementById('command-sheet');
+
+        dragHandle.addEventListener('mousedown', startDrag);
+        dragHandle.addEventListener('touchstart', startDrag);
+
+        function startDrag(e) {
+            isDragging = true;
+            startY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+            startHeight = sheet.offsetHeight;
+
+            document.addEventListener('mousemove', doDrag);
+            document.addEventListener('touchmove', doDrag);
+            document.addEventListener('mouseup', stopDrag);
+            document.addEventListener('touchend', stopDrag);
+        }
+
+        function doDrag(e) {
+            if (!isDragging) return;
+
+            const currentY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+            const diff = startY - currentY;
+            const newHeight = startHeight + diff;
+
+            // Constrain height between 50vh and 90vh
+            const minHeight = window.innerHeight * 0.5;
+            const maxHeight = window.innerHeight * 0.9;
+
+            if (newHeight >= minHeight && newHeight <= maxHeight) {
+                sheet.style.height = newHeight + 'px';
             }
         }
 
-
-        // If a command is typed, show its options
-        if (currentCmd && commandOptions[currentCmd]) {
-            // Special handling for when an option that has sub-options was just typed
-            if (lastOption && subOptions[currentCmd] && subOptions[currentCmd][lastOption]) {
-                // Show sub-options for this option
-                const subOpts = subOptions[currentCmd][lastOption];
-                subOpts.forEach(subOpt => {
-                    const button = document.createElement('button');
-                    button.textContent = subOpt;
-                    button.dataset.subopt = subOpt;
-                    button.addEventListener('click', function() {
-                        // Add the sub-option with spaces
-                        const currentValue = commandInput.value;
-                        
-                        // Only add a space before if there isn't one already
-                        const newValue = currentValue.endsWith(' ') ? 
-                                    currentValue + subOpt + ' ' : 
-                                    currentValue + ' ' + subOpt + ' ';
-                        
-                        commandInput.value = newValue;
-                        commandInput.focus();
-                        autoResizeTextarea();
-                        
-                        // Put cursor at the end
-                        commandInput.selectionStart = commandInput.selectionEnd = newValue.length;
-                    });
-                    shortcutButtons.appendChild(button);
-                });
-                
-                // Add an extra "custom" button for free-form input
-                const customButton = document.createElement('button');
-                customButton.textContent = "custom...";
-                customButton.style.fontStyle = "italic";
-                shortcutButtons.appendChild(customButton);
-                
-                return; // Early return as we've handled the sub-options
-            }
-            
-            // Show options for the current command
-            commandOptions[currentCmd].forEach(option => {
-                const button = document.createElement('button');
-                button.textContent = option;
-                button.dataset.option = option;
-                button.addEventListener('click', function() {
-                    // Add the option with spaces
-                    const currentValue = commandInput.value;
-                    
-                    // Only add a space before if there isn't one already
-                    let newValue;
-                    if (currentValue.endsWith(' ')) {
-                        newValue = currentValue + option + ' ';
-                    } else {
-                        newValue = currentValue + ' ' + option + ' ';
-                    }
-                    
-                    commandInput.value = newValue;
-                    commandInput.focus();
-                    autoResizeTextarea();
-                    
-                    // Update buttons immediately to show sub-options if applicable
-                    updateShortcutButtons();
-                    
-                    // Put cursor at the end
-                    commandInput.selectionStart = commandInput.selectionEnd = newValue.length;
-                });
-                shortcutButtons.appendChild(button);
-            });
-            
-            // Add a special button for direct LLM actions if current command is 'llm'
-            if (currentCmd === 'llm' && cmdParts.length === 2 && !lastOption) {
-                // This means they've typed "llm noteId" but no options yet
-                // Add direct action buttons
-
-                // First add a separator
-                const separator = document.createElement('div');
-                separator.className = 'button-separator';
-                shortcutButtons.appendChild(separator);
-
-                // Add shortcut buttons for common LLM actions
-                ['summarize', 'connect', 'tags', 'expand', 'concepts', 'questions', 'critique'].forEach(action => {
-                    const button = document.createElement('button');
-                    button.textContent = action;
-                    button.style.backgroundColor = '#3a7a50'; // Different color for action buttons
-                    button.addEventListener('click', function() {
-                        // Add the complete action option
-                        const noteId = cmdParts[1]; // Get the note ID
-                        commandInput.value = `llm ${noteId} -a ${action}`;
-                        commandInput.focus();
-                        autoResizeTextarea();
-
-                        // Put cursor at the end
-                        commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
-                    });
-                    shortcutButtons.appendChild(button);
-                });
-            }
-
-            // Add quick action buttons for api-key
-            if (currentCmd === 'api-key' && cmdParts.length === 1) {
-                // First add a separator
-                const separator = document.createElement('div');
-                separator.className = 'button-separator';
-                shortcutButtons.appendChild(separator);
-
-                // Add list button
-                const listBtn = document.createElement('button');
-                listBtn.textContent = 'list';
-                listBtn.style.backgroundColor = '#3a7a50';
-                listBtn.addEventListener('click', function() {
-                    commandInput.value = 'api-key --list';
-                    commandInput.focus();
-                    autoResizeTextarea();
-                    commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
-                });
-                shortcutButtons.appendChild(listBtn);
-
-                // Add generate button
-                const genBtn = document.createElement('button');
-                genBtn.textContent = 'generate';
-                genBtn.style.backgroundColor = '#3a7a50';
-                genBtn.addEventListener('click', function() {
-                    commandInput.value = 'api-key --generate';
-                    commandInput.focus();
-                    autoResizeTextarea();
-                    commandInput.selectionStart = commandInput.selectionEnd = commandInput.value.length;
-                });
-                shortcutButtons.appendChild(genBtn);
-            }
-        } else {
-            // Show top-level commands (filtered by user preferences)
-            getVisibleCommands().forEach(cmd => {
-                const button = document.createElement('button');
-                button.textContent = cmd;
-                button.dataset.cmd = cmd;
-                button.addEventListener('click', function() {
-                    const commandText = cmd;
-                    commandInput.value = commandText;
-                    commandInput.focus();
-                    autoResizeTextarea();
-
-                    // Update buttons immediately to reflect new command
-                    updateShortcutButtons();
-
-                    // If this is a command needing quotes, add them and position cursor
-                    if (autoQuoteCommands.includes(cmd)) {
-                        // Auto-add quotes and position cursor between them
-                        commandInput.value = cmd + ' ""';
-                        autoResizeTextarea();
-                        // Set cursor position between the quotes
-                        const cursorPos = commandInput.value.length - 1;
-                        setTimeout(() => {
-                            commandInput.selectionStart = commandInput.selectionEnd = cursorPos;
-                        }, 0);
-                    }
-                });
-                shortcutButtons.appendChild(button);
-            });
+        function stopDrag() {
+            isDragging = false;
+            document.removeEventListener('mousemove', doDrag);
+            document.removeEventListener('touchmove', doDrag);
+            document.removeEventListener('mouseup', stopDrag);
+            document.removeEventListener('touchend', stopDrag);
         }
-    }
-    
-    // Save command history to localStorage
-    function saveHistory(history) {
-        try {
-            // Keep only the last 100 commands
-            const limitedHistory = history.slice(-100);
-            localStorage.setItem('zettl_history', JSON.stringify(limitedHistory));
-        } catch (e) {
-            console.error('Error saving history', e);
-        }
-    }
-    
-    // Load command history from localStorage
-    function loadHistory() {
-        try {
-            const history = localStorage.getItem('zettl_history');
-            return history ? JSON.parse(history) : [];
-        } catch (e) {
-            console.error('Error loading history', e);
-            return [];
-        }
-    }
-
-    // Modal functions
-    function openEditModal(noteId, content) {
-        currentEditNoteId = noteId;
-        originalContent = content;
-        modalNoteId.textContent = `#${noteId}`;
-        modalTextarea.value = content;
-        editModal.classList.add('show');
-        modalTextarea.focus();
-    }
-
-    function closeEditModal() {
-        editModal.classList.remove('show');
-        currentEditNoteId = null;
-        originalContent = '';
-        modalTextarea.value = '';
-        commandInput.focus();
-    }
-
-    function saveNote() {
-        const newContent = modalTextarea.value;
-
-        // Check if content changed
-        if (newContent.trim() === originalContent.trim()) {
-            appendOutput('No changes made', true);
-            closeEditModal();
-            return;
-        }
-
-        // Show saving indicator
-        modalSave.disabled = true;
-        modalSave.textContent = 'Saving...';
-
-        // Send update request
-        fetch('/api/update-note', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                note_id: currentEditNoteId,
-                content: newContent
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                appendOutput(`<span class="green">✓ Updated note #${currentEditNoteId}</span>`, true);
-                closeEditModal();
-            } else {
-                appendOutput(`<span class="red">Error: ${data.error || 'Failed to update note'}</span>`, true);
-            }
-        })
-        .catch(error => {
-            appendOutput(`<span class="red">Error: ${error.message || 'Failed to save changes'}</span>`, true);
-        })
-        .finally(() => {
-            modalSave.disabled = false;
-            modalSave.textContent = 'Save (Ctrl+Enter)';
-        });
-    }
-
-    // Modal event listeners
-    modalClose.addEventListener('click', closeEditModal);
-    modalCancel.addEventListener('click', closeEditModal);
-    modalSave.addEventListener('click', saveNote);
-
-    // Click outside modal to close
-    editModal.addEventListener('click', function(e) {
-        if (e.target === editModal) {
-            closeEditModal();
-        }
-    });
-
-    // Keyboard shortcuts for modal
-    modalTextarea.addEventListener('keydown', function(e) {
-        // Ctrl+Enter to save
-        if (e.ctrlKey && e.key === 'Enter') {
-            e.preventDefault();
-            saveNote();
-        }
-        // Escape to cancel
-        else if (e.key === 'Escape') {
-            e.preventDefault();
-            closeEditModal();
-        }
-    });
-
-    // Global Escape key handler
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && editModal.classList.contains('show')) {
-            closeEditModal();
-        }
-    });
-
-
-    // Adjust terminal height on orientation change
-    window.addEventListener('resize', function() {
-        // Small delay to allow browser UI to settle
-        setTimeout(() => {
-            // Ensure we see the latest content
-            terminalOutput.scrollTop = terminalOutput.scrollHeight;
-        }, 100);
-    });
-
-    // Handle iOS viewport issues
-    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-        // Visual viewport awareness
-        if (window.visualViewport) {
-            window.visualViewport.addEventListener('resize', () => {
-                // Prevent scrolling when keyboard appears
-                document.body.style.height = window.visualViewport.height + 'px';
-                window.scrollTo(0, 0);
-            });
-        }
-    }
-
-    // ============================================================================
-    // Chat Functionality
-    // ============================================================================
-
-    const chatPanel = document.getElementById('chat-panel');
-    const toggleChatBtn = document.getElementById('toggle-chat-btn');
-    const closeChatBtn = document.getElementById('close-chat-btn');
-    const minimizeChatBtn = document.getElementById('minimize-chat-btn');
-    const chatResizeHandle = document.getElementById('chat-resize-handle');
-    const chatMessages = document.getElementById('chat-messages');
-    const chatInput = document.getElementById('chat-input');
-    const sendChatBtn = document.getElementById('send-chat-btn');
-
-    let currentConversationId = null;
-    let isSending = false;
-    let chatWidth = parseInt(localStorage.getItem('chatWidth')) || 400;
-    let isResizing = false;
-
-    // Restore chat width from localStorage
-    if (chatWidth) {
-        chatPanel.style.width = chatWidth + 'px';
-        chatPanel.style.right = chatPanel.classList.contains('open') ? '0' : '-' + chatWidth + 'px';
-    }
-
-    // Toggle chat panel
-    function toggleChat() {
-        const isCurrentlyOpen = chatPanel.classList.contains('open');
-        chatPanel.classList.toggle('open');
-
-        if (!isCurrentlyOpen) {
-            // Opening
-            chatPanel.classList.remove('collapsed');
-            minimizeChatBtn.textContent = '−';
-            chatPanel.style.right = '0';
-            chatInput.focus();
-            // Create new conversation if none exists
-            if (!currentConversationId) {
-                createNewConversation();
-            }
-        } else {
-            // Closing
-            chatPanel.style.right = '-' + chatWidth + 'px';
-        }
-    }
-
-    // Close chat panel
-    function closeChat() {
-        chatPanel.classList.remove('open');
-        chatPanel.style.right = '-' + chatWidth + 'px';
-    }
-
-    // Minimize/maximize chat panel
-    function toggleMinimize() {
-        chatPanel.classList.toggle('collapsed');
-        if (chatPanel.classList.contains('collapsed')) {
-            minimizeChatBtn.textContent = '+';
-            minimizeChatBtn.title = 'Maximize';
-        } else {
-            minimizeChatBtn.textContent = '−';
-            minimizeChatBtn.title = 'Minimize';
-        }
-    }
-
-    // Chat resize functionality
-    chatResizeHandle.addEventListener('mousedown', (e) => {
-        isResizing = true;
-        chatResizeHandle.classList.add('resizing');
-        document.body.style.cursor = 'col-resize';
-        document.body.style.userSelect = 'none';
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (!isResizing) return;
-
-        const newWidth = window.innerWidth - e.clientX;
-        if (newWidth >= 300 && newWidth <= window.innerWidth * 0.8) {
-            chatWidth = newWidth;
-            chatPanel.style.width = newWidth + 'px';
-            localStorage.setItem('chatWidth', newWidth);
-        }
-    });
-
-    document.addEventListener('mouseup', () => {
-        if (isResizing) {
-            isResizing = false;
-            chatResizeHandle.classList.remove('resizing');
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-        }
-    });
-
-    // Create a new conversation
-    function createNewConversation() {
-        // Get visible note IDs from terminal output
-        const visibleNoteIds = getVisibleNoteIds();
-
-        fetch('/api/chat/conversations', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                title: 'New Conversation',
-                context_note_ids: visibleNoteIds
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                currentConversationId = data.conversation_id;
-                console.log('Created conversation:', currentConversationId);
-            }
-        })
-        .catch(error => {
-            console.error('Error creating conversation:', error);
-        });
-    }
-
-    // Extract note IDs from visible terminal output
-    function getVisibleNoteIds() {
-        const noteIds = [];
-        const noteElements = terminalOutput.querySelectorAll('[data-note-id]');
-        noteElements.forEach(el => {
-            const noteId = el.getAttribute('data-note-id');
-            if (noteId && !noteIds.includes(noteId)) {
-                noteIds.push(noteId);
-            }
-        });
-        return noteIds;
-    }
-
-    // Add message to chat UI
-    function addChatMessage(role, content) {
-        // Remove welcome message if present
-        const welcome = chatMessages.querySelector('.chat-welcome');
-        if (welcome) {
-            welcome.remove();
-        }
-
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `chat-message ${role}`;
-
-        // For assistant messages, render markdown; for user messages, use plain text
-        if (role === 'assistant') {
-            messageDiv.innerHTML = renderMarkdown(content);
-        } else {
-            messageDiv.textContent = content;
-        }
-
-        chatMessages.appendChild(messageDiv);
-
-        // Scroll to bottom
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-
-        return messageDiv;
-    }
-
-    // Send chat message
-    async function sendMessage() {
-        const message = chatInput.value.trim();
-        if (!message || isSending || !currentConversationId) return;
-
-        isSending = true;
-        sendChatBtn.disabled = true;
-        chatInput.disabled = true;
-
-        // Add user message to chat panel only
-        addChatMessage('user', message);
-        chatInput.value = '';
-
-        // Show loading indicator
-        const loadingMsg = addChatMessage('loading', 'Thinking...');
-        const mainLoadingDiv = document.createElement('div');
-        mainLoadingDiv.className = 'output-line';
-        mainLoadingDiv.innerHTML = '<div style="color: #888; font-style: italic;">🤔 Thinking...</div>';
-        mainLoadingDiv.id = 'chat-loading-indicator';
-        terminalOutput.appendChild(mainLoadingDiv);
-        terminalOutput.scrollTop = terminalOutput.scrollHeight;
-
-        try {
-            const visibleNoteIds = getVisibleNoteIds();
-
-            const response = await fetch('/api/chat/message', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    conversation_id: currentConversationId,
-                    message: message,
-                    context_note_ids: visibleNoteIds
-                })
-            });
-
-            const data = await response.json();
-
-            // Remove loading messages
-            loadingMsg.remove();
-            const mainLoading = document.getElementById('chat-loading-indicator');
-            if (mainLoading) mainLoading.remove();
-
-            if (data.success) {
-                // Add assistant response to chat panel only
-                addChatMessage('assistant', data.message);
-
-                // Display formatted tool results on main screen
-                if (data.tool_results_data && data.tool_results_data.length > 0) {
-                    let mainScreenContent = '';
-
-                    // Display each tool execution result
-                    data.tool_results_data.forEach((toolResult, index) => {
-                        mainScreenContent += '<div style="margin-bottom: 16px; padding: 12px; background: rgba(74, 158, 255, 0.05); border-left: 3px solid #4a9eff; border-radius: 4px;">';
-
-                        // Tool header
-                        mainScreenContent += '<div style="color: #4a9eff; font-weight: bold; margin-bottom: 10px; font-size: 0.95em;">';
-                        mainScreenContent += `🔧 ${toolResult.name}`;
-                        if (!toolResult.success) {
-                            mainScreenContent += ' <span style="color: #ff6b6b;">(failed)</span>';
-                        }
-                        mainScreenContent += '</div>';
-
-                        // Tool input (show concisely)
-                        if (toolResult.input && Object.keys(toolResult.input).length > 0) {
-                            mainScreenContent += '<div style="color: #888; font-size: 0.8em; margin-bottom: 10px;">';
-                            const inputStr = Object.entries(toolResult.input).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ');
-                            mainScreenContent += `<span style="opacity: 0.7;">Input:</span> ${escapeHtml(inputStr)}`;
-                            mainScreenContent += '</div>';
-                        }
-
-                        // Tool result (formatted intelligently)
-                        mainScreenContent += formatToolResult(toolResult.result);
-
-                        mainScreenContent += '</div>';
-                    });
-
-                    window.appendOutput(mainScreenContent, true);
-                }
-            } else {
-                addChatMessage('assistant', `Error: ${data.error}`);
-                window.appendOutput(`<div style="color: #ff6b6b;">Error: ${data.error}</div>`, true);
-            }
-        } catch (error) {
-            loadingMsg.remove();
-            const mainLoading = document.getElementById('chat-loading-indicator');
-            if (mainLoading) mainLoading.remove();
-            addChatMessage('assistant', `Error: ${error.message}`);
-            window.appendOutput(`<div style="color: #ff6b6b;">Error: ${error.message}</div>`, true);
-        } finally {
-            isSending = false;
-            sendChatBtn.disabled = false;
-            chatInput.disabled = false;
-            chatInput.focus();
-        }
-    }
-
-    // Event listeners
-    toggleChatBtn.addEventListener('click', toggleChat);
-    closeChatBtn.addEventListener('click', closeChat);
-    minimizeChatBtn.addEventListener('click', toggleMinimize);
-    sendChatBtn.addEventListener('click', sendMessage);
-
-    // Chat keyboard shortcuts
-    chatInput.addEventListener('keydown', function(e) {
-        // Ctrl+Enter to send
-        if (e.ctrlKey && e.key === 'Enter') {
-            e.preventDefault();
-            sendMessage();
-        }
-        // Escape to close chat
-        else if (e.key === 'Escape') {
-            e.preventDefault();
-            closeChat();
-        }
-    });
-
-    // Global keyboard shortcut: Ctrl+K to toggle chat
-    document.addEventListener('keydown', function(e) {
-        if (e.ctrlKey && e.key === 'k') {
-            e.preventDefault();
-            toggleChat();
-        }
-    });
-});
     </script>
 </body>
 </html>

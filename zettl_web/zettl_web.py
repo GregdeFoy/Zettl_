@@ -215,12 +215,62 @@ COMMAND_OPTIONS = {
     'search': {
         'short_opts': {
             't': {'name': 'tag', 'multiple': True},
+            'd': {'name': 'date'},
             'f': {'name': 'full', 'flag': True}
         },
         'long_opts': {
             'tag': {'multiple': True},
             'exclude-tag': {'multiple': True},
+            'date': {},
             'full': {'flag': True}
+        }
+    },
+    'show': {
+        'short_opts': {
+            'r': {'name': 'related', 'flag': True},
+            'f': {'name': 'full', 'flag': True}
+        },
+        'long_opts': {
+            'related': {'flag': True},
+            'full': {'flag': True}
+        }
+    },
+    'link': {
+        'short_opts': {
+            'c': {'name': 'context'},
+            'r': {'name': 'remove', 'flag': True}
+        },
+        'long_opts': {
+            'context': {},
+            'remove': {'flag': True}
+        }
+    },
+    'tags': {
+        'short_opts': {
+            'r': {'name': 'remove', 'flag': True}
+        },
+        'long_opts': {
+            'remove': {'flag': True}
+        }
+    },
+    'graph': {
+        'short_opts': {
+            'o': {'name': 'output'},
+            'd': {'name': 'depth', 'type': int}
+        },
+        'long_opts': {
+            'output': {},
+            'depth': {'type': int}
+        }
+    },
+    'delete': {
+        'short_opts': {
+            'f': {'name': 'force', 'flag': True}
+        },
+        'long_opts': {
+            'force': {'flag': True},
+            'keep-links': {'flag': True},
+            'keep-tags': {'flag': True}
         }
     },
     'llm': {
@@ -289,45 +339,69 @@ COMMAND_OPTIONS = {
     'todo': {
         'short_opts': {
             't': {'name': 'tag', 'multiple': True},
-            'l': {'name': 'link', 'multiple': True}
+            'l': {'name': 'link', 'multiple': True},
+            'a': {'name': 'all', 'flag': True},
+            'c': {'name': 'cancel', 'flag': True},
+            'f': {'name': 'full', 'flag': True},
+            'dt': {'name': 'donetoday', 'flag': True}
         },
         'long_opts': {
             'tag': {'multiple': True},
             'link': {'multiple': True},
-            'id': {}
+            'id': {},
+            'all': {'flag': True},
+            'cancel': {'flag': True},
+            'full': {'flag': True},
+            'donetoday': {'flag': True}
         }
     },
     'idea': {
         'short_opts': {
             't': {'name': 'tag', 'multiple': True},
-            'l': {'name': 'link', 'multiple': True}
+            'l': {'name': 'link', 'multiple': True},
+            'a': {'name': 'all', 'flag': True},
+            'c': {'name': 'cancel', 'flag': True},
+            'f': {'name': 'full', 'flag': True}
         },
         'long_opts': {
             'tag': {'multiple': True},
             'link': {'multiple': True},
-            'id': {}
+            'id': {},
+            'all': {'flag': True},
+            'cancel': {'flag': True},
+            'full': {'flag': True}
         }
     },
     'note': {
         'short_opts': {
             't': {'name': 'tag', 'multiple': True},
-            'l': {'name': 'link', 'multiple': True}
+            'l': {'name': 'link', 'multiple': True},
+            'a': {'name': 'all', 'flag': True},
+            'c': {'name': 'cancel', 'flag': True},
+            'f': {'name': 'full', 'flag': True}
         },
         'long_opts': {
             'tag': {'multiple': True},
             'link': {'multiple': True},
-            'id': {}
+            'id': {},
+            'all': {'flag': True},
+            'cancel': {'flag': True},
+            'full': {'flag': True}
         }
     },
     'project': {
         'short_opts': {
             't': {'name': 'tag', 'multiple': True},
-            'l': {'name': 'link', 'multiple': True}
+            'l': {'name': 'link', 'multiple': True},
+            'a': {'name': 'all', 'flag': True},
+            'f': {'name': 'full', 'flag': True}
         },
         'long_opts': {
             'tag': {'multiple': True},
             'link': {'multiple': True},
-            'id': {}
+            'id': {},
+            'all': {'flag': True},
+            'full': {'flag': True}
         }
     },
 
@@ -972,32 +1046,38 @@ def execute_command():
 
             for note in notes:
                 note_id = note['id']
-                created_at = notes_manager.db.format_timestamp(note['created_at'])
+
+                # Get tags for this note
+                try:
+                    tags = notes_manager.get_tags(note_id)
+                except Exception:
+                    tags = []
 
                 if compact:
                     # Very compact mode - just IDs
                     result += f"{ZettlFormatter.note_id(note_id)}\n"
                 elif full:
-                    # Full content mode
-                    result += f"{ZettlFormatter.note_id(note_id)} [{ZettlFormatter.timestamp(created_at)}]\n"
-                    result += "-" * 40 + "\n"
-                    result += f"{note['content']}\n"
-
-                    # Add tags display
-                    try:
-                        tags = notes_manager.get_tags(note_id)
-                        if tags:
-                            result += f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}\n"
-                    except Exception:
-                        pass
-
-                    result += "\n"  # Extra line between notes
-                else:
-                    # Default mode - ID, timestamp, and preview
+                    # Full content mode - ID, tags, full content
                     formatted_id = ZettlFormatter.note_id(note_id)
-                    formatted_time = ZettlFormatter.timestamp(created_at)
-                    content_preview = note['content'][:50] + "..." if len(note['content']) > 50 else note['content']
-                    result += f"{formatted_id} [{formatted_time}]: {content_preview}\n\n"  # Added extra newline
+                    if tags:
+                        formatted_tags = [ZettlFormatter.tag(t) for t in tags]
+                        result += f"{formatted_id}  {' '.join(formatted_tags)}\n\n"
+                    else:
+                        result += f"{formatted_id}\n\n"
+
+                    result += f"{note['content']}\n\n"
+                else:
+                    # Default preview mode - ID [tags] | first line (matching CLI)
+                    line_parts = [ZettlFormatter.note_id(note_id)]
+
+                    if tags:
+                        formatted_tags = [ZettlFormatter.tag(t) for t in tags]
+                        line_parts.append(' '.join(formatted_tags))
+
+                    first_line = note['content'].split('\n')[0]
+                    line_parts.append(f'<span class="pipe-sep">|</span> {first_line}')
+
+                    result += '  '.join(line_parts) + "\n\n"
 
 
         elif cmd in ["todo", "idea", "note", "project"]:
@@ -1027,46 +1107,160 @@ def execute_command():
 
             # LIST MODE: If no content provided, list notes with that tag
             if not content:
-                # Special handling for project list mode to show stats
+                # Special handling for project: list mode OR detail view
                 if cmd == "project":
-                    projects = notes_manager.get_notes_by_tag('project')
+                    # DETAIL VIEW: If -l flag provided, show project details
+                    if link_ids:
+                        if len(link_ids) > 1:
+                            result = ZettlFormatter.warning("Please specify only one project to view details.")
+                        else:
+                            project_id = link_ids[0]
+                            try:
+                                # Get the project note
+                                project_note = notes_manager.get_note(project_id)
+                                project_tags = [t.lower() for t in notes_manager.get_tags(project_id)]
 
-                    if not projects:
-                        result = f"{ZettlFormatter.warning('No projects found.')}\n"
+                                # Verify it's a project
+                                if 'project' not in project_tags:
+                                    result = ZettlFormatter.error(f"Note '{project_id}' is not a project.")
+                                else:
+                                    # Build project detail view
+                                    result = "═" * 63 + "\n"
+                                    result += f"  PROJECT: {project_note['content'].split(chr(10))[0][:40]} (#{project_id})\n"
+                                    result += "═" * 63 + "\n\n"
+                                    result += f"{project_note['content']}\n\n"
+
+                                    # Get linked notes
+                                    linked_notes = notes_manager.get_related_notes(project_id)
+
+                                    if not linked_notes:
+                                        result += ZettlFormatter.warning("No notes linked to this project.")
+                                    else:
+                                        show_full = 'full' in options or 'f' in flags
+                                        show_all_notes = 'all' in options or 'a' in flags
+
+                                        # Ensure tags loaded
+                                        for note in linked_notes:
+                                            if 'all_tags' not in note or not note['all_tags']:
+                                                try:
+                                                    note['all_tags'] = notes_manager.get_tags(note['id'])
+                                                except Exception:
+                                                    note['all_tags'] = []
+
+                                        # Categorize by type
+                                        todos, ideas, notes_list = [], [], []
+                                        for n in linked_notes:
+                                            tags_lower = [t.lower() for t in n.get('all_tags', [])]
+                                            if 'todo' in tags_lower:
+                                                todos.append(n)
+                                            elif 'idea' in tags_lower:
+                                                ideas.append(n)
+                                            elif 'note' in tags_lower:
+                                                notes_list.append(n)
+
+                                        # Categorize by status
+                                        def categorize(note_list):
+                                            active, done, canceled = [], [], []
+                                            for n in note_list:
+                                                tags = [t.lower() for t in n.get('all_tags', [])]
+                                                if 'cancel' in tags:
+                                                    canceled.append(n)
+                                                elif 'done' in tags:
+                                                    done.append(n)
+                                                else:
+                                                    active.append(n)
+                                            return active, done, canceled
+
+                                        ta, td, tc = categorize(todos)
+                                        ia, id, ic = categorize(ideas)
+                                        na, nd, nc = categorize(notes_list)
+
+                                        # Statistics
+                                        result += "─" * 63 + "\n  📊 STATISTICS\n" + "─" * 63 + "\n"
+                                        result += f"  📋 Todos:  {len(ta)} active, {len(td)} done, {len(tc)} canceled\n"
+                                        result += f"  💡 Ideas:  {len(ia)} active, {len(id)} done, {len(ic)} canceled\n"
+                                        result += f"  📝 Notes:  {len(na)} active, {len(nd)} done, {len(nc)} canceled\n"
+                                        result += f"  {'─' * 9}\n"
+                                        result += f"  Total:     {len(ta)+len(ia)+len(na)} active, {len(td)+len(id)+len(nd)} done, {len(tc)+len(ic)+len(nc)} canceled\n"
+
+                                        # Display sections
+                                        if ta or (show_all_notes and (td or tc)):
+                                            result += "\n" + "━" * 63 + f"\n📋 TODOS ({len(ta)} active)\n" + "━" * 63 + "\n"
+                                            for t in ta:
+                                                preview = t['content'][:80] if not show_full else t['content']
+                                                result += f"\n  {ZettlFormatter.note_id(t['id'])}: {preview}\n"
+                                            if show_all_notes and td:
+                                                result += f"\n  ✓ Done ({len(td)})\n"
+                                                for t in td:
+                                                    result += f"    {ZettlFormatter.note_id(t['id'])}: {t['content'][:60]}\n"
+                                            if show_all_notes and tc:
+                                                result += f"\n  ✗ Canceled ({len(tc)})\n"
+                                                for t in tc:
+                                                    result += f"    {ZettlFormatter.note_id(t['id'])}: {t['content'][:60]}\n"
+
+                                        if ia or (show_all_notes and (id or ic)):
+                                            result += "\n" + "━" * 63 + f"\n💡 IDEAS ({len(ia)} active)\n" + "━" * 63 + "\n"
+                                            for i in ia:
+                                                preview = i['content'][:80] if not show_full else i['content']
+                                                result += f"\n  {ZettlFormatter.note_id(i['id'])}: {preview}\n"
+                                            if show_all_notes and id:
+                                                result += f"\n  ✓ Done ({len(id)})\n"
+                                                for i in id:
+                                                    result += f"    {ZettlFormatter.note_id(i['id'])}: {i['content'][:60]}\n"
+
+                                        if na or (show_all_notes and (nd or nc)):
+                                            result += "\n" + "━" * 63 + f"\n📝 NOTES ({len(na)} active)\n" + "━" * 63 + "\n"
+                                            for n in na:
+                                                preview = n['content'][:80] if not show_full else n['content']
+                                                result += f"\n  {ZettlFormatter.note_id(n['id'])}: {preview}\n"
+                                            if show_all_notes and nd:
+                                                result += f"\n  ✓ Done ({len(nd)})\n"
+                                                for n in nd:
+                                                    result += f"    {ZettlFormatter.note_id(n['id'])}: {n['content'][:60]}\n"
+
+                            except Exception as e:
+                                result = ZettlFormatter.error(f"Project '{project_id}' not found: {str(e)}")
                     else:
-                        result = f"{ZettlFormatter.header(f'Active Projects ({len(projects)} total)')}\n\n"
+                        # LIST MODE: Show all projects
+                        projects = notes_manager.get_notes_by_tag('project')
 
-                        # Get all project stats at once
-                        try:
-                            all_stats = notes_manager.db.get_project_stats()
-                            stats_dict = {s['project_id']: s for s in all_stats}
-                        except Exception:
-                            stats_dict = {}
+                        if not projects:
+                            result = f"{ZettlFormatter.warning('No projects found.')}\n"
+                        else:
+                            result = f"{ZettlFormatter.header(f'Active Projects ({len(projects)} total)')}\n\n"
 
-                        for project in projects:
-                            project_id = project['id']
+                            # Get all project stats at once
+                            try:
+                                all_stats = notes_manager.db.get_project_stats()
+                                stats_dict = {s['project_id']: s for s in all_stats}
+                            except Exception:
+                                stats_dict = {}
 
-                            # Get stats from the view
-                            stats_data = stats_dict.get(project_id, {'active_todos': 0, 'active_ideas': 0, 'active_notes': 0})
-                            todos_count = stats_data.get('active_todos', 0)
-                            ideas_count = stats_data.get('active_ideas', 0)
-                            notes_count = stats_data.get('active_notes', 0)
+                            for project in projects:
+                                project_id = project['id']
 
-                            stats = f"({todos_count} todos, {ideas_count} ideas, {notes_count} notes)"
+                                # Get stats from the view
+                                stats_data = stats_dict.get(project_id, {'active_todos': 0, 'active_ideas': 0, 'active_notes': 0})
+                                todos_count = stats_data.get('active_todos', 0)
+                                ideas_count = stats_data.get('active_ideas', 0)
+                                notes_count = stats_data.get('active_notes', 0)
 
-                            # Get content preview
-                            content_preview = project['content'].split('\n')[0][:60]
-                            if len(project['content']) > 60:
-                                content_preview += "..."
+                                stats = f"({todos_count} todos, {ideas_count} ideas, {notes_count} notes)"
 
-                            formatted_id = ZettlFormatter.note_id(project_id)
-                            result += f"  {formatted_id} {stats}: {content_preview}\n\n"
+                                # Get content preview
+                                content_preview = project['content'].split('\n')[0][:60]
+                                if len(project['content']) > 60:
+                                    content_preview += "..."
+
+                                formatted_id = ZettlFormatter.note_id(project_id)
+                                result += f"  {formatted_id} {stats}: {content_preview}\n\n"
                 elif cmd == "todo":
                     # TODO LIST MODE - Full CLI behavior with filtering
                     # Extract options
                     donetoday = 'donetoday' in options or 'dt' in flags
                     show_all = 'all' in options or 'a' in flags
                     cancel_flag = 'cancel' in options or 'c' in flags
+                    show_full = 'full' in options or 'f' in flags
                     filter_tags = []
                     if 'tag' in options:
                         if isinstance(options['tag'], list):
@@ -1237,25 +1431,78 @@ def execute_command():
 
                             if category_dict:
                                 for category, notes in sorted(category_dict.items()):
+                                    # Get category tags to exclude from individual note display
                                     if " - " in category:
+                                        category_tags_lower = [t.strip().lower() for t in category.split(" - ")]
                                         tags_in_cat = category.split(" - ")
                                         formatted_tags = [ZettlFormatter.tag(t) for t in tags_in_cat]
                                         category_display = " - ".join(formatted_tags)
                                         output += f"{category_display} ({len(notes)})\n\n"
                                     else:
+                                        category_tags_lower = [category.lower()]
                                         output += f"{ZettlFormatter.tag(category)} ({len(notes)})\n\n"
 
                                     for note in notes:
-                                        formatted_id = ZettlFormatter.note_id(note['id'])
-                                        output += f"  {formatted_id}:\n"
-                                        output += f"{note['content']}\n\n"
+                                        note_id = note['id']
+                                        # Get tags for this note
+                                        try:
+                                            note_tags = notes_manager.get_tags(note_id)
+                                        except Exception:
+                                            note_tags = []
+
+                                        # Exclude category tags and type/status tags from display
+                                        excluded = category_tags_lower + ['todo', 'idea', 'note', 'done', 'cancel']
+                                        display_tags = [t for t in note_tags if t.lower() not in excluded]
+
+                                        if show_full:
+                                            # Full mode: show ID and tags on first line, then full content
+                                            line_parts = [ZettlFormatter.note_id(note_id)]
+                                            if display_tags:
+                                                formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                                                line_parts.append(' '.join(formatted_tags))
+                                            output += '  ' + '  '.join(line_parts) + "\n\n"
+                                            output += note['content'] + "\n\n"
+                                        else:
+                                            # Preview mode: ID [tags] | first line (matching CLI)
+                                            line_parts = [ZettlFormatter.note_id(note_id)]
+                                            if display_tags:
+                                                formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                                                line_parts.append(' '.join(formatted_tags))
+                                            first_line = note['content'].split('\n')[0]
+                                            line_parts.append(f'<span class="pipe-sep">|</span> {first_line}')
+                                            output += '  ' + '  '.join(line_parts) + "\n\n"
 
                             if uncategorized_list:
                                 output += "Uncategorized\n\n"
                                 for note in uncategorized_list:
-                                    formatted_id = ZettlFormatter.note_id(note['id'])
-                                    output += f"  {formatted_id}:\n"
-                                    output += f"{note['content']}\n\n"
+                                    note_id = note['id']
+                                    # Get tags for this note
+                                    try:
+                                        note_tags = notes_manager.get_tags(note_id)
+                                    except Exception:
+                                        note_tags = []
+
+                                    # Exclude type tags ('todo', 'idea', 'note') and status tags from display
+                                    excluded = ['todo', 'idea', 'note', 'done', 'cancel']
+                                    display_tags = [t for t in note_tags if t.lower() not in excluded]
+
+                                    if show_full:
+                                        # Full mode: show ID and tags on first line, then full content
+                                        line_parts = [ZettlFormatter.note_id(note_id)]
+                                        if display_tags:
+                                            formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                                            line_parts.append(' '.join(formatted_tags))
+                                        output += '  ' + '  '.join(line_parts) + "\n\n"
+                                        output += note['content'] + "\n\n"
+                                    else:
+                                        # Preview mode: ID [tags] | first line (matching CLI)
+                                        line_parts = [ZettlFormatter.note_id(note_id)]
+                                        if display_tags:
+                                            formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                                            line_parts.append(' '.join(formatted_tags))
+                                        first_line = note['content'].split('\n')[0]
+                                        line_parts.append(f'<span class="pipe-sep">|</span> {first_line}')
+                                        output += '  ' + '  '.join(line_parts) + "\n\n"
 
                             return output
 
@@ -1303,6 +1550,7 @@ def execute_command():
                     # Extract options
                     show_all = 'all' in options or 'a' in flags
                     cancel_flag = 'cancel' in options or 'c' in flags
+                    show_full = 'full' in options or 'f' in flags
                     filter_tags = []
                     if 'tag' in options:
                         if isinstance(options['tag'], list):
@@ -1455,16 +1703,62 @@ def execute_command():
                                         output += f"{ZettlFormatter.tag(category)} ({len(notes_list)})\n\n"
 
                                     for note in notes_list:
-                                        formatted_id = ZettlFormatter.note_id(note['id'])
-                                        output += f"  {formatted_id}:\n"
-                                        output += f"{note['content']}\n\n"
+                                        note_id = note['id']
+                                        # Get tags for this note
+                                        try:
+                                            note_tags = notes_manager.get_tags(note_id)
+                                        except Exception:
+                                            note_tags = []
+
+                                        if show_full:
+                                            # Full mode: show ID and tags on first line, then full content
+                                            line_parts = [ZettlFormatter.note_id(note_id)]
+                                            if note_tags:
+                                                formatted_tags = [ZettlFormatter.tag(t) for t in note_tags]
+                                                line_parts.append(' '.join(formatted_tags))
+                                            output += '  ' + '  '.join(line_parts) + "\n\n"
+                                            output += note['content'] + "\n\n"
+                                        else:
+                                            # Preview mode: ID [tags] | first line (matching CLI)
+                                            line_parts = [ZettlFormatter.note_id(note_id)]
+                                            if note_tags:
+                                                formatted_tags = [ZettlFormatter.tag(t) for t in note_tags]
+                                                line_parts.append(' '.join(formatted_tags))
+                                            first_line = note['content'].split('\n')[0]
+                                            line_parts.append(f'<span class="pipe-sep">|</span> {first_line}')
+                                            output += '  ' + '  '.join(line_parts) + "\n\n"
 
                             if uncategorized_list:
                                 output += "Uncategorized\n\n"
                                 for note in uncategorized_list:
-                                    formatted_id = ZettlFormatter.note_id(note['id'])
-                                    output += f"  {formatted_id}:\n"
-                                    output += f"{note['content']}\n\n"
+                                    note_id = note['id']
+                                    # Get tags for this note
+                                    try:
+                                        note_tags = notes_manager.get_tags(note_id)
+                                    except Exception:
+                                        note_tags = []
+
+                                    # Exclude type tags ('todo', 'idea', 'note') and status tags from display
+                                    excluded = ['todo', 'idea', 'note', 'done', 'cancel']
+                                    display_tags = [t for t in note_tags if t.lower() not in excluded]
+
+                                    if show_full:
+                                        # Full mode: show ID and tags on first line, then full content
+                                        line_parts = [ZettlFormatter.note_id(note_id)]
+                                        if display_tags:
+                                            formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                                            line_parts.append(' '.join(formatted_tags))
+                                        output += '  ' + '  '.join(line_parts) + "\n\n"
+                                        output += note['content'] + "\n\n"
+                                    else:
+                                        # Preview mode: ID [tags] | first line (matching CLI)
+                                        line_parts = [ZettlFormatter.note_id(note_id)]
+                                        if display_tags:
+                                            formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                                            line_parts.append(' '.join(formatted_tags))
+                                        first_line = note['content'].split('\n')[0]
+                                        line_parts.append(f'<span class="pipe-sep">|</span> {first_line}')
+                                        output += '  ' + '  '.join(line_parts) + "\n\n"
 
                             return output
 
@@ -1487,6 +1781,7 @@ def execute_command():
                     # Extract options
                     show_all = 'all' in options or 'a' in flags
                     cancel_flag = 'cancel' in options or 'c' in flags
+                    show_full = 'full' in options or 'f' in flags
                     filter_tags = []
                     if 'tag' in options:
                         if isinstance(options['tag'], list):
@@ -1639,16 +1934,62 @@ def execute_command():
                                         output += f"{ZettlFormatter.tag(category)} ({len(notes_list)})\n\n"
 
                                     for note in notes_list:
-                                        formatted_id = ZettlFormatter.note_id(note['id'])
-                                        output += f"  {formatted_id}:\n"
-                                        output += f"{note['content']}\n\n"
+                                        note_id = note['id']
+                                        # Get tags for this note
+                                        try:
+                                            note_tags = notes_manager.get_tags(note_id)
+                                        except Exception:
+                                            note_tags = []
+
+                                        if show_full:
+                                            # Full mode: show ID and tags on first line, then full content
+                                            line_parts = [ZettlFormatter.note_id(note_id)]
+                                            if note_tags:
+                                                formatted_tags = [ZettlFormatter.tag(t) for t in note_tags]
+                                                line_parts.append(' '.join(formatted_tags))
+                                            output += '  ' + '  '.join(line_parts) + "\n\n"
+                                            output += note['content'] + "\n\n"
+                                        else:
+                                            # Preview mode: ID [tags] | first line (matching CLI)
+                                            line_parts = [ZettlFormatter.note_id(note_id)]
+                                            if note_tags:
+                                                formatted_tags = [ZettlFormatter.tag(t) for t in note_tags]
+                                                line_parts.append(' '.join(formatted_tags))
+                                            first_line = note['content'].split('\n')[0]
+                                            line_parts.append(f'<span class="pipe-sep">|</span> {first_line}')
+                                            output += '  ' + '  '.join(line_parts) + "\n\n"
 
                             if uncategorized_list:
                                 output += "Uncategorized\n\n"
                                 for note in uncategorized_list:
-                                    formatted_id = ZettlFormatter.note_id(note['id'])
-                                    output += f"  {formatted_id}:\n"
-                                    output += f"{note['content']}\n\n"
+                                    note_id = note['id']
+                                    # Get tags for this note
+                                    try:
+                                        note_tags = notes_manager.get_tags(note_id)
+                                    except Exception:
+                                        note_tags = []
+
+                                    # Exclude type tags ('todo', 'idea', 'note') and status tags from display
+                                    excluded = ['todo', 'idea', 'note', 'done', 'cancel']
+                                    display_tags = [t for t in note_tags if t.lower() not in excluded]
+
+                                    if show_full:
+                                        # Full mode: show ID and tags on first line, then full content
+                                        line_parts = [ZettlFormatter.note_id(note_id)]
+                                        if display_tags:
+                                            formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                                            line_parts.append(' '.join(formatted_tags))
+                                        output += '  ' + '  '.join(line_parts) + "\n\n"
+                                        output += note['content'] + "\n\n"
+                                    else:
+                                        # Preview mode: ID [tags] | first line (matching CLI)
+                                        line_parts = [ZettlFormatter.note_id(note_id)]
+                                        if display_tags:
+                                            formatted_tags = [ZettlFormatter.tag(t) for t in display_tags]
+                                            line_parts.append(' '.join(formatted_tags))
+                                        first_line = note['content'].split('\n')[0]
+                                        line_parts.append(f'<span class="pipe-sep">|</span> {first_line}')
+                                        output += '  ' + '  '.join(line_parts) + "\n\n"
 
                             return output
 
