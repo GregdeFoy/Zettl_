@@ -1568,71 +1568,86 @@ def llm(note_id, action, count, show_source):
         console.print(ZettlFormatter.error(str(e)))
 
 @cli.command()
-@click.argument('note_id')
+@click.argument('note_ids', nargs=-1, required=True)
 @click.option('--force', '-f', is_flag=True, help='Skip confirmation prompt')
-@click.option('--keep-links', is_flag=True, help='Keep links to and from this note')
-@click.option('--keep-tags', is_flag=True, help='Keep tags associated with this note')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def delete(note_id, force, keep_links, keep_tags):
-    """Delete a note and its associated data."""
+def delete(note_ids, force):
+    """Delete one or more notes and their associated data (tags and links)."""
     try:
-        # First get the note to show what will be deleted
-        try:
-            note = get_notes_manager().get_note(note_id)
-            
-            # Get related data counts for information
+        notes_to_delete = []
+        failed_previews = []
+
+        # Collect preview information for all notes
+        for note_id in note_ids:
             try:
-                tags = get_notes_manager().get_tags(note_id)
-                related_notes = get_notes_manager().get_related_notes(note_id)
-                tag_count = len(tags)
-                link_count = len(related_notes)
-            except Exception:
-                tag_count = 0
-                link_count = 0
-                
-            # Show preview of what will be deleted
-            console.print(ZettlFormatter.header(f"Note to delete: #{note_id}"))
-            content_preview = note['content'][:100] + "[...]" if len(note['content']) > 100 else note['content']
-            click.echo(f"Content: {content_preview}")
-            click.echo(f"Associated tags: {tag_count}")
-            click.echo(f"Connected notes: {link_count}")
-            
-        except Exception as e:
-            if not force:
-                console.print(ZettlFormatter.warning(f"Could not retrieve note: {str(e)}"))
-                if not click.confirm("Continue with deletion anyway?"):
-                    click.echo("Deletion cancelled.")
-                    return
-        
+                note = get_notes_manager().get_note(note_id)
+
+                # Get related data counts
+                try:
+                    tags = get_notes_manager().get_tags(note_id)
+                    related_notes = get_notes_manager().get_related_notes(note_id)
+                    tag_count = len(tags)
+                    link_count = len(related_notes)
+                except Exception:
+                    tag_count = 0
+                    link_count = 0
+
+                notes_to_delete.append({
+                    'id': note_id,
+                    'content': note['content'],
+                    'tag_count': tag_count,
+                    'link_count': link_count
+                })
+            except Exception as e:
+                failed_previews.append({'id': note_id, 'error': str(e)})
+
+        # Show preview of all notes to be deleted
+        if notes_to_delete:
+            console.print(ZettlFormatter.header(f"Notes to delete: {len(notes_to_delete)}"))
+            for note_info in notes_to_delete:
+                content_preview = note_info['content'][:100] + "[...]" if len(note_info['content']) > 100 else note_info['content']
+                click.echo(f"\n#{note_info['id']}")
+                click.echo(f"  Content: {content_preview}")
+                click.echo(f"  Tags: {note_info['tag_count']}, Links: {note_info['link_count']}")
+
+        # Show failed previews
+        if failed_previews:
+            console.print(ZettlFormatter.warning(f"\nCould not retrieve {len(failed_previews)} note(s):"))
+            for failed in failed_previews:
+                click.echo(f"  #{failed['id']}: {failed['error']}")
+
+            if not force and not click.confirm("\nContinue with deletion anyway?"):
+                click.echo("Deletion cancelled.")
+                return
+
         # Confirm deletion if not forced
-        if not force and not click.confirm(f"Delete note #{note_id}?"):
+        total_count = len(notes_to_delete) + len(failed_previews)
+        if not force and not click.confirm(f"\nDelete {total_count} note(s)?"):
             click.echo("Deletion cancelled.")
             return
-        
-        # Determine cascade setting based on flags
-        cascade = not (keep_links and keep_tags)
-        
-        # Delete with custom handling if specific items should be kept
-        if cascade and (keep_links or keep_tags):
-            # Custom deletion flow
-            if not keep_tags:
-                get_notes_manager().delete_note_tags(note_id)
-                click.echo(f"Deleted tags for note #{note_id}")
-            
-            if not keep_links:
-                get_notes_manager().delete_note_links(note_id)
-                click.echo(f"Deleted links for note #{note_id}")
-            
-            # Now delete the note itself (with cascade=False since we handled dependencies)
-            get_notes_manager().delete_note(note_id, cascade=False)
-        else:
-            # Standard cascade deletion
-            get_notes_manager().delete_note(note_id, cascade=cascade)
-        
-        console.print(ZettlFormatter.success(f"Deleted note #{note_id}"))
-        
+
+        # Delete all notes with cascade (removes tags and links)
+        deleted_count = 0
+        failed_deletions = []
+
+        for note_id in note_ids:
+            try:
+                get_notes_manager().delete_note(note_id, cascade=True)
+                deleted_count += 1
+            except Exception as e:
+                failed_deletions.append({'id': note_id, 'error': str(e)})
+
+        # Report results
+        if deleted_count > 0:
+            console.print(ZettlFormatter.success(f"Deleted {deleted_count} note(s)"))
+
+        if failed_deletions:
+            console.print(ZettlFormatter.error(f"Failed to delete {len(failed_deletions)} note(s):"), err=True)
+            for failed in failed_deletions:
+                click.echo(f"  #{failed['id']}: {failed['error']}", err=True)
+
     except Exception as e:
-        console.print(ZettlFormatter.error(f"Error deleting note: {str(e)}"), err=True)
+        console.print(ZettlFormatter.error(f"Error deleting notes: {str(e)}"), err=True)
 
 
 @cli.command()

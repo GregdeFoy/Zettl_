@@ -258,9 +258,7 @@ COMMAND_OPTIONS = {
             'f': {'name': 'force', 'flag': True}
         },
         'long_opts': {
-            'force': {'flag': True},
-            'keep-links': {'flag': True},
-            'keep-tags': {'flag': True}
+            'force': {'flag': True}
         }
     },
     'llm': {
