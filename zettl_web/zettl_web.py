@@ -2136,47 +2136,70 @@ def execute_command():
                             tags.append(options['tag'])
 
                     # Create the note with custom ID if provided
+                    custom_id_fallback = False
                     if custom_id:
                         try:
                             from datetime import datetime
                             now = datetime.now().isoformat()
                             note_id = notes_manager.create_note_with_timestamp(content, now, custom_id)
-                            result = f"Created {cmd} #{note_id}\n"
                         except Exception as e:
                             # If custom ID already exists, use regular creation
                             if "already exists" in str(e) or "duplicate" in str(e).lower():
                                 note_id = notes_manager.create_note(content)
-                                result = f"Created {cmd} #{note_id} (custom ID '{custom_id}' already exists)\n"
+                                custom_id_fallback = True
                             else:
                                 raise e
                     else:
                         note_id = notes_manager.create_note(content)
-                        result = f"Created {cmd} #{note_id}\n"
+
+                    # Track successful tags and links for compact output
+                    added_tags = []
+                    linked_ids = []
+                    warnings = []
 
                     # Add automatic tags
                     for tag in auto_tags:
                         try:
                             notes_manager.add_tag(note_id, tag)
-                            result += f"Added tag '{tag}' to note #{note_id}\n"
+                            added_tags.append(tag)
                         except Exception as e:
-                            result += f"{ZettlFormatter.warning(f'Could not add tag {tag}: {str(e)}')}\n"
+                            warnings.append(ZettlFormatter.warning(f'Could not add tag {tag}: {str(e)}'))
 
                     # Add user-provided tags
                     for tag in tags:
                         if tag and tag not in auto_tags:
                             try:
                                 notes_manager.add_tag(note_id, tag)
-                                result += f"Added tag '{tag}' to note #{note_id}\n"
+                                added_tags.append(tag)
                             except Exception as e:
-                                result += f"{ZettlFormatter.warning(f'Could not add tag {tag}: {str(e)}')}\n"
+                                warnings.append(ZettlFormatter.warning(f'Could not add tag {tag}: {str(e)}'))
 
                     # Create links from -l options
                     for link_id in link_ids:
                         try:
                             notes_manager.create_link(note_id, link_id)
-                            result += f"Created link from #{note_id} to #{link_id}\n"
+                            linked_ids.append(link_id)
                         except Exception as e:
-                            result += f"{ZettlFormatter.warning(f'Could not create link to #{link_id}: {str(e)}')}\n"
+                            warnings.append(ZettlFormatter.warning(f'Could not create link to #{link_id}: {str(e)}'))
+
+                    # Build compact result
+                    result = f"**{cmd.capitalize()}** {ZettlFormatter.note_id(note_id)}"
+                    if custom_id_fallback:
+                        result += f" (custom ID '{custom_id}' already exists)"
+                    result += "\n"
+
+                    # Build details line: tags - x,y,z | linked - a,b
+                    details = []
+                    if added_tags:
+                        details.append(f"tags: {', '.join(added_tags)}")
+                    if linked_ids:
+                        details.append(f"linked: {', '.join(['#' + lid for lid in linked_ids])}")
+                    if details:
+                        result += ' | '.join(details) + "\n"
+
+                    # Add any warnings
+                    for warning in warnings:
+                        result += warning + "\n"
 
         elif cmd == "show":
             if not remaining_args:

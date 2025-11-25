@@ -793,6 +793,8 @@
         // ===== STATE MANAGEMENT =====
         let currentMode = 'NORMAL';
         let commandHistory = [];
+        let historyIndex = -1;
+        let savedInput = '';
         let currentConversationId = null;
 
         // ===== MODE SWITCHING =====
@@ -806,6 +808,8 @@
         // ===== SHEET CONTROLS =====
         function openSheet(prefill = '') {
             setMode('INSERT');
+            historyIndex = -1;
+            savedInput = '';
 
             const sheet = document.getElementById('command-sheet');
             const overlay = document.getElementById('overlay');
@@ -847,6 +851,39 @@
             if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
                 if (currentMode === 'INSERT' && e.key === 'Escape') {
                     closeSheet();
+                    return;
+                }
+
+                // Handle Up/Down arrows for command history
+                if (currentMode === 'INSERT' && e.key === 'ArrowUp') {
+                    if (commandHistory.length === 0) return;
+                    e.preventDefault();
+                    const input = e.target;
+                    if (historyIndex === -1) {
+                        savedInput = input.value;
+                        historyIndex = commandHistory.length - 1;
+                    } else if (historyIndex > 0) {
+                        historyIndex--;
+                    }
+                    input.value = commandHistory[historyIndex];
+                    input.selectionStart = input.selectionEnd = input.value.length;
+                    updateOptionPills(input.value);
+                    return;
+                }
+
+                if (currentMode === 'INSERT' && e.key === 'ArrowDown') {
+                    if (historyIndex === -1) return;
+                    e.preventDefault();
+                    const input = e.target;
+                    if (historyIndex < commandHistory.length - 1) {
+                        historyIndex++;
+                        input.value = commandHistory[historyIndex];
+                    } else {
+                        historyIndex = -1;
+                        input.value = savedInput;
+                    }
+                    input.selectionStart = input.selectionEnd = input.value.length;
+                    updateOptionPills(input.value);
                     return;
                 }
 
@@ -971,6 +1008,7 @@
 
                 // Add to history
                 commandHistory.push(command);
+                historyIndex = -1;
 
             } catch (error) {
                 loadingCard.remove();

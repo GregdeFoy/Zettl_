@@ -55,7 +55,10 @@ def create_new_note(content, tag, link=None, custom_id=None, auto_tags=None):
         else:
             note_id = notes_manager.create_note(content)
 
-        click.echo(f"Created note #{note_id}")
+        # Track successful tags and links for compact output
+        added_tags = []
+        linked_ids = []
+        warnings = []
 
         # Collect all tags to add
         all_tags = []
@@ -68,26 +71,43 @@ def create_new_note(content, tag, link=None, custom_id=None, auto_tags=None):
         if all_tags:
             try:
                 notes_manager.add_tags_batch(note_id, all_tags)
-                for t in all_tags:
-                    click.echo(f"Added tag '{t}' to note #{note_id}")
+                added_tags.extend(all_tags)
             except Exception as e:
                 # If batch fails, fall back to individual tags
-                click.echo(f"Warning: Batch tag insertion failed, trying individually: {str(e)}", err=True)
+                warnings.append(f"Batch tag insertion failed, trying individually: {str(e)}")
                 for t in all_tags:
                     try:
                         notes_manager.add_tag(note_id, t)
-                        click.echo(f"Added tag '{t}' to note #{note_id}")
+                        added_tags.append(t)
                     except Exception as e:
-                        click.echo(f"Warning: Could not add tag '{t}': {str(e)}", err=True)
+                        warnings.append(f"Could not add tag '{t}': {str(e)}")
 
         # Create links if provided via -l option (now supports multiple)
         if link:
             for link_id in link:
                 try:
                     notes_manager.create_link(note_id, link_id)
-                    click.echo(f"Created link from #{note_id} to #{link_id}")
+                    linked_ids.append(link_id)
                 except Exception as e:
-                    click.echo(f"Warning: Could not create link to note #{link_id}: {str(e)}", err=True)
+                    warnings.append(f"Could not create link to note #{link_id}: {str(e)}")
+
+        # Build compact output
+        note_type = auto_tags[0].capitalize() if auto_tags else "Note"
+        click.echo(f"{note_type} #{note_id}")
+
+        # Build details line: tags: x, y, z | linked: #a, #b
+        details = []
+        if added_tags:
+            details.append(f"tags: {', '.join(added_tags)}")
+        if linked_ids:
+            details.append(f"linked: {', '.join(['#' + lid for lid in linked_ids])}")
+        if details:
+            click.echo(' | '.join(details))
+
+        # Show any warnings
+        for warning in warnings:
+            click.echo(f"Warning: {warning}", err=True)
+
     except Exception as e:
         click.echo(f"Error creating note: {str(e)}", err=True)
 
