@@ -1161,7 +1161,7 @@ def link(source_id, target_id, context, remove):
 
 @cli.command()
 @click.argument('note_ids', nargs=-1)
-@click.option('--tags', '-t', multiple=True, help='Tag(s) to add or remove')
+@click.option('--tags', '-t', help='Tag(s) to add or remove (space-separated)')
 @click.option('--remove', '-r', is_flag=True, help='Remove the specified tag(s) instead of adding')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def tag(note_ids, tags, remove):
@@ -1171,7 +1171,7 @@ def tag(note_ids, tags, remove):
         zt tag                                    - List all tags with their counts
         zt tag xyz12                              - Show all tags for note xyz12
         zt tag xyz12 -t work                      - Add 'work' tag to note xyz12
-        zt tag xyz12 abc34 -t work important      - Add tags to multiple notes
+        zt tag xyz12 abc34 -t "work important"    - Add tags to multiple notes
         zt tag xyz12 abc34 -t work -r             - Remove 'work' tag from multiple notes
     """
     try:
@@ -1187,8 +1187,8 @@ def tag(note_ids, tags, remove):
                 console.print(ZettlFormatter.warning("No tags found."))
             return
 
-        # Convert tags tuple to list
-        tag_list = list(tags)
+        # Split tags string into list
+        tag_list = tags.split() if tags else []
 
         # If tags provided, add or remove them
         if tag_list:
@@ -1244,9 +1244,13 @@ def tag(note_ids, tags, remove):
 @click.option('--exclude-tag', '+t', multiple=True, help='Exclude notes with this tag (can specify multiple, excludes ANY)')
 @click.option('--date', '-d', help='Search for notes created on a specific date (YYYY-MM-DD format)')
 @click.option('--full', '-f', is_flag=True, help='Show full content of matching notes')
+@click.option('--threshold', '-s', type=float, default=0.3, help='Fuzzy search sensitivity (0.0-1.0, lower=more results, default=0.3)')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def search(query, tag, exclude_tag, date, full):
-    """Search for notes containing text, with specific tags, or by date.
+def search(query, tag, exclude_tag, date, full, threshold):
+    """Search for notes using fuzzy matching, with specific tags, or by date.
+
+    Fuzzy search finds notes even with typos or partial matches.
+    Use --threshold to adjust sensitivity (lower = more results).
 
     Multiple tags can be specified:
     - Multiple -t tags: Note must have ALL specified tags (AND logic)
@@ -1270,12 +1274,12 @@ def search(query, tag, exclude_tag, date, full):
                 console.print(ZettlFormatter.error(str(e)))
                 return
         elif query:
-            # Search by content
-            results = notes_manager.search_notes(query)
+            # Search by content using fuzzy matching
+            results = notes_manager.search_notes(query, threshold=threshold)
             if not results:
-                console.print(ZettlFormatter.warning(f"No notes found containing '{query}'"))
+                console.print(ZettlFormatter.warning(f"No notes found matching '{query}'"))
                 return
-            search_description.append(f"containing '{query}'")
+            search_description.append(f"matching '{query}'")
         else:
             # No primary search criteria - start with all notes
             # If we have any tag filters, we need to search ALL notes
@@ -1348,7 +1352,22 @@ def search(query, tag, exclude_tag, date, full):
 
             if full:
                 # Full content mode with new format
-                ZettlFormatter.render_note(note, tags=note_tags, mode='full')
+                # Show similarity score if available (from fuzzy search)
+                if 'similarity' in note and query:
+                    sim = note['similarity']
+                    if sim >= 0.8:
+                        sim_color = "green"
+                    elif sim >= 0.5:
+                        sim_color = "yellow"
+                    else:
+                        sim_color = "dim"
+                    console.print(f"{ZettlFormatter.note_id(note['id'])} [{sim_color}]{sim:.0%}[/{sim_color}]")
+                    console.print("-" * 40)
+                    console.print(note['content'])
+                    if note_tags:
+                        console.print(f"Tags: {' '.join([ZettlFormatter.tag(t) for t in note_tags])}")
+                else:
+                    ZettlFormatter.render_note(note, tags=note_tags, mode='full')
                 console.print()  # Empty line between notes
             else:
                 # Preview mode with new pipe separator format
@@ -1360,8 +1379,20 @@ def search(query, tag, exclude_tag, date, full):
                     pattern = re.compile(re.escape(query), re.IGNORECASE)
                     content_first_line = pattern.sub(r"[bold yellow]\g<0>[/bold yellow]", content_first_line)
 
-                # Build the line: ID [tags] | content
+                # Build the line: ID [similarity] [tags] | content
                 line_parts = [formatted_id]
+
+                # Show similarity score if available (from fuzzy search)
+                if 'similarity' in note and query:
+                    sim = note['similarity']
+                    if sim >= 0.8:
+                        sim_color = "green"
+                    elif sim >= 0.5:
+                        sim_color = "yellow"
+                    else:
+                        sim_color = "dim"
+                    line_parts.append(f"[{sim_color}]{sim:.0%}[/{sim_color}]")
+
                 if note_tags:
                     formatted_tags = [ZettlFormatter.tag(t) for t in note_tags]
                     line_parts.append(' '.join(formatted_tags))

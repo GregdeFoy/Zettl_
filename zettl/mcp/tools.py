@@ -24,25 +24,32 @@ class ZettlMCPTools:
         """
         self.db = Database(jwt_token=jwt_token)
 
-    def search_notes(self, query: str) -> List[Dict[str, Any]]:
+    def search_notes(self, query: str, threshold: float = 0.3) -> List[Dict[str, Any]]:
         """
-        Search for notes containing the query string
+        Search for notes using fuzzy matching (handles typos and partial matches)
 
         Args:
             query: Search query string
+            threshold: Similarity threshold (0.0-1.0, lower=more results, default=0.3)
 
         Returns:
-            List of notes matching the query
+            List of notes matching the query, ordered by relevance
         """
         try:
-            results = self.db.search_notes(query)
+            results = self.db.search_notes(query, threshold=threshold)
             # Format for better MCP consumption
-            return [{
-                'id': note['id'],
-                'content': note['content'][:500] + ('...' if len(note['content']) > 500 else ''),
-                'created_at': self.db.format_timestamp(note['created_at']),
-                'full_content': note['content']
-            } for note in results]
+            formatted = []
+            for note in results:
+                item = {
+                    'id': note['id'],
+                    'content': note['content'][:500] + ('...' if len(note['content']) > 500 else ''),
+                    'created_at': self.db.format_timestamp(note['created_at']),
+                    'full_content': note['content']
+                }
+                if 'similarity' in note:
+                    item['similarity'] = note['similarity']
+                formatted.append(item)
+            return formatted
         except Exception as e:
             return {'error': str(e)}
 

@@ -48,9 +48,9 @@ class Notes:
         """Get all tags for a note."""
         return self.db.get_tags(note_id)
         
-    def search_notes(self, query: str) -> List[Dict[str, Any]]:
-        """Search for notes containing the query string."""
-        return self.db.search_notes(query)
+    def search_notes(self, query: str, threshold: float = 0.3, limit: int = 100) -> List[Dict[str, Any]]:
+        """Search for notes using fuzzy matching."""
+        return self.db.search_notes(query, threshold=threshold, limit=limit)
         
     def search_notes_by_date(self, date_str: str) -> List[Dict[str, Any]]:
         """Search for notes created on a specific date (YYYY-MM-DD format)."""

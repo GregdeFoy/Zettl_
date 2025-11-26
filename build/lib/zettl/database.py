@@ -694,16 +694,38 @@ class Database:
         except Exception:
             return []
 
-    def search_notes(self, query: str) -> List[Dict[str, Any]]:
-        """Search for notes containing the query string."""
-        params = {'content': f'ilike.*{query}*'}
-        response = self._make_request('GET', 'notes', params=params)
+    def search_notes(self, query: str, threshold: float = 0.3, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Search for notes using fuzzy matching (trigram similarity).
 
-        data = response.json()
-        if not data:
-            return []
+        Args:
+            query: The search query string
+            threshold: Minimum similarity score (0.0-1.0, default 0.3)
+            limit: Maximum number of results (default 100)
 
-        return data
+        Returns:
+            List of matching notes with similarity scores, ordered by relevance
+        """
+        try:
+            # Use the fuzzy search RPC function
+            response = self._make_request(
+                'POST',
+                'rpc/fuzzy_search_notes',
+                data={
+                    'search_query': query,
+                    'similarity_threshold': threshold,
+                    'max_results': limit
+                }
+            )
+            data = response.json()
+            return data if data else []
+        except Exception:
+            # Fallback to simple ILIKE search if fuzzy search fails
+            # (e.g., if pg_trgm extension not installed)
+            params = {'content': f'ilike.*{query}*'}
+            response = self._make_request('GET', 'notes', params=params)
+            data = response.json()
+            return data if data else []
 
     def search_notes_by_date(self, date_str: str) -> List[Dict[str, Any]]:
         """

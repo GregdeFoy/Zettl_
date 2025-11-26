@@ -602,6 +602,32 @@
             padding: 0;
         }
 
+        /* Help text styling - preserves formatting while looking clean */
+        .help-text {
+            background: transparent;
+            color: var(--black);
+            padding: 8px 0;
+            margin: 0;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            border: none;
+            overflow-x: auto;
+        }
+
+        .help-text strong {
+            color: var(--coral);
+            font-weight: 700;
+        }
+
+        .help-text code {
+            background: rgba(0, 0, 0, 0.08);
+            padding: 1px 5px;
+            border-radius: 3px;
+            color: #1E40AF;
+        }
+
         .markdown-content ul, .markdown-content ol {
             margin-left: 24px;
             margin-bottom: 12px;
@@ -725,7 +751,7 @@
                 <button class="pill" onclick="fillCommand('list ')">list</button>
                 <button class="pill" onclick="fillCommand('search ')">search</button>
                 <button class="pill" onclick="fillCommand('show ')">show</button>
-                <button class="pill" onclick="fillCommand('tags ')">tags</button>
+                <button class="pill" onclick="fillCommand('tag ')">tag</button>
                 <button class="pill" onclick="fillCommand('link ')">link</button>
                 <button class="pill" onclick="fillCommand('llm ')">llm</button>
             </div>
@@ -1092,8 +1118,8 @@
                 'search': ['-t', '+t', '-d', '--full'],
                 'show': ['-r', '--full'],
                 'link': ['-c', '-r'],
-                'tags': ['-r'],
-                'delete': ['-f', '--keep-links', '--keep-tags'],
+                'tag': ['-t', '-r'],
+                'delete': ['-f'],
                 'llm': ['-a summarize', '-a tags', '-a connect', '-a expand', '-c']
             };
 

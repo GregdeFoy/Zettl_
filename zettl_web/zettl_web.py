@@ -216,13 +216,15 @@ COMMAND_OPTIONS = {
         'short_opts': {
             't': {'name': 'tag', 'multiple': True},
             'd': {'name': 'date'},
-            'f': {'name': 'full', 'flag': True}
+            'f': {'name': 'full', 'flag': True},
+            's': {'name': 'threshold'}
         },
         'long_opts': {
             'tag': {'multiple': True},
             'exclude-tag': {'multiple': True},
             'date': {},
-            'full': {'flag': True}
+            'full': {'flag': True},
+            'threshold': {}
         }
     },
     'show': {
@@ -247,11 +249,11 @@ COMMAND_OPTIONS = {
     },
     'tag': {
         'short_opts': {
-            't': {'name': 'tags', 'multiple': True},
+            't': {'name': 'tags'},
             'r': {'name': 'remove', 'flag': True}
         },
         'long_opts': {
-            'tags': {'multiple': True},
+            'tags': {},
             'remove': {'flag': True}
         }
     },
@@ -536,9 +538,9 @@ def process_for_web(text):
     Process text for web display - everything is treated as markdown unless it's already HTML.
     No ANSI codes, no special markers needed.
     """
-    # If the text already contains HTML tags (like from Eisenhower matrix), don't wrap it in markdown-content
-    # This allows raw HTML to pass through for complex layouts like tables
-    if '<div' in text or '<table' in text or '<span' in text:
+    # If the text already contains HTML tags (like from Eisenhower matrix or help text), don't wrap it in markdown-content
+    # This allows raw HTML to pass through for complex layouts like tables and pre-formatted help
+    if '<div' in text or '<table' in text or '<span' in text or '<pre' in text:
         return text
 
     # Otherwise, wrap in markdown-content div for markdown rendering
@@ -2381,17 +2383,18 @@ def execute_command():
                 exclude_tags = [exclude_tags] if exclude_tags else []
 
             full = 'f' in flags or 'full' in flags
+            threshold = float(options.get('threshold', 0.3))
             query = remaining_args[0] if remaining_args else ""
             search_description = []
 
             # Step 1: Get initial result set based on primary criteria
             if query:
-                # Search by content
-                search_results = notes_manager.search_notes(query)
+                # Search by content using fuzzy matching
+                search_results = notes_manager.search_notes(query, threshold=threshold)
                 if not search_results:
-                    result = ZettlFormatter.warning(f"No notes found containing '{query}'")
+                    result = ZettlFormatter.warning(f"No notes found matching '{query}'")
                 else:
-                    search_description.append(f"containing '{query}'")
+                    search_description.append(f"matching '{query}'")
                     result = ""
             else:
                 # No primary search criteria - start with all notes
@@ -2459,17 +2462,23 @@ def execute_command():
             # Display the results if we have any
             if 'search_results' in locals() and search_results:
                 for note in search_results:
+                    # Show similarity score if available
+                    sim_str = ""
+                    if 'similarity' in note and query:
+                        sim = note['similarity']
+                        sim_str = f" ({sim:.0%})"
+
                     if full:
                         # Full content mode
-                        result += f"{ZettlFormatter.note_id(note['id'])}\n"
+                        result += f"{ZettlFormatter.note_id(note['id'])}{sim_str}\n"
                         result += "-" * 40 + "\n"
                         result += f"{note['content']}\n"
 
                         # Add tags display
                         try:
-                            tags = notes_manager.get_tags(note['id'])
-                            if tags:
-                                result += f"Tags: {', '.join([ZettlFormatter.tag(t) for t in tags])}\n"
+                            note_tags = notes_manager.get_tags(note['id'])
+                            if note_tags:
+                                result += f"Tags: {', '.join([ZettlFormatter.tag(t) for t in note_tags])}\n"
                         except Exception:
                             pass
 
@@ -2482,7 +2491,7 @@ def execute_command():
                             pattern = re.compile(re.escape(query), re.IGNORECASE)
                             content_preview = pattern.sub(r"**\g<0>**", content_preview)
 
-                        result += f"{ZettlFormatter.note_id(note['id'])}: {content_preview}\n"
+                        result += f"{ZettlFormatter.note_id(note['id'])}{sim_str}: {content_preview}\n\n"
                     
         elif cmd == "tags":
             # Handle various ways the tags command is used

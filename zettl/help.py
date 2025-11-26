@@ -15,26 +15,25 @@ class CommandHelp:
 
     @classmethod
     def _convert_to_markdown(cls, text):
-        """Convert rich markup to markdown."""
-        # [bold green]text[/bold green] -> **text**
-        # [bold]text[/bold green] -> **text**
-        # [blue]text[/blue] -> *text* (use italic for colored text)
-        # [cyan]text[/cyan] -> `text` (use code for cyan)
-        # [bold yellow]text[/bold yellow] -> **text**
+        """Convert rich markup to HTML for web display with preserved formatting."""
+        # Remove [dim] markers
+        text = re.sub(r'\[dim\](.*?)\[/dim\]', r'\1', text)
 
-        # Replace bold with color markers -> just bold
-        text = re.sub(r'\[bold [^\]]+\]([^\[]+)\[/bold [^\]]+\]', r'**\1**', text)
+        # Replace bold with color markers -> <strong> (use non-greedy .*? to handle brackets in content like [QUERY])
+        text = re.sub(r'\[bold [^\]]+\](.*?)\[/bold [^\]]+\]', r'<strong>\1</strong>', text)
         # Replace plain bold
-        text = re.sub(r'\[bold\]([^\[]+)\[/bold\]', r'**\1**', text)
-        # Replace colored text with italics
-        text = re.sub(r'\[blue\]([^\[]+)\[/blue\]', r'*\1*', text)
+        text = re.sub(r'\[bold\](.*?)\[/bold\]', r'<strong>\1</strong>', text)
+        # Replace colored text - keep plain for readability
+        text = re.sub(r'\[blue\](.*?)\[/blue\]', r'\1', text)
         # Replace cyan with inline code
-        text = re.sub(r'\[cyan\]([^\[]+)\[/cyan\]', r'`\1`', text)
-        # Replace yellow (keep plain for markdown)
-        text = re.sub(r'\[yellow\]([^\[]+)\[/yellow\]', r'\1', text)
-        text = re.sub(r'\[bold yellow\]([^\[]+)\[/bold yellow\]', r'**\1**', text)
+        text = re.sub(r'\[cyan\](.*?)\[/cyan\]', r'<code>\1</code>', text)
+        # Replace yellow with inline code (options/flags)
+        text = re.sub(r'\[yellow\](.*?)\[/yellow\]', r'<code>\1</code>', text)
+        text = re.sub(r'\[bold yellow\](.*?)\[/bold yellow\]', r'<strong>\1</strong>', text)
 
-        return text
+        # Wrap the entire output in a pre block to preserve formatting
+        # This ensures line breaks and indentation are kept
+        return f'<pre class="help-text">{text}</pre>'
 
     @classmethod
     def get_main_help(cls):
@@ -66,8 +65,8 @@ class CommandHelp:
   [bold yellow]list[/bold yellow]                List recent notes
     [blue]→[/blue] zettl list --limit 10
 
-  [bold yellow]search[/bold yellow]              Search by text, tag, or date
-    [blue]→[/blue] zettl search "concept" -t work
+  [bold yellow]search[/bold yellow]              Fuzzy search by text, tag, or date
+    [blue]→[/blue] zettl search "concpt" -t work  [dim](typo-tolerant)[/dim]
 
   [bold yellow]edit[/bold yellow]                Edit note in default text editor
     [blue]→[/blue] zettl edit 22a4b
@@ -305,18 +304,25 @@ See 'zettl project --help' for full documentation.
 """,
 
             "search": f"""
-[bold green]search [QUERY][/bold green] - Search notes by text, tags, or date
+[bold green]search [QUERY][/bold green] - Fuzzy search notes by text, tags, or date
+
+Uses fuzzy matching to find notes even with typos or partial matches.
+Results show similarity scores (green ≥80%, yellow ≥50%, dim <50%).
 
 [bold]Options:[/bold]
   [yellow]-t, --tag TAG[/yellow]        Must have tag (AND with multiple)
   [yellow]+t, --exclude-tag TAG[/yellow] Must not have tag (OR with multiple)
   [yellow]-d, --date DATE[/yellow]      Created on date (YYYY-MM-DD)
   [yellow]-f, --full[/yellow]           Show full content
+  [yellow]-s, --threshold NUM[/yellow]  Fuzzy sensitivity 0.0-1.0 (default: 0.3)
+                         Lower = more results, higher = stricter
 
 [bold]Examples:[/bold]
-  [blue]zettl search "keyword"[/blue]
-  [blue]zettl search -t work -t urgent[/blue]    Has work AND urgent
-  [blue]zettl search -t project +t done[/blue]   Has project, not done
+  [blue]zettl search "keyword"[/blue]           Fuzzy match "keyword"
+  [blue]zettl search "keywrd"[/blue]            Finds "keyword" despite typo
+  [blue]zettl search "python" -s 0.5[/blue]     Stricter matching
+  [blue]zettl search -t work -t urgent[/blue]   Has work AND urgent
+  [blue]zettl search -t project +t done[/blue]  Has project, not done
   [blue]zettl search -d 2025-04-07 -t work[/blue]
 """,
 
