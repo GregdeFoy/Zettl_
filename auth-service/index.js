@@ -646,7 +646,7 @@ app.get('/api/auth/settings', verifyToken, async (req, res) => {
   try {
     // Get user settings
     const settingsResult = await pool.query(
-      'SELECT claude_api_key, hidden_buttons, created_at, updated_at FROM user_settings WHERE user_id = $1',
+      'SELECT claude_api_key, hidden_buttons, trmnl_uuid, created_at, updated_at FROM user_settings WHERE user_id = $1',
       [req.user.sub]
     );
 
@@ -676,11 +676,100 @@ app.get('/api/auth/settings', verifyToken, async (req, res) => {
     res.json({
       claude_api_key: decryptedKey,
       hidden_buttons: settingsResult.rows[0]?.hidden_buttons || [],
+      trmnl_uuid: settingsResult.rows[0]?.trmnl_uuid || null,
       cli_tokens: tokensResult.rows
     });
   } catch (error) {
     console.error('Settings fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+
+// Update TRMNL UUID
+app.post('/api/auth/settings/trmnl-uuid', verifyToken, async (req, res) => {
+  const { uuid } = req.body;
+
+  try {
+    // Check if user_settings row exists
+    const existing = await pool.query(
+      'SELECT user_id FROM user_settings WHERE user_id = $1',
+      [req.user.sub]
+    );
+
+    if (existing.rows.length > 0) {
+      // Update existing row
+      await pool.query(
+        'UPDATE user_settings SET trmnl_uuid = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
+        [uuid || null, req.user.sub]
+      );
+    } else {
+      // Insert new row
+      await pool.query(
+        'INSERT INTO user_settings (user_id, trmnl_uuid) VALUES ($1, $2)',
+        [req.user.sub, uuid || null]
+      );
+    }
+
+    res.json({ message: 'TRMNL UUID updated successfully' });
+  } catch (error) {
+    console.error('TRMNL UUID update error:', error);
+    res.status(500).json({ error: 'Failed to update TRMNL UUID' });
+  }
+});
+
+// Get TRMNL UUID (accepts both JWT and CLI token auth)
+app.get('/api/auth/settings/trmnl-uuid', async (req, res) => {
+  try {
+    let userId;
+
+    // Check for JWT token first
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded.sub;
+      } catch (err) {
+        return res.status(401).json({ error: 'Invalid JWT token' });
+      }
+    }
+    // Otherwise check for CLI token
+    else {
+      const cliToken = req.headers['x-api-key'];
+      if (!cliToken) {
+        return res.status(401).json({ error: 'No authentication provided' });
+      }
+
+      const tokenHash = crypto.createHash('sha256').update(cliToken).digest('hex');
+
+      // Validate token and get user_id
+      const tokenResult = await pool.query(
+        `SELECT user_id FROM cli_tokens
+         WHERE token_hash = $1
+           AND is_active = true
+           AND (expires_at IS NULL OR expires_at > NOW())`,
+        [tokenHash]
+      );
+
+      if (tokenResult.rows.length === 0) {
+        return res.status(401).json({ error: 'Invalid or expired CLI token' });
+      }
+
+      userId = tokenResult.rows[0].user_id;
+    }
+
+    // Get TRMNL UUID
+    const settingsResult = await pool.query(
+      'SELECT trmnl_uuid FROM user_settings WHERE user_id = $1',
+      [userId]
+    );
+
+    res.json({
+      trmnl_uuid: settingsResult.rows[0]?.trmnl_uuid || null
+    });
+  } catch (error) {
+    console.error('TRMNL UUID fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch TRMNL UUID' });
   }
 });
 

@@ -55,7 +55,10 @@ def create_new_note(content, tag, link=None, custom_id=None, auto_tags=None):
         else:
             note_id = notes_manager.create_note(content)
 
-        click.echo(f"Created note #{note_id}")
+        # Track successful tags and links for compact output
+        added_tags = []
+        linked_ids = []
+        warnings = []
 
         # Collect all tags to add
         all_tags = []
@@ -68,26 +71,43 @@ def create_new_note(content, tag, link=None, custom_id=None, auto_tags=None):
         if all_tags:
             try:
                 notes_manager.add_tags_batch(note_id, all_tags)
-                for t in all_tags:
-                    click.echo(f"Added tag '{t}' to note #{note_id}")
+                added_tags.extend(all_tags)
             except Exception as e:
                 # If batch fails, fall back to individual tags
-                click.echo(f"Warning: Batch tag insertion failed, trying individually: {str(e)}", err=True)
+                warnings.append(f"Batch tag insertion failed, trying individually: {str(e)}")
                 for t in all_tags:
                     try:
                         notes_manager.add_tag(note_id, t)
-                        click.echo(f"Added tag '{t}' to note #{note_id}")
+                        added_tags.append(t)
                     except Exception as e:
-                        click.echo(f"Warning: Could not add tag '{t}': {str(e)}", err=True)
+                        warnings.append(f"Could not add tag '{t}': {str(e)}")
 
         # Create links if provided via -l option (now supports multiple)
         if link:
             for link_id in link:
                 try:
                     notes_manager.create_link(note_id, link_id)
-                    click.echo(f"Created link from #{note_id} to #{link_id}")
+                    linked_ids.append(link_id)
                 except Exception as e:
-                    click.echo(f"Warning: Could not create link to note #{link_id}: {str(e)}", err=True)
+                    warnings.append(f"Could not create link to note #{link_id}: {str(e)}")
+
+        # Build compact output
+        note_type = auto_tags[0].capitalize() if auto_tags else "Note"
+        click.echo(f"{note_type} #{note_id}")
+
+        # Build details line: tags: x, y, z | linked: #a, #b
+        details = []
+        if added_tags:
+            details.append(f"tags: {', '.join(added_tags)}")
+        if linked_ids:
+            details.append(f"linked: {', '.join(['#' + lid for lid in linked_ids])}")
+        if details:
+            click.echo(' | '.join(details))
+
+        # Show any warnings
+        for warning in warnings:
+            click.echo(f"Warning: {warning}", err=True)
+
     except Exception as e:
         click.echo(f"Error creating note: {str(e)}", err=True)
 
@@ -1140,21 +1160,23 @@ def link(source_id, target_id, context, remove):
         console.print(ZettlFormatter.error(f"Error: {str(e)}"), err=True)
 
 @cli.command()
-@click.argument('note_id', required=False)
-@click.argument('tag_string', required=False)
+@click.argument('note_ids', nargs=-1)
+@click.option('--tags', '-t', multiple=True, help='Tag(s) to add or remove')
 @click.option('--remove', '-r', is_flag=True, help='Remove the specified tag(s) instead of adding')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
-def tags(note_id, tag_string, remove):
-    """Show, add, or remove tags from a note.
+def tag(note_ids, tags, remove):
+    """Show, add, or remove tags from one or more notes.
 
     Usage:
-        zt tags                            - List all tags with their counts
-        zt tags xyz12                      - Show all tags for note xyz12
-        zt tags xyz12 "tag1"               - Add tag1 to note xyz12
-        zt tags xyz12 "tag1 tag2" -r       - Remove tags from note xyz12
+        zt tag                                    - List all tags with their counts
+        zt tag xyz12                              - Show all tags for note xyz12
+        zt tag xyz12 -t work                      - Add 'work' tag to note xyz12
+        zt tag xyz12 abc34 -t work important      - Add tags to multiple notes
+        zt tag xyz12 abc34 -t work -r             - Remove 'work' tag from multiple notes
     """
     try:
-        if not note_id:
+        # No arguments: list all tags
+        if not note_ids:
             tags_with_counts = get_notes_manager().get_all_tags_with_counts()
             if tags_with_counts:
                 console.print(ZettlFormatter.header(f"All Tags (showing {len(tags_with_counts)})"))
@@ -1165,29 +1187,54 @@ def tags(note_id, tag_string, remove):
                 console.print(ZettlFormatter.warning("No tags found."))
             return
 
-        if tag_string:
-            tag_list = tag_string.split()
+        # Convert tags tuple to list
+        tag_list = list(tags)
 
-            if remove:
-                for tag in tag_list:
-                    get_notes_manager().delete_tag(note_id, tag)
-                if len(tag_list) == 1:
-                    console.print(ZettlFormatter.success(f"Removed tag '{tag_list[0]}' from note #{note_id}"))
-                else:
-                    console.print(ZettlFormatter.success(f"Removed {len(tag_list)} tags from note #{note_id}"))
-            else:
-                if len(tag_list) == 1:
-                    get_notes_manager().add_tag(note_id, tag_list[0])
-                    click.echo(f"Added tag '{tag_list[0]}' to note #{note_id}")
-                else:
-                    get_notes_manager().add_tags_batch(note_id, tag_list)
-                    click.echo(f"Added {len(tag_list)} tags to note #{note_id}: {', '.join(tag_list)}")
+        # If tags provided, add or remove them
+        if tag_list:
+            success_count = 0
+            failed = []
 
-        note_tags = get_notes_manager().get_tags(note_id)
-        if note_tags:
-            console.print(f"Tags for note #{note_id}: {', '.join([ZettlFormatter.tag(t) for t in note_tags])}")
-        else:
-            click.echo(f"No tags for note #{note_id}")
+            for note_id in note_ids:
+                try:
+                    if remove:
+                        for t in tag_list:
+                            get_notes_manager().delete_tag(note_id, t)
+                    else:
+                        if len(tag_list) == 1:
+                            get_notes_manager().add_tag(note_id, tag_list[0])
+                        else:
+                            get_notes_manager().add_tags_batch(note_id, tag_list)
+                    success_count += 1
+                except Exception as e:
+                    failed.append({'id': note_id, 'error': str(e)})
+
+            # Report results
+            action = "Removed" if remove else "Added"
+            tag_str = ', '.join(tag_list)
+            if success_count > 0:
+                if len(note_ids) == 1:
+                    console.print(ZettlFormatter.success(f"{action} tag(s) '{tag_str}' {'from' if remove else 'to'} note #{note_ids[0]}"))
+                else:
+                    console.print(ZettlFormatter.success(f"{action} tag(s) '{tag_str}' {'from' if remove else 'to'} {success_count} note(s)"))
+
+            if failed:
+                console.print(ZettlFormatter.error(f"Failed on {len(failed)} note(s):"), err=True)
+                for f in failed:
+                    click.echo(f"  #{f['id']}: {f['error']}", err=True)
+
+        # Show tags for each note (only if single note or no tags were modified)
+        if len(note_ids) == 1 or not tag_list:
+            for note_id in note_ids:
+                try:
+                    note_tags = get_notes_manager().get_tags(note_id)
+                    if note_tags:
+                        console.print(f"Tags for note #{note_id}: {', '.join([ZettlFormatter.tag(t) for t in note_tags])}")
+                    else:
+                        click.echo(f"No tags for note #{note_id}")
+                except Exception as e:
+                    console.print(ZettlFormatter.error(f"Could not get tags for #{note_id}: {str(e)}"))
+
     except Exception as e:
         console.print(ZettlFormatter.error(str(e)))
 
@@ -2180,9 +2227,98 @@ def rules(source):
         # Always show the full rule with markdown rendering
         md = Markdown(random_rule['full_text'])
         console.print(md)
-            
+
     except Exception as e:
         console.print(ZettlFormatter.error(str(e)))
+
+
+@cli.command(name='trmnl')
+@click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
+def trmnl_cmd():
+    """Push completed todos to TRMNL e-ink display.
+
+    Sends today's completed todos to your TRMNL device webhook.
+    Configure your TRMNL UUID in the webapp settings first.
+
+    Example:
+        zt trmnl
+    """
+    try:
+        import requests
+        from zettl.config import AUTH_URL
+
+        # Get API key
+        api_key = zettl_auth.require_auth()
+
+        # Fetch TRMNL UUID from auth service
+        console.print(ZettlFormatter.info("Fetching TRMNL configuration..."))
+        response = requests.get(
+            f'{AUTH_URL}/settings/trmnl-uuid',
+            headers={'X-API-Key': api_key},
+            timeout=10
+        )
+
+        if response.status_code != 200:
+            console.print(ZettlFormatter.error("Failed to fetch TRMNL UUID from settings"))
+            return
+
+        data = response.json()
+        trmnl_uuid = data.get('trmnl_uuid')
+
+        if not trmnl_uuid:
+            console.print(ZettlFormatter.error("TRMNL UUID not configured. Set it in the webapp settings."))
+            return
+
+        # Get completed todos for today
+        console.print(ZettlFormatter.info("Fetching completed todos..."))
+        notes_manager = get_notes_manager()
+
+        # Get all notes tagged with 'todo'
+        todo_notes = notes_manager.get_notes_with_all_tags_by_tag('todo')
+
+        if not todo_notes:
+            todos_data = []
+        else:
+            # Filter for todos completed today
+            done_today_data = notes_manager.get_tags_created_today('done')
+            done_today_ids = {item['note_id'] for item in done_today_data} if done_today_data else set()
+
+            # Filter todo_notes to only include those completed today
+            completed_today = [note for note in todo_notes if note['id'] in done_today_ids]
+
+            # Format todos for TRMNL
+            todos_data = [{'content': note['content']} for note in completed_today]
+
+        # Prepare payload for TRMNL webhook
+        payload = {
+            'merge_variables': {
+                'todos': todos_data,
+                'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+            }
+        }
+
+        # Push to TRMNL webhook
+        console.print(ZettlFormatter.info(f"Pushing {len(todos_data)} completed todos to TRMNL..."))
+
+        webhook_url = f'https://usetrmnl.com/api/custom_plugins/{trmnl_uuid}'
+        response = requests.post(
+            webhook_url,
+            json=payload,
+            headers={'Content-Type': 'application/json'},
+            timeout=15
+        )
+
+        if response.status_code == 200:
+            console.print(ZettlFormatter.success(f"Successfully pushed {len(todos_data)} completed todos to TRMNL"))
+        else:
+            console.print(ZettlFormatter.error(f"Failed to push to TRMNL: {response.status_code} - {response.text}"))
+
+    except requests.exceptions.Timeout:
+        console.print(ZettlFormatter.error("Request timed out. Please try again."))
+    except requests.exceptions.RequestException as e:
+        console.print(ZettlFormatter.error(f"Network error: {str(e)}"))
+    except Exception as e:
+        console.print(ZettlFormatter.error(f"Error: {str(e)}"))
 
 
 if __name__ == '__main__':

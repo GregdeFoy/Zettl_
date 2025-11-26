@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     claude_api_key TEXT,
     hidden_buttons JSONB DEFAULT '[]',
+    trmnl_uuid VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

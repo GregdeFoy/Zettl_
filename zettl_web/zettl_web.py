@@ -12,7 +12,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 import re
 import jwt
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # Add the parent directory to the Python path to find the zettl module
 sys.path.insert(0, '/app')
@@ -245,11 +245,13 @@ COMMAND_OPTIONS = {
             'remove': {'flag': True}
         }
     },
-    'tags': {
+    'tag': {
         'short_opts': {
+            't': {'name': 'tags', 'multiple': True},
             'r': {'name': 'remove', 'flag': True}
         },
         'long_opts': {
+            'tags': {'multiple': True},
             'remove': {'flag': True}
         }
     },
@@ -873,6 +875,131 @@ def update_hidden_buttons():
 
     except Exception as e:
         logger.error(f"Error updating hidden buttons: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/settings/trmnl-uuid', methods=['POST'])
+@jwt_required
+def update_trmnl_uuid():
+    """Update TRMNL UUID for the current user."""
+    try:
+        data = request.get_json()
+        uuid = data.get('uuid', '').strip()
+
+        token = session.get('access_token')
+
+        # Send to auth service
+        response = requests.post(
+            f'{AUTH_URL}/api/auth/settings/trmnl-uuid',
+            headers={'Authorization': f'Bearer {token}'},
+            json={'uuid': uuid if uuid else None},
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            return jsonify({
+                'success': True,
+                'message': 'TRMNL UUID updated successfully'
+            })
+        else:
+            error_data = response.json() if response.content else {}
+            return jsonify({
+                'success': False,
+                'error': error_data.get('error', 'Failed to update TRMNL UUID')
+            }), response.status_code
+
+    except Exception as e:
+        logger.error(f"Error updating TRMNL UUID: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/settings/trmnl-push', methods=['POST'])
+@jwt_required
+def push_to_trmnl():
+    """Push completed todos to TRMNL device."""
+    try:
+        token = session.get('access_token')
+
+        # Fetch TRMNL UUID from auth service
+        response = requests.get(
+            f'{AUTH_URL}/api/auth/settings/trmnl-uuid',
+            headers={'Authorization': f'Bearer {token}'},
+            timeout=10
+        )
+
+        if response.status_code != 200:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to fetch TRMNL UUID'
+            }), 500
+
+        data = response.json()
+        trmnl_uuid = data.get('trmnl_uuid')
+
+        if not trmnl_uuid:
+            return jsonify({
+                'success': False,
+                'error': 'TRMNL UUID not configured'
+            }), 400
+
+        # Get completed todos for today
+        notes_manager = get_notes_manager()
+
+        # Get all notes tagged with 'todo'
+        todo_notes = notes_manager.get_notes_with_all_tags_by_tag('todo')
+
+        if not todo_notes:
+            todos_data = []
+        else:
+            # Filter for todos completed today
+            done_today_data = notes_manager.get_tags_created_today('done')
+            done_today_ids = {item['note_id'] for item in done_today_data} if done_today_data else set()
+
+            # Filter todo_notes to only include those completed today
+            completed_today = [note for note in todo_notes if note['id'] in done_today_ids]
+
+            # Format todos for TRMNL
+            todos_data = [{'content': note['content']} for note in completed_today]
+
+        # Prepare payload for TRMNL webhook
+        payload = {
+            'merge_variables': {
+                'todos': todos_data,
+                'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+            }
+        }
+
+        # Push to TRMNL webhook
+        webhook_url = f'https://usetrmnl.com/api/custom_plugins/{trmnl_uuid}'
+        response = requests.post(
+            webhook_url,
+            json=payload,
+            headers={'Content-Type': 'application/json'},
+            timeout=15
+        )
+
+        if response.status_code == 200:
+            return jsonify({
+                'success': True,
+                'message': f'Successfully pushed {len(todos_data)} completed todos to TRMNL'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'TRMNL API error: {response.status_code}'
+            }), 500
+
+    except requests.exceptions.Timeout:
+        return jsonify({
+            'success': False,
+            'error': 'Request timed out'
+        }), 504
+    except Exception as e:
+        logger.error(f"Error pushing to TRMNL: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -2139,7 +2266,6 @@ def execute_command():
                     custom_id_fallback = False
                     if custom_id:
                         try:
-                            from datetime import datetime
                             now = datetime.now().isoformat()
                             note_id = notes_manager.create_note_with_timestamp(content, now, custom_id)
                         except Exception as e:
@@ -2873,6 +2999,70 @@ def execute_command():
             else:
                 result = ZettlFormatter.error("Usage: api-key --list | api-key --generate [name]")
 
+        elif cmd == "trmnl":
+            # Push completed todos to TRMNL device
+            try:
+                token = session.get('access_token')
+
+                # Fetch TRMNL UUID from auth service
+                response = requests.get(
+                    f'{AUTH_URL}/api/auth/settings/trmnl-uuid',
+                    headers={'Authorization': f'Bearer {token}'},
+                    timeout=10
+                )
+
+                if response.status_code != 200:
+                    result = ZettlFormatter.error("Failed to fetch TRMNL configuration")
+                else:
+                    data = response.json()
+                    trmnl_uuid = data.get('trmnl_uuid')
+
+                    if not trmnl_uuid:
+                        result = ZettlFormatter.error("TRMNL UUID not configured. Set it in Settings.")
+                    else:
+                        # Get all notes tagged with 'todo'
+                        todo_notes = notes_manager.get_notes_with_all_tags_by_tag('todo')
+
+                        if not todo_notes:
+                            todos_data = []
+                        else:
+                            # Filter for todos completed today
+                            done_today_data = notes_manager.get_tags_created_today('done')
+                            done_today_ids = {item['note_id'] for item in done_today_data} if done_today_data else set()
+
+                            # Filter todo_notes to only include those completed today
+                            completed_today = [note for note in todo_notes if note['id'] in done_today_ids]
+
+                            # Format todos for TRMNL
+                            todos_data = [{'content': note['content']} for note in completed_today]
+
+                        # Prepare payload for TRMNL webhook
+                        payload = {
+                            'merge_variables': {
+                                'todos': todos_data,
+                                'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+                            }
+                        }
+
+                        # Push to TRMNL webhook
+                        webhook_url = f'https://usetrmnl.com/api/custom_plugins/{trmnl_uuid}'
+                        response = requests.post(
+                            webhook_url,
+                            json=payload,
+                            headers={'Content-Type': 'application/json'},
+                            timeout=15
+                        )
+
+                        if response.status_code == 200:
+                            result = ZettlFormatter.success(f"Pushed {len(todos_data)} completed todos to TRMNL")
+                        else:
+                            result = ZettlFormatter.error(f"TRMNL API error: {response.status_code}")
+
+            except requests.exceptions.Timeout:
+                result = ZettlFormatter.error("Request timed out")
+            except Exception as e:
+                result = ZettlFormatter.error(f"Error: {str(e)}")
+
         else:
             result = f"Unknown command: {cmd}. Try 'help' for available commands."
             
@@ -2916,7 +3106,6 @@ def format_eisenhower_matrix(todo_notes, include_done=False, include_donetoday=F
     # Get notes with 'done' tag added today
     done_today_ids = set()
     if include_donetoday:
-        from datetime import datetime, timedelta, timezone
         today = datetime.now(timezone.utc).date()
         
         try:

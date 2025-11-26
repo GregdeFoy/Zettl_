@@ -419,6 +419,28 @@
             </div>
         </div>
 
+        <!-- TRMNL Integration Section -->
+        <div class="settings-section">
+            <h2>TRMNL Integration</h2>
+            <div class="settings-content">
+                <p class="help-text">Connect to your TRMNL e-ink display to show completed todos</p>
+
+                <div class="form-group">
+                <label for="trmnl-uuid">Plugin UUID</label>
+                <input type="text"
+                       id="trmnl-uuid"
+                       placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                       autocomplete="off">
+            </div>
+
+            <div class="button-group">
+                <button onclick="saveTrmnlUuid()" class="btn">Save UUID</button>
+            </div>
+
+            <div id="trmnl-status" class="status-message"></div>
+            </div>
+        </div>
+
         <!-- CLI Tokens Section -->
         <div class="settings-section">
             <h2>CLI Access Tokens</h2>
@@ -489,6 +511,11 @@
                     // Load Claude API key
                     if (settings.claude_api_key) {
                         document.getElementById('claude-api-key').value = settings.claude_api_key;
+                    }
+
+                    // Load TRMNL UUID
+                    if (settings.trmnl_uuid) {
+                        document.getElementById('trmnl-uuid').value = settings.trmnl_uuid;
                     }
 
                     // Load CLI tokens
@@ -686,6 +713,42 @@
                 } else {
                     statusEl.className = 'status-message error';
                     statusEl.innerHTML = '✗ ' + (data.error || 'Failed to save API key');
+                }
+            } catch (e) {
+                statusEl.className = 'status-message error';
+                statusEl.innerHTML = '✗ Error: ' + e.message;
+            }
+
+            // Hide after 5 seconds
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 5000);
+        }
+
+        async function saveTrmnlUuid() {
+            const uuid = document.getElementById('trmnl-uuid').value.trim();
+            const statusEl = document.getElementById('trmnl-status');
+
+            // Show loading state
+            statusEl.style.display = 'block';
+            statusEl.className = 'status-message';
+            statusEl.innerHTML = 'Saving...';
+
+            try {
+                const response = await fetch('/api/settings/trmnl-uuid', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({uuid: uuid})
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    statusEl.className = 'status-message success';
+                    statusEl.innerHTML = '✓ TRMNL UUID saved successfully';
+                } else {
+                    statusEl.className = 'status-message error';
+                    statusEl.innerHTML = '✗ ' + (data.error || 'Failed to save UUID');
                 }
             } catch (e) {
                 statusEl.className = 'status-message error';

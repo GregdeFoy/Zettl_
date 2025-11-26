@@ -947,9 +947,21 @@
                         e.preventDefault();
                         openSheet('search ');
                         break;
+                    case 'c':
+                        e.preventDefault();
+                        toggleChat();
+                        break;
                     case '?':
                         e.preventDefault();
                         toggleHelp();
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        document.getElementById('main-content').scrollBy(0, -100);
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        document.getElementById('main-content').scrollBy(0, 100);
                         break;
                 }
             }
@@ -1111,6 +1123,9 @@
         function toggleChat() {
             const chatPanel = document.getElementById('chat-panel');
             chatPanel.classList.toggle('open');
+            if (chatPanel.classList.contains('open')) {
+                document.getElementById('chat-input').focus();
+            }
         }
 
         async function sendChatMessage() {
