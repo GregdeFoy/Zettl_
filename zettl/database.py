@@ -543,6 +543,25 @@ class Database:
 
         return linked_notes
 
+    def get_all_links(self) -> List[Dict[str, Any]]:
+        """Get all links in the database."""
+        cache_key = "all_links"
+
+        # Check if in cache
+        cached_links = get_from_cache(cache_key)
+        if cached_links is not None:
+            return cached_links
+
+        # Fetch all links
+        params = {'select': 'source_id,target_id'}
+        response = self._make_request('GET', 'links', params=params)
+        links = response.json() or []
+
+        # Cache the result
+        set_in_cache(cache_key, links, ttl=60)
+
+        return links
+
     def add_tag(self, note_id: str, tag: str) -> str:
         """Add a tag to a note."""
         # Verify note exists

@@ -229,15 +229,13 @@
             bottom: 0;
             left: 0;
             right: 0;
-            height: 75vh;
             background: var(--cream);
             border-top: var(--border-thick) solid var(--black);
-            box-shadow: 0 -8px 0 rgba(0, 0, 0, 0.3);
+            box-shadow: 0 -6px 0 rgba(0, 0, 0, 0.2);
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 300;
-            display: flex;
-            flex-direction: column;
-            border-radius: 24px 24px 0 0;
+            padding: 12px 16px;
+            padding-bottom: max(12px, env(safe-area-inset-bottom));
         }
 
         #command-sheet.hidden {
@@ -255,7 +253,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.4);
+            background: rgba(0, 0, 0, 0.3);
             z-index: 250;
             opacity: 0;
             pointer-events: none;
@@ -267,151 +265,119 @@
             pointer-events: auto;
         }
 
-        .sheet-header {
+        /* CLI-style input area */
+        .cli-input-area {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 20px;
-            border-bottom: 3px solid var(--black);
-            background: var(--yellow);
-        }
-
-        .sheet-mode {
-            font-weight: 700;
-            font-size: 16px;
-            text-transform: uppercase;
-        }
-
-        .btn-close {
-            padding: 8px 16px;
-            background: var(--coral);
-            color: white;
-            border: 3px solid var(--black);
-            font-weight: 700;
-            cursor: pointer;
-            font-family: 'JetBrains Mono', monospace;
-            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.2);
-        }
-
-        .sheet-body {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-        }
-
-        #command-input {
-            width: 100%;
-            min-height: 120px;
-            padding: 16px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 16px;
-            border: var(--border) solid var(--black);
+            align-items: flex-end;
             background: white;
-            resize: vertical;
-            box-shadow: inset 3px 3px 0 rgba(0, 0, 0, 0.1);
-            margin-bottom: 16px;
+            border: var(--border) solid var(--black);
+            padding: 10px 14px;
+            min-height: 44px;
+            box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.05);
         }
 
-        #command-input:focus {
+        .cli-prompt {
+            color: var(--coral);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            font-weight: 700;
+            margin-right: 8px;
+            user-select: none;
+            line-height: 1.4;
+        }
+
+        .cli-input-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            position: relative;
+        }
+
+        .cli-input {
+            color: var(--black);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            font-weight: 400;
+            background: transparent;
+            border: none;
             outline: none;
-            box-shadow: inset 0 0 0 3px var(--cyan);
+            min-width: 2px;
+            max-width: 100%;
+            word-break: break-word;
+            line-height: 1.4;
+            caret-color: transparent;
         }
 
-        .option-pills {
+        .cli-input:empty::before {
+            content: 'type command...';
+            color: rgba(0, 0, 0, 0.25);
+        }
+
+        .cli-cursor {
+            display: inline-block;
+            width: 8px;
+            height: 2px;
+            background: var(--coral);
+            margin-left: 1px;
+            margin-bottom: 4px;
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .quick-commands {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 16px;
+            gap: 6px;
+            margin-bottom: 10px;
         }
 
-        .pill {
-            padding: 8px 16px;
-            background: white;
-            border: 3px solid var(--black);
-            font-size: 14px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .pill:hover {
-            background: var(--cyan);
-            transform: translateY(-2px);
-        }
-
-        .pill:active {
-            transform: translateY(0);
-        }
-
-        .section-title {
-            font-weight: 700;
-            font-size: 12px;
-            text-transform: uppercase;
-            margin-bottom: 12px;
-            opacity: 0.6;
-            letter-spacing: 1px;
-        }
-
-        #suggestions {
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 2px solid var(--black);
-        }
-
-        .suggestion-item {
-            padding: 12px;
+        .quick-cmd {
+            padding: 6px 12px;
             background: white;
             border: 2px solid var(--black);
-            margin-bottom: 8px;
+            font-size: 12px;
+            font-weight: 700;
             cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.15s;
         }
 
-        .suggestion-item:hover {
+        .quick-cmd:hover {
             background: var(--cyan);
-            transform: translateX(4px);
+        }
+
+        .quick-cmd:active {
+            transform: translate(1px, 1px);
         }
 
         .btn-submit {
             width: 100%;
-            padding: 18px;
+            padding: 14px;
             background: var(--green);
             color: var(--black);
-            border: var(--border) solid var(--black);
-            font-family: 'Space Grotesk', sans-serif;
+            border: 3px solid var(--black);
+            font-family: 'JetBrains Mono', monospace;
             font-weight: 700;
-            font-size: 18px;
+            font-size: 14px;
             text-transform: uppercase;
             cursor: pointer;
-            box-shadow: var(--shadow);
-            transition: all 0.2s;
-            margin-top: 16px;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
+            transition: all 0.15s;
         }
 
         .btn-submit:hover {
             transform: translate(-2px, -2px);
-            box-shadow: var(--shadow-lg);
+            box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.2);
         }
 
         .btn-submit:active {
             transform: translate(2px, 2px);
-            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
-        }
-
-        .drag-handle {
-            text-align: center;
-            padding: 12px;
-            background: var(--yellow);
-            border-bottom: 3px solid var(--black);
-            font-size: 18px;
-            font-weight: 700;
-            cursor: grab;
-        }
-
-        .drag-handle:active {
-            cursor: grabbing;
+            box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
         }
 
         /* ===== KEYBOARD SHORTCUTS HELP ===== */
@@ -538,10 +504,6 @@
                 padding: 8px 12px;
             }
 
-            #command-sheet {
-                height: 85vh;
-            }
-
             #chat-panel {
                 width: 100%;
                 right: -100%;
@@ -550,6 +512,15 @@
             #shortcuts-help {
                 width: 95%;
                 padding: 20px;
+            }
+
+            .quick-commands {
+                gap: 4px;
+            }
+
+            .quick-cmd {
+                padding: 5px 10px;
+                font-size: 11px;
             }
         }
 
@@ -727,40 +698,28 @@
 
     <!-- Command Sheet (bottom sheet) -->
     <div id="command-sheet" class="hidden">
-        <div class="drag-handle" id="drag-handle">═══ Drag ═══</div>
-
-        <div class="sheet-header">
-            <span class="sheet-mode">INSERT</span>
-            <button class="btn-close" onclick="closeSheet()">✕ ESC</button>
+        <div class="quick-commands">
+            <button class="quick-cmd" onclick="fillCommand('todo ')">todo</button>
+            <button class="quick-cmd" onclick="fillCommand('idea ')">idea</button>
+            <button class="quick-cmd" onclick="fillCommand('note ')">note</button>
+            <button class="quick-cmd" onclick="fillCommand('project ')">project</button>
+            <button class="quick-cmd" onclick="fillCommand('list ')">list</button>
+            <button class="quick-cmd" onclick="fillCommand('search ')">search</button>
+            <button class="quick-cmd" onclick="fillCommand('show ')">show</button>
+            <button class="quick-cmd" onclick="fillCommand('llm ')">llm</button>
+            <button class="quick-cmd" onclick="fillCommand('clear')">clear</button>
         </div>
 
-        <div class="sheet-body">
-            <textarea id="command-input" placeholder="Enter command..."></textarea>
+        <div id="option-pills" class="quick-commands" style="display: none;">
+            <!-- Dynamically populated based on command -->
+        </div>
 
-            <div class="section-title">Options</div>
-            <div id="option-pills" class="option-pills">
-                <!-- Dynamically populated based on command -->
+        <div class="cli-input-area">
+            <span class="cli-prompt">&gt;</span>
+            <div class="cli-input-wrapper">
+                <div id="command-input" class="cli-input" contenteditable="true" autocapitalize="none" spellcheck="false"></div>
+                <span class="cli-cursor"></span>
             </div>
-
-            <div class="section-title">Quick Commands</div>
-            <div class="option-pills">
-                <button class="pill" onclick="fillCommand('todo ')">todo</button>
-                <button class="pill" onclick="fillCommand('idea ')">idea</button>
-                <button class="pill" onclick="fillCommand('note ')">note</button>
-                <button class="pill" onclick="fillCommand('project ')">project</button>
-                <button class="pill" onclick="fillCommand('list ')">list</button>
-                <button class="pill" onclick="fillCommand('search ')">search</button>
-                <button class="pill" onclick="fillCommand('show ')">show</button>
-                <button class="pill" onclick="fillCommand('tag ')">tag</button>
-                <button class="pill" onclick="fillCommand('link ')">link</button>
-                <button class="pill" onclick="fillCommand('llm ')">llm</button>
-            </div>
-
-            <div id="suggestions">
-                <!-- Autocomplete suggestions will appear here -->
-            </div>
-
-            <button class="btn-submit" onclick="submitCommand()">⏎ SUBMIT</button>
         </div>
     </div>
 
@@ -810,7 +769,7 @@
             </div>
         </div>
         <div class="chat-input-area">
-            <textarea class="chat-input" id="chat-input" placeholder="Ask me anything..."></textarea>
+            <textarea class="chat-input" id="chat-input" placeholder="Ask me anything..." autocapitalize="none"></textarea>
             <button class="btn-submit" onclick="sendChatMessage()" style="margin-top: 12px;">Send</button>
         </div>
     </div>
@@ -847,8 +806,17 @@
             hintBar.style.display = 'none';
 
             const input = document.getElementById('command-input');
-            input.value = prefill;
+            input.textContent = prefill;
             input.focus();
+            // Move cursor to end
+            if (prefill) {
+                const range = document.createRange();
+                const sel = window.getSelection();
+                range.selectNodeContents(input);
+                range.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
 
             updateOptionPills(prefill);
         }
@@ -872,62 +840,68 @@
         // ===== KEYBOARD SHORTCUTS (VIM-STYLE) =====
         let lastKey = '';
 
+        // Helper to check if we're in an editable element
+        function isEditableElement(el) {
+            return el.tagName === 'TEXTAREA' ||
+                   el.tagName === 'INPUT' ||
+                   el.isContentEditable;
+        }
+
+        // Helper to set cursor to end of contenteditable
+        function setCursorToEnd(el) {
+            const range = document.createRange();
+            const sel = window.getSelection();
+            range.selectNodeContents(el);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+
         document.addEventListener('keydown', (e) => {
-            // Ignore if typing in an input/textarea
-            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+            // Ignore if typing in an input/textarea/contenteditable
+            if (isEditableElement(e.target)) {
                 if (currentMode === 'INSERT' && e.key === 'Escape') {
                     closeSheet();
                     return;
                 }
 
-                // Handle Up/Down arrows for command history
-                if (currentMode === 'INSERT' && e.key === 'ArrowUp') {
+                // Handle Up/Down arrows for command history (only for CLI input)
+                const cliInput = document.getElementById('command-input');
+                if (currentMode === 'INSERT' && e.target === cliInput && e.key === 'ArrowUp') {
                     if (commandHistory.length === 0) return;
                     e.preventDefault();
-                    const input = e.target;
                     if (historyIndex === -1) {
-                        savedInput = input.value;
+                        savedInput = cliInput.textContent;
                         historyIndex = commandHistory.length - 1;
                     } else if (historyIndex > 0) {
                         historyIndex--;
                     }
-                    input.value = commandHistory[historyIndex];
-                    input.selectionStart = input.selectionEnd = input.value.length;
-                    updateOptionPills(input.value);
+                    cliInput.textContent = commandHistory[historyIndex];
+                    setCursorToEnd(cliInput);
+                    updateOptionPills(cliInput.textContent);
                     return;
                 }
 
-                if (currentMode === 'INSERT' && e.key === 'ArrowDown') {
+                if (currentMode === 'INSERT' && e.target === cliInput && e.key === 'ArrowDown') {
                     if (historyIndex === -1) return;
                     e.preventDefault();
-                    const input = e.target;
                     if (historyIndex < commandHistory.length - 1) {
                         historyIndex++;
-                        input.value = commandHistory[historyIndex];
+                        cliInput.textContent = commandHistory[historyIndex];
                     } else {
                         historyIndex = -1;
-                        input.value = savedInput;
+                        cliInput.textContent = savedInput;
                     }
-                    input.selectionStart = input.selectionEnd = input.value.length;
-                    updateOptionPills(input.value);
+                    setCursorToEnd(cliInput);
+                    updateOptionPills(cliInput.textContent);
                     return;
                 }
 
-                // Handle Enter key behavior
-                if (currentMode === 'INSERT' && e.key === 'Enter') {
-                    // Shift+Enter or Backslash+Enter: create newline
-                    if (e.shiftKey || lastKey === '\\') {
-                        // If it was backslash+Enter, remove the backslash
-                        if (lastKey === '\\') {
-                            const textarea = e.target;
-                            const cursorPos = textarea.selectionStart;
-                            const textBefore = textarea.value.substring(0, cursorPos - 1);
-                            const textAfter = textarea.value.substring(cursorPos);
-                            textarea.value = textBefore + '\n' + textAfter;
-                            textarea.selectionStart = textarea.selectionEnd = cursorPos;
-                            e.preventDefault();
-                        }
-                        // Shift+Enter: allow default newline behavior
+                // Handle Enter key behavior for CLI input
+                if (currentMode === 'INSERT' && e.target === cliInput && e.key === 'Enter') {
+                    // Shift+Enter: create newline
+                    if (e.shiftKey) {
+                        // Allow default behavior for newline
                         lastKey = '';
                         return;
                     }
@@ -938,7 +912,7 @@
                     return;
                 }
 
-                // Track last key for backslash+Enter detection
+                // Track last key
                 lastKey = e.key;
                 return;
             }
@@ -974,6 +948,8 @@
                         openSheet('search ');
                         break;
                     case 'c':
+                        // Don't intercept Ctrl+C (copy) or Cmd+C (Mac)
+                        if (e.ctrlKey || e.metaKey) break;
                         e.preventDefault();
                         toggleChat();
                         break;
@@ -996,16 +972,37 @@
         // ===== COMMAND EXECUTION =====
         function fillCommand(cmd) {
             const input = document.getElementById('command-input');
-            input.value = cmd;
+            input.textContent = cmd;
             input.focus();
+            setCursorToEnd(input);
             updateOptionPills(cmd);
         }
 
         async function submitCommand() {
             const input = document.getElementById('command-input');
-            const command = input.value.trim();
+            const command = input.textContent.trim();
 
             if (!command) return;
+
+            // Handle clear command locally (no server call needed)
+            if (command.toLowerCase() === 'clear') {
+                const output = document.getElementById('output');
+                output.innerHTML = `
+                    <div class="note-card">
+                        <div class="note-header">
+                            <div class="note-id">Welcome to Zettl</div>
+                        </div>
+                        <div class="note-content">
+                            <p>Press <strong>/</strong>, <strong>t</strong>, <strong>i</strong>, or <strong>n</strong> to start. Press <strong>?</strong> for help.</p>
+                        </div>
+                    </div>
+                `;
+                input.textContent = '';
+                closeSheet();
+                commandHistory.push(command);
+                historyIndex = -1;
+                return;
+            }
 
             // Show loading state
             const output = document.getElementById('output');
@@ -1042,7 +1039,7 @@
                 closeSheet();
 
                 // Clear input
-                input.value = '';
+                input.textContent = '';
 
                 // Add to history
                 commandHistory.push(command);
@@ -1107,42 +1104,46 @@
             const pillsContainer = document.getElementById('option-pills');
             pillsContainer.innerHTML = '';
 
-            const cmd = command.trim().split(' ')[0];
+            const cmd = command.trim().split(' ')[0].toLowerCase();
 
             const optionsMap = {
-                'todo': ['-l', '-t', '-a', '-c', '-f', '-dt', '--id'],
-                'idea': ['-l', '-t', '-a', '-c', '-f', '--id'],
-                'note': ['-l', '-t', '-a', '-c', '-f', '--id'],
-                'project': ['-l', '-t', '-a', '-f', '--id'],
-                'list': ['--limit', '--full', '--compact'],
-                'search': ['-t', '+t', '-d', '--full'],
+                'todo': ['-l', '-t', '-c', '-dt'],
+                'idea': ['-l', '-t', '-c'],
+                'note': ['-l', '-t', '-c'],
+                'project': ['-l', '-t'],
+                'list': ['--limit', '--full'],
+                'search': ['-t', '+t', '--full'],
                 'show': ['-r', '--full'],
                 'link': ['-c', '-r'],
                 'tag': ['-t', '-r'],
                 'delete': ['-f'],
-                'llm': ['-a summarize', '-a tags', '-a connect', '-a expand', '-c']
+                'llm': ['-a summarize', '-a tags', '-a expand']
             };
 
             const options = optionsMap[cmd] || [];
 
-            options.forEach(opt => {
-                const pill = document.createElement('button');
-                pill.className = 'pill';
-                pill.textContent = opt;
-                pill.onclick = () => insertOption(opt);
-                pillsContainer.appendChild(pill);
-            });
+            if (options.length > 0) {
+                pillsContainer.style.display = 'flex';
+                options.forEach(opt => {
+                    const pill = document.createElement('button');
+                    pill.className = 'quick-cmd';
+                    pill.textContent = opt;
+                    pill.onclick = () => insertOption(opt);
+                    pillsContainer.appendChild(pill);
+                });
+            } else {
+                pillsContainer.style.display = 'none';
+            }
         }
 
         function insertOption(option) {
             const input = document.getElementById('command-input');
-            const cursorPos = input.selectionStart;
-            const textBefore = input.value.substring(0, cursorPos);
-            const textAfter = input.value.substring(cursorPos);
-
-            input.value = textBefore + ' ' + option + ' ' + textAfter;
+            // Append option at the end for contenteditable
+            const currentText = input.textContent;
+            input.textContent = currentText + ' ' + option + ' ';
             input.focus();
-            input.selectionStart = input.selectionEnd = cursorPos + option.length + 2;
+            setCursorToEnd(input);
+            updateOptionPills(input.textContent);
         }
 
         // ===== CHAT PANEL =====
@@ -1253,6 +1254,12 @@
             setTimeout(() => {
                 submitCommand();
             }, 500);
+
+            // Add input listener for CLI input to update option pills
+            const cliInput = document.getElementById('command-input');
+            cliInput.addEventListener('input', () => {
+                updateOptionPills(cliInput.textContent);
+            });
         });
 
         // ===== MOBILE: Chat input enter key =====
@@ -1285,51 +1292,6 @@
             chatLastKey = e.key;
         });
 
-        // ===== DRAG HANDLE FOR SHEET RESIZING =====
-        let isDragging = false;
-        let startY = 0;
-        let startHeight = 0;
-
-        const dragHandle = document.getElementById('drag-handle');
-        const sheet = document.getElementById('command-sheet');
-
-        dragHandle.addEventListener('mousedown', startDrag);
-        dragHandle.addEventListener('touchstart', startDrag);
-
-        function startDrag(e) {
-            isDragging = true;
-            startY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
-            startHeight = sheet.offsetHeight;
-
-            document.addEventListener('mousemove', doDrag);
-            document.addEventListener('touchmove', doDrag);
-            document.addEventListener('mouseup', stopDrag);
-            document.addEventListener('touchend', stopDrag);
-        }
-
-        function doDrag(e) {
-            if (!isDragging) return;
-
-            const currentY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
-            const diff = startY - currentY;
-            const newHeight = startHeight + diff;
-
-            // Constrain height between 50vh and 90vh
-            const minHeight = window.innerHeight * 0.5;
-            const maxHeight = window.innerHeight * 0.9;
-
-            if (newHeight >= minHeight && newHeight <= maxHeight) {
-                sheet.style.height = newHeight + 'px';
-            }
-        }
-
-        function stopDrag() {
-            isDragging = false;
-            document.removeEventListener('mousemove', doDrag);
-            document.removeEventListener('touchmove', doDrag);
-            document.removeEventListener('mouseup', stopDrag);
-            document.removeEventListener('touchend', stopDrag);
-        }
     </script>
 </body>
 </html>

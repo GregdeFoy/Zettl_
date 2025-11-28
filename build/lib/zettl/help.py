@@ -17,19 +17,19 @@ class CommandHelp:
     def _convert_to_markdown(cls, text):
         """Convert rich markup to HTML for web display with preserved formatting."""
         # Remove [dim] markers
-        text = re.sub(r'\[dim\]([^\[]*)\[/dim\]', r'\1', text)
+        text = re.sub(r'\[dim\](.*?)\[/dim\]', r'\1', text)
 
-        # Replace bold with color markers -> <strong>
-        text = re.sub(r'\[bold [^\]]+\]([^\[]+)\[/bold [^\]]+\]', r'<strong>\1</strong>', text)
+        # Replace bold with color markers -> <strong> (use non-greedy .*? to handle brackets in content like [QUERY])
+        text = re.sub(r'\[bold [^\]]+\](.*?)\[/bold [^\]]+\]', r'<strong>\1</strong>', text)
         # Replace plain bold
-        text = re.sub(r'\[bold\]([^\[]+)\[/bold\]', r'<strong>\1</strong>', text)
+        text = re.sub(r'\[bold\](.*?)\[/bold\]', r'<strong>\1</strong>', text)
         # Replace colored text - keep plain for readability
-        text = re.sub(r'\[blue\]([^\[]+)\[/blue\]', r'\1', text)
+        text = re.sub(r'\[blue\](.*?)\[/blue\]', r'\1', text)
         # Replace cyan with inline code
-        text = re.sub(r'\[cyan\]([^\[]+)\[/cyan\]', r'<code>\1</code>', text)
+        text = re.sub(r'\[cyan\](.*?)\[/cyan\]', r'<code>\1</code>', text)
         # Replace yellow with inline code (options/flags)
-        text = re.sub(r'\[yellow\]([^\[]+)\[/yellow\]', r'<code>\1</code>', text)
-        text = re.sub(r'\[bold yellow\]([^\[]+)\[/bold yellow\]', r'<strong>\1</strong>', text)
+        text = re.sub(r'\[yellow\](.*?)\[/yellow\]', r'<code>\1</code>', text)
+        text = re.sub(r'\[bold yellow\](.*?)\[/bold yellow\]', r'<strong>\1</strong>', text)
 
         # Wrap the entire output in a pre block to preserve formatting
         # This ensures line breaks and indentation are kept

@@ -47,12 +47,14 @@ app.use(express.json());
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // 5 requests per window
-  message: 'Too many authentication attempts, please try again later'
+  message: 'Too many authentication attempts, please try again later',
+  validate: { trustProxy: false } // Suppress trust proxy validation error
 });
 
 const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 60 // 60 requests per minute
+  max: 60, // 60 requests per minute
+  validate: { trustProxy: false } // Suppress trust proxy validation error
 });
 
 app.use('/api/', apiLimiter);
@@ -646,7 +648,7 @@ app.get('/api/auth/settings', verifyToken, async (req, res) => {
   try {
     // Get user settings
     const settingsResult = await pool.query(
-      'SELECT claude_api_key, hidden_buttons, trmnl_uuid, created_at, updated_at FROM user_settings WHERE user_id = $1',
+      'SELECT claude_api_key, hidden_buttons, trmnl_webhooks, created_at, updated_at FROM user_settings WHERE user_id = $1',
       [req.user.sub]
     );
 
@@ -676,7 +678,7 @@ app.get('/api/auth/settings', verifyToken, async (req, res) => {
     res.json({
       claude_api_key: decryptedKey,
       hidden_buttons: settingsResult.rows[0]?.hidden_buttons || [],
-      trmnl_uuid: settingsResult.rows[0]?.trmnl_uuid || null,
+      trmnl_webhooks: settingsResult.rows[0]?.trmnl_webhooks || [],
       cli_tokens: tokensResult.rows
     });
   } catch (error) {
@@ -685,11 +687,16 @@ app.get('/api/auth/settings', verifyToken, async (req, res) => {
   }
 });
 
-// Update TRMNL UUID
-app.post('/api/auth/settings/trmnl-uuid', verifyToken, async (req, res) => {
-  const { uuid } = req.body;
+// Update TRMNL webhooks
+app.post('/api/auth/settings/trmnl-webhooks', verifyToken, async (req, res) => {
+  const { webhooks } = req.body;
 
   try {
+    // Validate webhooks array
+    if (!Array.isArray(webhooks)) {
+      return res.status(400).json({ error: 'webhooks must be an array' });
+    }
+
     // Check if user_settings row exists
     const existing = await pool.query(
       'SELECT user_id FROM user_settings WHERE user_id = $1',
@@ -699,26 +706,26 @@ app.post('/api/auth/settings/trmnl-uuid', verifyToken, async (req, res) => {
     if (existing.rows.length > 0) {
       // Update existing row
       await pool.query(
-        'UPDATE user_settings SET trmnl_uuid = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
-        [uuid || null, req.user.sub]
+        'UPDATE user_settings SET trmnl_webhooks = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
+        [JSON.stringify(webhooks), req.user.sub]
       );
     } else {
       // Insert new row
       await pool.query(
-        'INSERT INTO user_settings (user_id, trmnl_uuid) VALUES ($1, $2)',
-        [req.user.sub, uuid || null]
+        'INSERT INTO user_settings (user_id, trmnl_webhooks) VALUES ($1, $2)',
+        [req.user.sub, JSON.stringify(webhooks)]
       );
     }
 
-    res.json({ message: 'TRMNL UUID updated successfully' });
+    res.json({ message: 'TRMNL webhooks updated successfully' });
   } catch (error) {
-    console.error('TRMNL UUID update error:', error);
-    res.status(500).json({ error: 'Failed to update TRMNL UUID' });
+    console.error('TRMNL webhooks update error:', error);
+    res.status(500).json({ error: 'Failed to update TRMNL webhooks' });
   }
 });
 
-// Get TRMNL UUID (accepts both JWT and CLI token auth)
-app.get('/api/auth/settings/trmnl-uuid', async (req, res) => {
+// Get TRMNL webhooks (accepts both JWT and CLI token auth)
+app.get('/api/auth/settings/trmnl-webhooks', async (req, res) => {
   try {
     let userId;
 
@@ -758,18 +765,18 @@ app.get('/api/auth/settings/trmnl-uuid', async (req, res) => {
       userId = tokenResult.rows[0].user_id;
     }
 
-    // Get TRMNL UUID
+    // Get TRMNL webhooks
     const settingsResult = await pool.query(
-      'SELECT trmnl_uuid FROM user_settings WHERE user_id = $1',
+      'SELECT trmnl_webhooks FROM user_settings WHERE user_id = $1',
       [userId]
     );
 
     res.json({
-      trmnl_uuid: settingsResult.rows[0]?.trmnl_uuid || null
+      trmnl_webhooks: settingsResult.rows[0]?.trmnl_webhooks || []
     });
   } catch (error) {
-    console.error('TRMNL UUID fetch error:', error);
-    res.status(500).json({ error: 'Failed to fetch TRMNL UUID' });
+    console.error('TRMNL webhooks fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch TRMNL webhooks' });
   }
 });
 

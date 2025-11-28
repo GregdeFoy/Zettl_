@@ -2263,13 +2263,98 @@ def rules(source):
         console.print(ZettlFormatter.error(str(e)))
 
 
+def get_trmnl_todos_payload_cli(notes_manager):
+    """Generate payload for todos webhook type (CLI version)."""
+    todo_notes = notes_manager.get_notes_with_all_tags_by_tag('todo')
+
+    if not todo_notes:
+        todos_data = []
+    else:
+        done_today_data = notes_manager.get_tags_created_today('done')
+        done_today_ids = {item['note_id'] for item in done_today_data} if done_today_data else set()
+        completed_today = [note for note in todo_notes if note['id'] in done_today_ids]
+        todos_data = [{'content': note['content']} for note in completed_today]
+
+    return {
+        'merge_variables': {
+            'todos': todos_data,
+            'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }
+    }, len(todos_data)
+
+
+def get_trmnl_stats_payload_cli(notes_manager):
+    """Generate payload for stats webhook type (CLI version)."""
+    from datetime import date, timedelta
+
+    all_notes = notes_manager.list_notes(limit=10000)
+    total_notes = len(all_notes)
+
+    all_links = notes_manager.db.get_all_links() if hasattr(notes_manager.db, 'get_all_links') else []
+    total_links = len(all_links)
+
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+
+    notes_today = 0
+    notes_this_week = 0
+    week_activity = [0] * 7
+
+    for note in all_notes:
+        created_at = note.get('created_at', '')
+        if created_at:
+            try:
+                note_date = datetime.fromisoformat(created_at.replace('Z', '+00:00')).date()
+                if note_date == today:
+                    notes_today += 1
+                if note_date >= week_start:
+                    notes_this_week += 1
+                    day_idx = note_date.weekday()
+                    week_activity[day_idx] += 1
+            except (ValueError, AttributeError):
+                pass
+
+    avg_per_day = round(notes_this_week / 7, 1) if notes_this_week > 0 else 0
+    links_per_note = round(total_links / total_notes, 1) if total_notes > 0 else 0
+
+    linked_note_ids = set()
+    for link in all_links:
+        linked_note_ids.add(link.get('source_id'))
+        linked_note_ids.add(link.get('target_id'))
+    orphan_notes = sum(1 for note in all_notes if note['id'] not in linked_note_ids)
+
+    todo_notes = notes_manager.get_notes_with_all_tags_by_tag('todo')
+    if todo_notes:
+        done_notes = notes_manager.get_notes_by_tag('done')
+        done_ids = {note['id'] for note in done_notes} if done_notes else set()
+        todos_active = sum(1 for note in todo_notes if note['id'] not in done_ids)
+    else:
+        todos_active = 0
+
+    return {
+        'merge_variables': {
+            'total_notes': total_notes,
+            'total_links': total_links,
+            'notes_today': notes_today,
+            'notes_this_week': notes_this_week,
+            'avg_per_day': avg_per_day,
+            'links_per_note': links_per_note,
+            'orphan_notes': orphan_notes,
+            'todos_active': todos_active,
+            'week_activity': week_activity,
+            'week_labels': ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+            'updated_at': datetime.now().strftime('%H:%M')
+        }
+    }, total_notes
+
+
 @cli.command(name='trmnl')
 @click.option('--help', '-h', is_flag=True, is_eager=True, expose_value=False, callback=show_help_callback, help='Show detailed help for this command')
 def trmnl_cmd():
-    """Push completed todos to TRMNL e-ink display.
+    """Push data to TRMNL e-ink display.
 
-    Sends today's completed todos to your TRMNL device webhook.
-    Configure your TRMNL UUID in the webapp settings first.
+    Sends data to all configured TRMNL webhooks based on their type.
+    Configure your TRMNL webhooks in the webapp settings first.
 
     Example:
         zt trmnl
@@ -2281,68 +2366,75 @@ def trmnl_cmd():
         # Get API key
         api_key = zettl_auth.require_auth()
 
-        # Fetch TRMNL UUID from auth service
+        # Fetch TRMNL webhooks from auth service
         console.print(ZettlFormatter.info("Fetching TRMNL configuration..."))
         response = requests.get(
-            f'{AUTH_URL}/settings/trmnl-uuid',
+            f'{AUTH_URL}/settings/trmnl-webhooks',
             headers={'X-API-Key': api_key},
             timeout=10
         )
 
         if response.status_code != 200:
-            console.print(ZettlFormatter.error("Failed to fetch TRMNL UUID from settings"))
+            console.print(ZettlFormatter.error("Failed to fetch TRMNL webhooks from settings"))
             return
 
         data = response.json()
-        trmnl_uuid = data.get('trmnl_uuid')
+        webhooks = data.get('trmnl_webhooks', [])
 
-        if not trmnl_uuid:
-            console.print(ZettlFormatter.error("TRMNL UUID not configured. Set it in the webapp settings."))
+        # Filter to only enabled webhooks with valid UUIDs
+        enabled_webhooks = [w for w in webhooks if w.get('enabled') and w.get('uuid')]
+
+        if not enabled_webhooks:
+            console.print(ZettlFormatter.error("No TRMNL webhooks configured. Set them in the webapp settings."))
             return
 
-        # Get completed todos for today
-        console.print(ZettlFormatter.info("Fetching completed todos..."))
+        console.print(ZettlFormatter.info("Gathering data..."))
         notes_manager = get_notes_manager()
 
-        # Get all notes tagged with 'todo'
-        todo_notes = notes_manager.get_notes_with_all_tags_by_tag('todo')
+        # Cache payloads by type
+        payloads = {}
 
-        if not todo_notes:
-            todos_data = []
+        # Push to all enabled TRMNL webhooks
+        console.print(ZettlFormatter.info(f"Pushing to {len(enabled_webhooks)} webhook(s)..."))
+
+        successful = 0
+        for webhook in enabled_webhooks:
+            webhook_name = webhook.get('name', 'Unnamed')
+            webhook_type = webhook.get('type', 'todos')
+            webhook_url = f'https://usetrmnl.com/api/custom_plugins/{webhook["uuid"]}'
+
+            # Get or generate payload for this type
+            if webhook_type not in payloads:
+                if webhook_type == 'stats':
+                    payloads[webhook_type] = get_trmnl_stats_payload_cli(notes_manager)
+                else:
+                    payloads[webhook_type] = get_trmnl_todos_payload_cli(notes_manager)
+
+            payload, count = payloads[webhook_type]
+
+            try:
+                resp = requests.post(
+                    webhook_url,
+                    json=payload,
+                    headers={'Content-Type': 'application/json'},
+                    timeout=15
+                )
+                if resp.status_code == 200:
+                    console.print(ZettlFormatter.success(f"  [{webhook_name}] ({webhook_type}) Success"))
+                    successful += 1
+                else:
+                    console.print(ZettlFormatter.error(f"  [{webhook_name}] ({webhook_type}) Failed: {resp.status_code}"))
+            except requests.exceptions.Timeout:
+                console.print(ZettlFormatter.error(f"  [{webhook_name}] ({webhook_type}) Timeout"))
+            except Exception as e:
+                console.print(ZettlFormatter.error(f"  [{webhook_name}] ({webhook_type}) Error: {str(e)}"))
+
+        if successful == len(enabled_webhooks):
+            console.print(ZettlFormatter.success(f"Successfully pushed to all {successful} webhook(s)"))
+        elif successful > 0:
+            console.print(ZettlFormatter.warning(f"Pushed to {successful}/{len(enabled_webhooks)} webhook(s)"))
         else:
-            # Filter for todos completed today
-            done_today_data = notes_manager.get_tags_created_today('done')
-            done_today_ids = {item['note_id'] for item in done_today_data} if done_today_data else set()
-
-            # Filter todo_notes to only include those completed today
-            completed_today = [note for note in todo_notes if note['id'] in done_today_ids]
-
-            # Format todos for TRMNL
-            todos_data = [{'content': note['content']} for note in completed_today]
-
-        # Prepare payload for TRMNL webhook
-        payload = {
-            'merge_variables': {
-                'todos': todos_data,
-                'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M')
-            }
-        }
-
-        # Push to TRMNL webhook
-        console.print(ZettlFormatter.info(f"Pushing {len(todos_data)} completed todos to TRMNL..."))
-
-        webhook_url = f'https://usetrmnl.com/api/custom_plugins/{trmnl_uuid}'
-        response = requests.post(
-            webhook_url,
-            json=payload,
-            headers={'Content-Type': 'application/json'},
-            timeout=15
-        )
-
-        if response.status_code == 200:
-            console.print(ZettlFormatter.success(f"Successfully pushed {len(todos_data)} completed todos to TRMNL"))
-        else:
-            console.print(ZettlFormatter.error(f"Failed to push to TRMNL: {response.status_code} - {response.text}"))
+            console.print(ZettlFormatter.error("Failed to push to any webhooks"))
 
     except requests.exceptions.Timeout:
         console.print(ZettlFormatter.error("Request timed out. Please try again."))

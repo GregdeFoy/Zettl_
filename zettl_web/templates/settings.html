@@ -423,21 +423,65 @@
         <div class="settings-section">
             <h2>TRMNL Integration</h2>
             <div class="settings-content">
-                <p class="help-text">Connect to your TRMNL e-ink display to show completed todos</p>
+                <p class="help-text">Connect to your TRMNL e-ink display to show completed todos. Configure up to 2 webhooks.</p>
 
-                <div class="form-group">
-                <label for="trmnl-uuid">Plugin UUID</label>
-                <input type="text"
-                       id="trmnl-uuid"
-                       placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                       autocomplete="off">
-            </div>
+                <!-- Webhook 1 -->
+                <div class="webhook-config" style="margin-bottom: 20px; padding: 15px; border: 1px solid var(--border-color); border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <h3 style="margin: 0; flex: 1;">Webhook 1</h3>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" id="trmnl-webhook-1-enabled" checked>
+                            <span>Enabled</span>
+                        </label>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label for="trmnl-webhook-1-name">Name</label>
+                        <input type="text" id="trmnl-webhook-1-name" placeholder="Todos" autocomplete="off">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label for="trmnl-webhook-1-type">Type</label>
+                        <select id="trmnl-webhook-1-type" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-color);">
+                            <option value="todos">Todos (completed today)</option>
+                            <option value="stats">Stats (zettelkasten overview)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="trmnl-webhook-1-uuid">Plugin UUID</label>
+                        <input type="text" id="trmnl-webhook-1-uuid" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off">
+                    </div>
+                </div>
 
-            <div class="button-group">
-                <button onclick="saveTrmnlUuid()" class="btn">Save UUID</button>
-            </div>
+                <!-- Webhook 2 -->
+                <div class="webhook-config" style="margin-bottom: 20px; padding: 15px; border: 1px solid var(--border-color); border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <h3 style="margin: 0; flex: 1;">Webhook 2</h3>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" id="trmnl-webhook-2-enabled">
+                            <span>Enabled</span>
+                        </label>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label for="trmnl-webhook-2-name">Name</label>
+                        <input type="text" id="trmnl-webhook-2-name" placeholder="Stats" autocomplete="off">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label for="trmnl-webhook-2-type">Type</label>
+                        <select id="trmnl-webhook-2-type" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-color);">
+                            <option value="todos">Todos (completed today)</option>
+                            <option value="stats">Stats (zettelkasten overview)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="trmnl-webhook-2-uuid">Plugin UUID</label>
+                        <input type="text" id="trmnl-webhook-2-uuid" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off">
+                    </div>
+                </div>
 
-            <div id="trmnl-status" class="status-message"></div>
+                <div class="button-group">
+                    <button onclick="saveTrmnlWebhooks()" class="btn">Save Webhooks</button>
+                </div>
+
+                <div id="trmnl-status" class="status-message"></div>
             </div>
         </div>
 
@@ -513,9 +557,19 @@
                         document.getElementById('claude-api-key').value = settings.claude_api_key;
                     }
 
-                    // Load TRMNL UUID
-                    if (settings.trmnl_uuid) {
-                        document.getElementById('trmnl-uuid').value = settings.trmnl_uuid;
+                    // Load TRMNL webhooks
+                    const webhooks = settings.trmnl_webhooks || [];
+                    if (webhooks[0]) {
+                        document.getElementById('trmnl-webhook-1-name').value = webhooks[0].name || '';
+                        document.getElementById('trmnl-webhook-1-uuid').value = webhooks[0].uuid || '';
+                        document.getElementById('trmnl-webhook-1-type').value = webhooks[0].type || 'todos';
+                        document.getElementById('trmnl-webhook-1-enabled').checked = webhooks[0].enabled !== false;
+                    }
+                    if (webhooks[1]) {
+                        document.getElementById('trmnl-webhook-2-name').value = webhooks[1].name || '';
+                        document.getElementById('trmnl-webhook-2-uuid').value = webhooks[1].uuid || '';
+                        document.getElementById('trmnl-webhook-2-type').value = webhooks[1].type || 'stats';
+                        document.getElementById('trmnl-webhook-2-enabled').checked = webhooks[1].enabled === true;
                     }
 
                     // Load CLI tokens
@@ -725,9 +779,27 @@
             }, 5000);
         }
 
-        async function saveTrmnlUuid() {
-            const uuid = document.getElementById('trmnl-uuid').value.trim();
+        async function saveTrmnlWebhooks() {
             const statusEl = document.getElementById('trmnl-status');
+
+            // Collect webhooks data
+            const webhooks = [
+                {
+                    name: document.getElementById('trmnl-webhook-1-name').value.trim() || 'Webhook 1',
+                    uuid: document.getElementById('trmnl-webhook-1-uuid').value.trim(),
+                    type: document.getElementById('trmnl-webhook-1-type').value,
+                    enabled: document.getElementById('trmnl-webhook-1-enabled').checked
+                },
+                {
+                    name: document.getElementById('trmnl-webhook-2-name').value.trim() || 'Webhook 2',
+                    uuid: document.getElementById('trmnl-webhook-2-uuid').value.trim(),
+                    type: document.getElementById('trmnl-webhook-2-type').value,
+                    enabled: document.getElementById('trmnl-webhook-2-enabled').checked
+                }
+            ];
+
+            // Filter out webhooks without UUIDs
+            const validWebhooks = webhooks.filter(w => w.uuid);
 
             // Show loading state
             statusEl.style.display = 'block';
@@ -735,20 +807,20 @@
             statusEl.innerHTML = 'Saving...';
 
             try {
-                const response = await fetch('/api/settings/trmnl-uuid', {
+                const response = await fetch('/api/settings/trmnl-webhooks', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({uuid: uuid})
+                    body: JSON.stringify({webhooks: validWebhooks})
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
                     statusEl.className = 'status-message success';
-                    statusEl.innerHTML = '✓ TRMNL UUID saved successfully';
+                    statusEl.innerHTML = '✓ TRMNL webhooks saved successfully';
                 } else {
                     statusEl.className = 'status-message error';
-                    statusEl.innerHTML = '✗ ' + (data.error || 'Failed to save UUID');
+                    statusEl.innerHTML = '✗ ' + (data.error || 'Failed to save webhooks');
                 }
             } catch (e) {
                 statusEl.className = 'status-message error';
