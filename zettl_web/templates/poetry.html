@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Poetry Companion - Zettl</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            /* Neo-Brutalist Color Palette */
+            --cream: #FFF8E7;
+            --yellow: #FFCC00;
+            --coral: #FF5E5B;
+            --cyan: #00D9FF;
+            --green: #00FF88;
+            --purple: #9D4EDD;
+            --black: #000000;
+
+            /* Borders & Shadows */
+            --border: 4px;
+            --border-thick: 6px;
+            --shadow: 6px 6px 0 rgba(0, 0, 0, 0.3);
+            --shadow-lg: 8px 8px 0 rgba(0, 0, 0, 0.3);
+
+            /* Spacing */
+            --header-height: 70px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--cream);
+            color: var(--black);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ===== HEADER ===== */
+        #header {
+            height: var(--header-height);
+            background: var(--purple);
+            border-bottom: var(--border-thick) solid var(--black);
+            box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            position: relative;
+            z-index: 200;
+        }
+
+        .logo {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn-header {
+            padding: 10px 16px;
+            background: white;
+            color: var(--black);
+            border: 3px solid var(--black);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-header:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-header:active {
+            transform: translate(1px, 1px);
+            box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        /* ===== MAIN LAYOUT (SPLIT SCREEN) ===== */
+        #main-container {
+            display: flex;
+            height: calc(100vh - var(--header-height));
+        }
+
+        /* Text Panel (Left) */
+        #text-panel {
+            flex: 1;
+            background: white;
+            border-right: var(--border-thick) solid var(--black);
+            overflow-y: auto;
+            position: relative;
+        }
+
+        #text-content {
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .text-header {
+            margin-bottom: 32px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid var(--black);
+        }
+
+        .text-title {
+            font-family: 'Crimson Text', serif;
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .text-meta {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .text-line {
+            font-family: 'Crimson Text', serif;
+            font-size: 18px;
+            line-height: 2.0;
+            padding: 4px 8px;
+            margin: 2px 0;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.15s;
+            user-select: none;
+        }
+
+        .text-line::before {
+            content: attr(data-line-number);
+            position: absolute;
+            left: -40px;
+            color: #ccc;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .text-line:hover {
+            background: rgba(255, 204, 0, 0.1);
+        }
+
+        .text-line.selected {
+            background: rgba(255, 204, 0, 0.3);
+            border-left: 4px solid var(--yellow);
+            padding-left: 12px;
+        }
+
+        .stanza-break {
+            height: 20px;
+        }
+
+        /* Selection Menu */
+        #selection-menu {
+            position: fixed;
+            background: white;
+            border: 3px solid var(--black);
+            box-shadow: var(--shadow);
+            padding: 12px;
+            display: none;
+            z-index: 300;
+        }
+
+        #selection-menu.visible {
+            display: block;
+        }
+
+        .btn-selection {
+            padding: 8px 16px;
+            background: var(--cyan);
+            color: var(--black);
+            border: 2px solid var(--black);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-selection:hover {
+            background: var(--yellow);
+        }
+
+        /* Chat Panel (Right) */
+        #chat-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--cream);
+        }
+
+        /* Conversation Selector */
+        #conversation-selector {
+            padding: 16px;
+            border-bottom: 3px solid var(--black);
+            background: white;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            align-items: center;
+        }
+
+        .conversation-tab {
+            padding: 8px 16px;
+            background: var(--cream);
+            border: 2px solid var(--black);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+
+        .conversation-tab:hover {
+            background: var(--cyan);
+        }
+
+        .conversation-tab.active {
+            background: var(--coral);
+            color: white;
+        }
+
+        .btn-new-conversation {
+            padding: 8px 12px;
+            background: var(--green);
+            border: 2px solid var(--black);
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .btn-new-conversation:hover {
+            background: var(--yellow);
+        }
+
+        /* Chat Messages */
+        #chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .chat-message {
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            border: 2px solid var(--black);
+            background: white;
+        }
+
+        .chat-message.user {
+            background: var(--cyan);
+            margin-left: 40px;
+        }
+
+        .chat-message.assistant {
+            background: white;
+            margin-right: 40px;
+        }
+
+        .message-range {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 8px;
+            font-style: italic;
+        }
+
+        .message-content {
+            line-height: 1.6;
+        }
+
+        /* Chat Input */
+        #chat-input-area {
+            padding: 16px;
+            border-top: 3px solid var(--black);
+            background: white;
+        }
+
+        #chat-input {
+            width: 100%;
+            min-height: 80px;
+            padding: 12px;
+            border: 3px solid var(--black);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            resize: vertical;
+            background: var(--cream);
+        }
+
+        .btn-send {
+            width: 100%;
+            padding: 12px;
+            margin-top: 8px;
+            background: var(--green);
+            color: var(--black);
+            border: 3px solid var(--black);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
+            transition: all 0.15s;
+        }
+
+        .btn-send:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-send:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        /* ===== ADD TEXT SHEET (Bottom Sheet) ===== */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 250;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        #overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #add-text-sheet {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: var(--border-thick) solid var(--black);
+            box-shadow: 0 -6px 0 rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 300;
+            padding: 24px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        #add-text-sheet.hidden {
+            transform: translateY(100%);
+        }
+
+        #add-text-sheet.visible {
+            transform: translateY(0);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 700;
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px;
+            border: 3px solid var(--black);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            background: var(--cream);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--purple);
+        }
+
+        textarea.form-input {
+            min-height: 200px;
+            font-family: 'Crimson Text', serif;
+            font-size: 16px;
+            line-height: 1.8;
+            resize: vertical;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background: var(--green);
+            color: var(--black);
+            border: 3px solid var(--black);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
+            transition: all 0.15s;
+            margin-top: 8px;
+        }
+
+        .btn-submit:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-cancel {
+            width: 100%;
+            padding: 14px;
+            background: white;
+            color: var(--black);
+            border: 3px solid var(--black);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.15s;
+            margin-top: 8px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 80px 40px;
+            color: #666;
+        }
+
+        .empty-state h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 24px;
+            margin-bottom: 16px;
+        }
+
+        /* Loading */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--black);
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Markdown in chat */
+        .markdown-content p {
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+
+        .markdown-content code {
+            background: var(--yellow);
+            padding: 2px 6px;
+            border: 1px solid var(--black);
+            font-size: 0.9em;
+        }
+
+        .markdown-content em {
+            font-style: italic;
+            color: var(--purple);
+        }
+
+        /* ===== LIBRARY PANEL (SIDE PANEL) ===== */
+        #library-panel {
+            position: fixed;
+            left: -400px;
+            top: var(--header-height);
+            width: 400px;
+            height: calc(100vh - var(--header-height));
+            background: white;
+            border-right: var(--border-thick) solid var(--black);
+            box-shadow: 8px 0 0 rgba(0, 0, 0, 0.3);
+            transition: left 0.3s;
+            z-index: 350;
+            overflow-y: auto;
+        }
+
+        #library-panel.open {
+            left: 0;
+        }
+
+        .library-header {
+            padding: 20px;
+            background: var(--purple);
+            color: white;
+            border-bottom: 3px solid var(--black);
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        .library-list {
+            padding: 20px;
+        }
+
+        .library-item {
+            padding: 16px;
+            background: var(--cream);
+            border: 3px solid var(--black);
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+            position: relative;
+        }
+
+        .library-item:hover {
+            background: var(--cyan);
+            transform: translate(-2px, -2px);
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .library-item-content {
+            padding-right: 40px;
+        }
+
+        .library-item-title {
+            font-weight: 700;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .library-item-author {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .btn-delete-text {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 28px;
+            height: 28px;
+            background: var(--coral);
+            color: white;
+            border: 2px solid var(--black);
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+
+        .btn-delete-text:hover {
+            background: #ff3333;
+            transform: scale(1.1);
+        }
+
+        .library-empty {
+            padding: 40px 20px;
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div id="header">
+        <div class="logo">📖 VERSE</div>
+        <div class="header-actions">
+            <button class="btn-header" onclick="toggleLibrary()">LIBRARY</button>
+            <button class="btn-header" onclick="openAddTextSheet()">+ NEW TEXT</button>
+            <button class="btn-header" onclick="window.location.href='/'">NOTES</button>
+            <button class="btn-header" onclick="window.location.href='/settings'">SETTINGS</button>
+            <button class="btn-header" onclick="logout()">LOGOUT</button>
+        </div>
+    </div>
+
+    <!-- Main Split Screen -->
+    <div id="main-container">
+        <!-- Text Panel (Left) -->
+        <div id="text-panel">
+            <div id="text-content">
+                <div class="empty-state">
+                    <h2>Welcome to Poetry Companion</h2>
+                    <p>Add a text to begin exploring literature with AI assistance.</p>
+                    <button class="btn-submit" onclick="openAddTextSheet()" style="max-width: 300px; margin: 20px auto;">
+                        Add Your First Text
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Panel (Right) -->
+        <div id="chat-panel">
+            <!-- Conversation Selector -->
+            <div id="conversation-selector">
+                <button class="btn-new-conversation" onclick="createNewConversation()" title="New Conversation">+</button>
+                <!-- Conversation tabs will be added here dynamically -->
+            </div>
+
+            <!-- Messages -->
+            <div id="chat-messages">
+                <div class="chat-message assistant">
+                    Select a text and start a conversation to explore it together.
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div id="chat-input-area">
+                <textarea id="chat-input" placeholder="Ask about the text, request explanations, discuss themes..."></textarea>
+                <button class="btn-send" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Selection Menu (Popup) -->
+    <div id="selection-menu">
+        <button class="btn-selection" onclick="discussSelection()">→ Discuss this passage</button>
+    </div>
+
+    <!-- Overlay -->
+    <div id="overlay" onclick="closeOverlays()"></div>
+
+    <!-- Library Panel -->
+    <div id="library-panel">
+        <div class="library-header">Your Texts</div>
+        <div class="library-list" id="library-list">
+            <div class="library-empty">
+                <p>Loading your library...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Text Sheet -->
+    <div id="add-text-sheet" class="hidden">
+        <h2 style="font-family: 'Space Grotesk', sans-serif; margin-bottom: 20px;">Add New Text</h2>
+
+        <form id="add-text-form" onsubmit="submitText(event)">
+            <div class="form-group">
+                <label class="form-label">Title *</label>
+                <input type="text" class="form-input" id="input-title" required placeholder="The Raven">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Author</label>
+                    <input type="text" class="form-input" id="input-author" placeholder="Edgar Allan Poe">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Language *</label>
+                    <select class="form-input" id="input-language" required>
+                        <option value="en">English</option>
+                        <option value="fr">French</option>
+                        <option value="es">Spanish</option>
+                        <option value="de">German</option>
+                        <option value="it">Italian</option>
+                        <option value="la">Latin</option>
+                        <option value="gr">Greek</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select class="form-input" id="input-type">
+                        <option value="poem">Poem</option>
+                        <option value="speech">Speech</option>
+                        <option value="prose">Prose</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Year</label>
+                    <input type="number" class="form-input" id="input-year" placeholder="1845">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Source</label>
+                <input type="text" class="form-input" id="input-source" placeholder="The Evening Mirror">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Text Content *</label>
+                <textarea class="form-input" id="input-content" required placeholder="Paste your text here...
+
+Preserve line breaks for poetry.
+Use blank lines to separate stanzas."></textarea>
+            </div>
+
+            <button type="submit" class="btn-submit">Add Text</button>
+            <button type="button" class="btn-cancel" onclick="closeAddTextSheet()">Cancel</button>
+        </form>
+    </div>
+
+    <script>
+        // ===== STATE =====
+        let currentText = null;
+        let currentConversation = null;
+        let conversations = [];
+        let selectionStart = null;
+        let selectionEnd = null;
+        let selectedRange = null;
+        let allTexts = [];
+
+        // ===== LIBRARY PANEL =====
+        function toggleLibrary() {
+            const panel = document.getElementById('library-panel');
+            const overlay = document.getElementById('overlay');
+
+            if (panel.classList.contains('open')) {
+                panel.classList.remove('open');
+                overlay.classList.remove('visible');
+            } else {
+                panel.classList.add('open');
+                overlay.classList.add('visible');
+                loadLibrary();
+            }
+        }
+
+        async function loadLibrary() {
+            const listContainer = document.getElementById('library-list');
+
+            try {
+                const response = await fetch('/poetry/api/texts');
+                const texts = await response.json();
+                allTexts = texts;
+
+                if (texts.length === 0) {
+                    listContainer.innerHTML = `
+                        <div class="library-empty">
+                            <p>No texts yet.</p>
+                            <p style="margin-top: 12px;">
+                                <button class="btn-submit" onclick="closeLibrary(); openAddTextSheet();">
+                                    Add Your First Text
+                                </button>
+                            </p>
+                        </div>
+                    `;
+                } else {
+                    listContainer.innerHTML = texts.map(text => `
+                        <div class="library-item">
+                            <div class="library-item-content" onclick="selectText(${text.id})">
+                                <div class="library-item-title">${text.title}</div>
+                                <div class="library-item-author">
+                                    ${text.author || 'Unknown Author'}
+                                    ${text.year ? `(${text.year})` : ''}
+                                </div>
+                            </div>
+                            <button class="btn-delete-text" onclick="event.stopPropagation(); deleteText(${text.id})" title="Delete text">×</button>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading library:', error);
+                listContainer.innerHTML = '<div class="library-empty"><p>Error loading library</p></div>';
+            }
+        }
+
+        function closeLibrary() {
+            document.getElementById('library-panel').classList.remove('open');
+            document.getElementById('overlay').classList.remove('visible');
+        }
+
+        function selectText(textId) {
+            closeLibrary();
+            loadText(textId);
+        }
+
+        async function deleteText(textId) {
+            const text = allTexts.find(t => t.id === textId);
+            const textTitle = text ? text.title : 'this text';
+
+            if (!confirm(`Are you sure you want to delete "${textTitle}"? This will also delete all associated conversations.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/poetry/api/texts/${textId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    // Reload library
+                    await loadLibrary();
+
+                    // If the deleted text was currently displayed, clear the view
+                    if (currentText && currentText.id === textId) {
+                        currentText = null;
+                        currentConversation = null;
+                        conversations = [];
+
+                        const textContent = document.getElementById('text-content');
+                        textContent.innerHTML = `
+                            <div class="empty-state">
+                                <h2>Text Deleted</h2>
+                                <p>Select another text from your library or add a new one.</p>
+                            </div>
+                        `;
+
+                        document.getElementById('chat-messages').innerHTML = `
+                            <div class="chat-message assistant">
+                                Select a text to begin exploring.
+                            </div>
+                        `;
+                    }
+                } else {
+                    alert('Error deleting text');
+                }
+            } catch (error) {
+                console.error('Error deleting text:', error);
+                alert('Error deleting text');
+            }
+        }
+
+        function closeOverlays() {
+            closeLibrary();
+            closeAddTextSheet();
+        }
+
+        // ===== ADD TEXT SHEET =====
+        function openAddTextSheet() {
+            document.getElementById('add-text-sheet').classList.remove('hidden');
+            document.getElementById('add-text-sheet').classList.add('visible');
+            document.getElementById('overlay').classList.add('visible');
+            document.getElementById('input-title').focus();
+        }
+
+        function closeAddTextSheet() {
+            document.getElementById('add-text-sheet').classList.remove('visible');
+            document.getElementById('add-text-sheet').classList.add('hidden');
+            document.getElementById('overlay').classList.remove('visible');
+            document.getElementById('add-text-form').reset();
+        }
+
+        async function submitText(event) {
+            event.preventDefault();
+
+            const data = {
+                title: document.getElementById('input-title').value,
+                author: document.getElementById('input-author').value || null,
+                source_language: document.getElementById('input-language').value,
+                text_type: document.getElementById('input-type').value,
+                year: document.getElementById('input-year').value || null,
+                source: document.getElementById('input-source').value || null,
+                content: document.getElementById('input-content').value
+            };
+
+            try {
+                const response = await fetch('/poetry/api/texts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    const text = await response.json();
+                    closeAddTextSheet();
+                    loadText(text[0].id);
+                } else {
+                    alert('Error adding text');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error adding text');
+            }
+        }
+
+        // ===== TEXT DISPLAY =====
+        async function loadText(textId) {
+            try {
+                const response = await fetch(`/poetry/api/texts/${textId}`);
+                const text = await response.json();
+                currentText = text;
+
+                renderText(text);
+                await loadConversations(textId);
+
+            } catch (error) {
+                console.error('Error loading text:', error);
+            }
+        }
+
+        function renderText(text) {
+            const container = document.getElementById('text-content');
+            const lines = text.content.split('\n');
+
+            let html = `
+                <div class="text-header">
+                    <div class="text-title">${text.title}</div>
+                    <div class="text-meta">
+                        ${text.author || 'Unknown Author'}
+                        ${text.year ? `(${text.year})` : ''}
+                    </div>
+                </div>
+            `;
+
+            lines.forEach((line, index) => {
+                if (line.trim() === '') {
+                    html += '<div class="stanza-break"></div>';
+                } else {
+                    html += `<div class="text-line" data-line-number="${index + 1}">${line}</div>`;
+                }
+            });
+
+            container.innerHTML = html;
+
+            // Attach selection handlers
+            document.querySelectorAll('.text-line').forEach(lineEl => {
+                lineEl.addEventListener('mousedown', handleLineMouseDown);
+                lineEl.addEventListener('mouseup', handleLineMouseUp);
+            });
+        }
+
+        // ===== TEXT SELECTION =====
+        function handleLineMouseDown(e) {
+            selectionStart = parseInt(e.currentTarget.dataset.lineNumber);
+            clearSelection();
+            hideSelectionMenu();
+        }
+
+        function handleLineMouseUp(e) {
+            selectionEnd = parseInt(e.currentTarget.dataset.lineNumber);
+
+            if (selectionStart && selectionEnd) {
+                const [start, end] = [
+                    Math.min(selectionStart, selectionEnd),
+                    Math.max(selectionStart, selectionEnd)
+                ];
+
+                highlightLines(start, end);
+
+                const lines = currentText.content.split('\n');
+                const selectedText = lines.slice(start - 1, end).join('\n');
+
+                selectedRange = {
+                    start: start,
+                    end: end,
+                    text: selectedText
+                };
+
+                showSelectionMenu(e.clientX, e.clientY);
+            }
+        }
+
+        function clearSelection() {
+            document.querySelectorAll('.text-line.selected').forEach(el => {
+                el.classList.remove('selected');
+            });
+            selectedRange = null;
+        }
+
+        function highlightLines(start, end) {
+            clearSelection();
+            for (let i = start; i <= end; i++) {
+                const lineEl = document.querySelector(`.text-line[data-line-number="${i}"]`);
+                if (lineEl) {
+                    lineEl.classList.add('selected');
+                }
+            }
+        }
+
+        function showSelectionMenu(x, y) {
+            const menu = document.getElementById('selection-menu');
+            menu.style.left = `${x}px`;
+            menu.style.top = `${y}px`;
+            menu.classList.add('visible');
+        }
+
+        function hideSelectionMenu() {
+            document.getElementById('selection-menu').classList.remove('visible');
+        }
+
+        function discussSelection() {
+            if (selectedRange) {
+                const input = document.getElementById('chat-input');
+                input.value = `Could you help me understand lines ${selectedRange.start}-${selectedRange.end}?`;
+                input.focus();
+                hideSelectionMenu();
+            }
+        }
+
+        // ===== CONVERSATIONS =====
+        async function loadConversations(textId) {
+            try {
+                const response = await fetch(`/poetry/api/texts/${textId}/conversations`);
+                conversations = await response.json();
+
+                if (conversations.length === 0) {
+                    // Create first conversation
+                    await createNewConversation();
+                } else {
+                    renderConversationTabs();
+                    loadConversation(conversations[0].id);
+                }
+            } catch (error) {
+                console.error('Error loading conversations:', error);
+            }
+        }
+
+        async function createNewConversation() {
+            if (!currentText) return;
+
+            try {
+                const response = await fetch(`/poetry/api/texts/${currentText.id}/conversations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: `Conversation ${conversations.length + 1}`
+                    })
+                });
+
+                const newConv = await response.json();
+                conversations.push(newConv[0]);
+                renderConversationTabs();
+                loadConversation(newConv[0].id);
+
+            } catch (error) {
+                console.error('Error creating conversation:', error);
+            }
+        }
+
+        function renderConversationTabs() {
+            const container = document.getElementById('conversation-selector');
+            const newBtn = container.querySelector('.btn-new-conversation');
+
+            // Clear existing tabs (keep the + button)
+            container.innerHTML = '';
+            container.appendChild(newBtn);
+
+            conversations.forEach((conv, index) => {
+                const tab = document.createElement('div');
+                tab.className = 'conversation-tab';
+                tab.textContent = conv.title || `Conversation ${index + 1}`;
+                tab.onclick = () => loadConversation(conv.id);
+
+                if (currentConversation && conv.id === currentConversation.id) {
+                    tab.classList.add('active');
+                }
+
+                container.appendChild(tab);
+            });
+        }
+
+        async function loadConversation(conversationId) {
+            try {
+                // Load conversation details
+                currentConversation = conversations.find(c => c.id === conversationId);
+                renderConversationTabs();
+
+                // Load messages
+                const response = await fetch(`/poetry/api/conversations/${conversationId}/messages`);
+                const messages = await response.json();
+
+                renderMessages(messages);
+
+            } catch (error) {
+                console.error('Error loading conversation:', error);
+            }
+        }
+
+        function renderMessages(messages) {
+            const container = document.getElementById('chat-messages');
+
+            if (messages.length === 0) {
+                container.innerHTML = `
+                    <div class="chat-message assistant">
+                        I'm ready to explore this text with you. Select some lines or ask me anything!
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = '';
+
+            messages.forEach(msg => {
+                const msgEl = document.createElement('div');
+                msgEl.className = `chat-message ${msg.role}`;
+
+                let content = '';
+
+                if (msg.selected_range) {
+                    const range = JSON.parse(msg.selected_range);
+                    content += `<div class="message-range">Lines ${range.start}-${range.end}</div>`;
+                }
+
+                if (msg.role === 'assistant') {
+                    content += `<div class="message-content markdown-content">${marked.parse(msg.content)}</div>`;
+                } else {
+                    content += `<div class="message-content">${msg.content}</div>`;
+                }
+
+                msgEl.innerHTML = content;
+                container.appendChild(msgEl);
+            });
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendMessage() {
+            if (!currentConversation) {
+                alert('Please select or create a conversation first');
+                return;
+            }
+
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+
+            if (!message) return;
+
+            const data = {
+                message: message,
+                selected_range: selectedRange
+            };
+
+            // Add user message to UI immediately
+            const container = document.getElementById('chat-messages');
+            const userMsg = document.createElement('div');
+            userMsg.className = 'chat-message user';
+
+            let msgHtml = '';
+            if (selectedRange) {
+                msgHtml += `<div class="message-range">Lines ${selectedRange.start}-${selectedRange.end}</div>`;
+            }
+            msgHtml += `<div class="message-content">${message}</div>`;
+            userMsg.innerHTML = msgHtml;
+            container.appendChild(userMsg);
+
+            // Show loading
+            const loadingMsg = document.createElement('div');
+            loadingMsg.className = 'chat-message assistant';
+            loadingMsg.innerHTML = '<div class="loading"></div> Thinking...';
+            container.appendChild(loadingMsg);
+
+            container.scrollTop = container.scrollHeight;
+            input.value = '';
+            clearSelection();
+            hideSelectionMenu();
+
+            try {
+                const response = await fetch(`/poetry/api/conversations/${currentConversation.id}/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                loadingMsg.remove();
+
+                const assistantMsg = document.createElement('div');
+                assistantMsg.className = 'chat-message assistant';
+                assistantMsg.innerHTML = `<div class="message-content markdown-content">${marked.parse(result.response)}</div>`;
+                container.appendChild(assistantMsg);
+
+                container.scrollTop = container.scrollHeight;
+
+            } catch (error) {
+                loadingMsg.remove();
+                console.error('Error:', error);
+                alert('Error sending message');
+            }
+        }
+
+        // Handle Enter key in chat input
+        document.getElementById('chat-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Click outside selection menu to hide
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('selection-menu');
+            if (!menu.contains(e.target) && !e.target.classList.contains('text-line')) {
+                hideSelectionMenu();
+            }
+        });
+
+        // ===== LOGOUT =====
+        async function logout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/login';
+            } catch (error) {
+                console.error('Logout error:', error);
+                window.location.href = '/login';
+            }
+        }
+    </script>
+</body>
+</html>
