@@ -73,6 +73,11 @@ CommandHelp.set_mode('web')
 
 logger.debug("Successfully imported Zettl components")
 
+# Import and register Poetry Companion blueprint
+from poetry_web import poetry_bp
+app.register_blueprint(poetry_bp, url_prefix='/poetry')
+logger.info("Registered Poetry Companion blueprint at /poetry")
+
 # JWT token validation decorator
 def jwt_required(f):
     @wraps(f)
