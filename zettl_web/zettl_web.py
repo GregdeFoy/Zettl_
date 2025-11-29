@@ -953,65 +953,58 @@ def get_trmnl_stats_payload(notes_manager):
     all_notes = notes_manager.list_notes(limit=10000)
     total_notes = len(all_notes)
 
-    # Get all links
-    all_links = notes_manager.db.get_all_links() if hasattr(notes_manager.db, 'get_all_links') else []
-    total_links = len(all_links)
+    # Get counts by tag
+    todo_notes = notes_manager.get_notes_with_all_tags_by_tag('todo') or []
+    idea_notes = notes_manager.get_notes_by_tag('idea') or []
+    project_notes = notes_manager.get_notes_by_tag('project') or []
 
-    # Calculate notes today and this week
+    total_todos = len(todo_notes)
+    total_ideas = len(idea_notes)
+    total_projects = len(project_notes)
+
+    # Calculate 30-day activity for notes created
     today = date.today()
-    week_start = today - timedelta(days=today.weekday())  # Monday
-
-    notes_today = 0
-    notes_this_week = 0
-    week_activity = [0] * 7  # Mon-Sun
+    notes_activity = [0] * 30  # Last 30 days, index 0 = 29 days ago, index 29 = today
 
     for note in all_notes:
         created_at = note.get('created_at', '')
         if created_at:
             try:
                 note_date = datetime.fromisoformat(created_at.replace('Z', '+00:00')).date()
-                if note_date == today:
-                    notes_today += 1
-                if note_date >= week_start:
-                    notes_this_week += 1
-                    # Calculate day index (0=Mon, 6=Sun)
-                    day_idx = note_date.weekday()
-                    week_activity[day_idx] += 1
+                days_ago = (today - note_date).days
+                if 0 <= days_ago < 30:
+                    # Index 29 = today, index 0 = 29 days ago
+                    notes_activity[29 - days_ago] += 1
             except (ValueError, AttributeError):
                 pass
 
-    # Calculate averages
-    avg_per_day = round(notes_this_week / 7, 1) if notes_this_week > 0 else 0
-    links_per_note = round(total_links / total_notes, 1) if total_notes > 0 else 0
+    # Calculate 30-day activity for todos completed (notes with both 'todo' and 'done' tags)
+    todos_activity = [0] * 30
+    done_notes = notes_manager.get_notes_by_tag('done') or []
+    todo_ids = {note['id'] for note in todo_notes}
 
-    # Get orphan notes (notes with no links)
-    linked_note_ids = set()
-    for link in all_links:
-        linked_note_ids.add(link.get('source_id'))
-        linked_note_ids.add(link.get('target_id'))
-    orphan_notes = sum(1 for note in all_notes if note['id'] not in linked_note_ids)
-
-    # Get active todos (tagged 'todo' but not 'done')
-    todo_notes = notes_manager.get_notes_with_all_tags_by_tag('todo')
-    if todo_notes:
-        done_notes = notes_manager.get_notes_by_tag('done')
-        done_ids = {note['id'] for note in done_notes} if done_notes else set()
-        todos_active = sum(1 for note in todo_notes if note['id'] not in done_ids)
-    else:
-        todos_active = 0
+    # Iterate through done_notes (which has modified_at) and check if they're also todos
+    for note in done_notes:
+        if note['id'] in todo_ids:
+            # Use modified_at as completion date
+            modified_at = note.get('modified_at', '')
+            if modified_at:
+                try:
+                    done_date = datetime.fromisoformat(modified_at.replace('Z', '+00:00')).date()
+                    days_ago = (today - done_date).days
+                    if 0 <= days_ago < 30:
+                        todos_activity[29 - days_ago] += 1
+                except (ValueError, AttributeError):
+                    pass
 
     return {
         'merge_variables': {
             'total_notes': total_notes,
-            'total_links': total_links,
-            'notes_today': notes_today,
-            'notes_this_week': notes_this_week,
-            'avg_per_day': avg_per_day,
-            'links_per_note': links_per_note,
-            'orphan_notes': orphan_notes,
-            'todos_active': todos_active,
-            'week_activity': week_activity,
-            'week_labels': ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+            'total_todos': total_todos,
+            'total_ideas': total_ideas,
+            'total_projects': total_projects,
+            'notes_activity': notes_activity,
+            'todos_activity': todos_activity,
             'updated_at': datetime.now().strftime('%H:%M')
         }
     }
