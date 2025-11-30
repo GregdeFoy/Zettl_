@@ -176,13 +176,46 @@ def text_conversations(text_id):
             'title': data.get('title', f'Conversation {datetime.now().strftime("%Y-%m-%d %H:%M")}')
         }
 
+        # Add Prefer header to get the created conversation back
+        headers['Prefer'] = 'return=representation'
+
         response = requests.post(
             f'{POSTGREST_URL}/text_conversations',
             headers=headers,
             json=conversation_data
         )
 
-        return jsonify(response.json()), response.status_code
+        if response.status_code == 201:
+            if response.text:
+                return jsonify(response.json()), response.status_code
+            else:
+                # Fallback if no body returned
+                return jsonify([conversation_data]), 201
+        else:
+            return jsonify(response.json()), response.status_code
+
+
+@poetry_bp.route('/api/conversations/<conversation_id>', methods=['DELETE'])
+@jwt_required
+def delete_conversation(conversation_id):
+    """Delete a conversation and all its messages"""
+    token = session.get('access_token')
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+    # Delete the conversation (messages will cascade delete)
+    response = requests.delete(
+        f'{POSTGREST_URL}/text_conversations',
+        headers=headers,
+        params={'id': f'eq.{conversation_id}'}
+    )
+
+    if response.status_code == 204:
+        return jsonify({'success': True}), 200
+    else:
+        return jsonify({'error': 'Failed to delete conversation'}), response.status_code
 
 
 @poetry_bp.route('/api/conversations/<conversation_id>/messages', methods=['GET', 'POST'])

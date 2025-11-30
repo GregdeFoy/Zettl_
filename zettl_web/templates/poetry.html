@@ -230,6 +230,14 @@
             cursor: pointer;
             white-space: nowrap;
             transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .conversation-tab span {
+            flex: 1;
+            cursor: pointer;
         }
 
         .conversation-tab:hover {
@@ -580,6 +588,28 @@
             transform: scale(1.1);
         }
 
+        .btn-delete-conversation {
+            width: 20px;
+            height: 20px;
+            background: var(--coral);
+            color: white;
+            border: 2px solid var(--black);
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            margin-left: 8px;
+            flex-shrink: 0;
+        }
+
+        .btn-delete-conversation:hover {
+            background: #ff3333;
+            transform: scale(1.15);
+        }
+
         .library-empty {
             padding: 40px 20px;
             text-align: center;
@@ -729,6 +759,9 @@ Use blank lines to separate stanzas."></textarea>
         let selectionStart = null;
         let selectionEnd = null;
         let selectedRange = null;
+        let isSelecting = false;
+        let currentHoverLine = null;
+        let justFinishedSelection = false;
         let allTexts = [];
 
         // ===== LIBRARY PANEL =====
@@ -933,44 +966,33 @@ Use blank lines to separate stanzas."></textarea>
 
             container.innerHTML = html;
 
-            // Attach selection handlers
+            // Attach selection handlers to each line
             document.querySelectorAll('.text-line').forEach(lineEl => {
-                lineEl.addEventListener('mousedown', handleLineMouseDown);
-                lineEl.addEventListener('mouseup', handleLineMouseUp);
+                lineEl.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    const lineNum = parseInt(e.currentTarget.dataset.lineNumber);
+                    selectionStart = lineNum;
+                    currentHoverLine = lineNum;
+                    isSelecting = true;
+                    clearSelection();
+                    hideSelectionMenu();
+                    highlightLines(lineNum, lineNum);
+                });
+
+                lineEl.addEventListener('mouseenter', (e) => {
+                    if (isSelecting) {
+                        currentHoverLine = parseInt(e.currentTarget.dataset.lineNumber);
+                        const [start, end] = [
+                            Math.min(selectionStart, currentHoverLine),
+                            Math.max(selectionStart, currentHoverLine)
+                        ];
+                        highlightLines(start, end);
+                    }
+                });
             });
         }
 
         // ===== TEXT SELECTION =====
-        function handleLineMouseDown(e) {
-            selectionStart = parseInt(e.currentTarget.dataset.lineNumber);
-            clearSelection();
-            hideSelectionMenu();
-        }
-
-        function handleLineMouseUp(e) {
-            selectionEnd = parseInt(e.currentTarget.dataset.lineNumber);
-
-            if (selectionStart && selectionEnd) {
-                const [start, end] = [
-                    Math.min(selectionStart, selectionEnd),
-                    Math.max(selectionStart, selectionEnd)
-                ];
-
-                highlightLines(start, end);
-
-                const lines = currentText.content.split('\n');
-                const selectedText = lines.slice(start - 1, end).join('\n');
-
-                selectedRange = {
-                    start: start,
-                    end: end,
-                    text: selectedText
-                };
-
-                showSelectionMenu(e.clientX, e.clientY);
-            }
-        }
-
         function clearSelection() {
             document.querySelectorAll('.text-line.selected').forEach(el => {
                 el.classList.remove('selected');
@@ -1050,23 +1072,39 @@ Use blank lines to separate stanzas."></textarea>
 
         function renderConversationTabs() {
             const container = document.getElementById('conversation-selector');
-            const newBtn = container.querySelector('.btn-new-conversation');
 
-            // Clear existing tabs (keep the + button)
-            container.innerHTML = '';
-            container.appendChild(newBtn);
+            // Remove only conversation tabs, keep the + button
+            const tabs = container.querySelectorAll('.conversation-tab');
+            tabs.forEach(tab => tab.remove());
+
+            // Add conversation tabs before the + button
+            const newBtn = container.querySelector('.btn-new-conversation');
 
             conversations.forEach((conv, index) => {
                 const tab = document.createElement('div');
                 tab.className = 'conversation-tab';
-                tab.textContent = conv.title || `Conversation ${index + 1}`;
-                tab.onclick = () => loadConversation(conv.id);
+
+                const title = document.createElement('span');
+                title.textContent = conv.title || `Conversation ${index + 1}`;
+                title.onclick = () => loadConversation(conv.id);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn-delete-conversation';
+                deleteBtn.innerHTML = '×';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    deleteConversation(conv.id);
+                };
+
+                tab.appendChild(title);
+                tab.appendChild(deleteBtn);
 
                 if (currentConversation && conv.id === currentConversation.id) {
                     tab.classList.add('active');
                 }
 
-                container.appendChild(tab);
+                // Insert before the + button
+                container.insertBefore(tab, newBtn);
             });
         }
 
@@ -1084,6 +1122,43 @@ Use blank lines to separate stanzas."></textarea>
 
             } catch (error) {
                 console.error('Error loading conversation:', error);
+            }
+        }
+
+        async function deleteConversation(conversationId) {
+            const conv = conversations.find(c => c.id === conversationId);
+            const title = conv ? (conv.title || 'this conversation') : 'this conversation';
+
+            if (!confirm(`Are you sure you want to delete ${title}? This will delete all messages.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/poetry/api/conversations/${conversationId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    // Remove from local array
+                    conversations = conversations.filter(c => c.id !== conversationId);
+
+                    // If we deleted the current conversation, switch to another or create new
+                    if (currentConversation && currentConversation.id === conversationId) {
+                        if (conversations.length > 0) {
+                            loadConversation(conversations[0].id);
+                        } else {
+                            // Create a new conversation
+                            await createNewConversation();
+                        }
+                    } else {
+                        renderConversationTabs();
+                    }
+                } else {
+                    alert('Failed to delete conversation');
+                }
+            } catch (error) {
+                console.error('Error deleting conversation:', error);
+                alert('Error deleting conversation');
             }
         }
 
@@ -1198,8 +1273,59 @@ Use blank lines to separate stanzas."></textarea>
             }
         });
 
+        // Global mouseup to finalize selection
+        document.addEventListener('mouseup', (e) => {
+            if (!isSelecting) return;
+
+            isSelecting = false;
+
+            // Use currentHoverLine as the end point
+            if (selectionStart !== null && currentHoverLine !== null) {
+                selectionEnd = currentHoverLine;
+
+                const [start, end] = [
+                    Math.min(selectionStart, selectionEnd),
+                    Math.max(selectionStart, selectionEnd)
+                ];
+
+                // Make sure highlighting is set
+                highlightLines(start, end);
+
+                // Get the selected text
+                if (currentText && currentText.content) {
+                    const lines = currentText.content.split('\n');
+                    const selectedText = lines.slice(start - 1, end).join('\n');
+
+                    selectedRange = {
+                        start: start,
+                        end: end,
+                        text: selectedText
+                    };
+
+                    // Set flag to prevent click from hiding menu
+                    justFinishedSelection = true;
+
+                    // Show the menu
+                    showSelectionMenu(e.clientX, e.clientY);
+
+                    // Reset flag after click event has passed
+                    setTimeout(() => {
+                        justFinishedSelection = false;
+                    }, 100);
+                } else {
+                    console.error('currentText is not available');
+                }
+            }
+
+            // Reset hover line
+            currentHoverLine = null;
+        });
+
         // Click outside selection menu to hide
         document.addEventListener('click', (e) => {
+            // Don't hide menu if we just finished a selection
+            if (justFinishedSelection) return;
+
             const menu = document.getElementById('selection-menu');
             if (!menu.contains(e.target) && !e.target.classList.contains('text-line')) {
                 hideSelectionMenu();
