@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Poetry Companion - Zettl</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -126,19 +126,19 @@
 
         .text-title {
             font-family: 'Crimson Text', serif;
-            font-size: 32px;
+            font-size: calc(var(--text-size, 18px) * 1.78);
             font-weight: 600;
             margin-bottom: 8px;
         }
 
         .text-meta {
-            font-size: 14px;
+            font-size: calc(var(--text-size, 18px) * 0.78);
             color: #666;
         }
 
         .text-line {
             font-family: 'Crimson Text', serif;
-            font-size: 18px;
+            font-size: var(--text-size, 18px);
             line-height: 2.0;
             padding: 4px 8px;
             margin: 2px 0;
@@ -146,6 +146,8 @@
             position: relative;
             transition: all 0.15s;
             user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
         }
 
         .text-line::before {
@@ -165,6 +167,16 @@
             background: rgba(255, 204, 0, 0.3);
             border-left: 4px solid var(--yellow);
             padding-left: 12px;
+        }
+
+        .text-line.long-press-active {
+            background: rgba(157, 78, 221, 0.15);
+            animation: pulse 0.4s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { background: rgba(157, 78, 221, 0); }
+            100% { background: rgba(157, 78, 221, 0.15); }
         }
 
         .stanza-break {
@@ -615,6 +627,282 @@
             text-align: center;
             color: #666;
         }
+
+        /* Zoom Controls */
+        #zoom-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 8px;
+            z-index: 150;
+            background: white;
+            border: 3px solid var(--black);
+            box-shadow: var(--shadow);
+            padding: 8px;
+        }
+
+        .btn-zoom {
+            width: 40px;
+            height: 40px;
+            background: var(--yellow);
+            color: var(--black);
+            border: 2px solid var(--black);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .btn-zoom:hover {
+            background: var(--cyan);
+            transform: translate(-2px, -2px);
+            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-zoom:active {
+            transform: translate(1px, 1px);
+            box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        #zoom-level {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 8px;
+            font-weight: 700;
+            font-size: 14px;
+            min-width: 50px;
+        }
+
+        /* Mobile View Toggle */
+        #view-toggle {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 400;
+            background: white;
+            border: 3px solid var(--black);
+            box-shadow: var(--shadow-lg);
+            padding: 8px;
+            gap: 8px;
+        }
+
+        .btn-view-toggle {
+            padding: 12px 24px;
+            background: var(--cream);
+            color: var(--black);
+            border: 2px solid var(--black);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-transform: uppercase;
+        }
+
+        .btn-view-toggle.active {
+            background: var(--purple);
+            color: white;
+        }
+
+        .btn-view-toggle:hover {
+            background: var(--cyan);
+        }
+
+        .btn-view-toggle.active:hover {
+            background: var(--purple);
+            opacity: 0.9;
+        }
+
+        /* ===== RESPONSIVE / MOBILE ===== */
+        @media (max-width: 1024px) {
+            /* Show toggle button on mobile */
+            #view-toggle {
+                display: flex;
+            }
+
+            /* Header adjustments */
+            #header {
+                padding: 0 12px;
+            }
+
+            .logo {
+                font-size: 20px;
+            }
+
+            .header-actions {
+                gap: 6px;
+            }
+
+            .btn-header {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            /* Hide one panel at a time on mobile */
+            #main-container {
+                position: relative;
+            }
+
+            #text-panel {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                border-right: none;
+                transition: transform 0.3s ease;
+            }
+
+            #text-panel.hidden-mobile {
+                transform: translateX(-100%);
+                pointer-events: none;
+            }
+
+            #chat-panel {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                transition: transform 0.3s ease;
+            }
+
+            #chat-panel.hidden-mobile {
+                transform: translateX(100%);
+                pointer-events: none;
+            }
+
+            /* Zoom controls adjustment */
+            #zoom-controls {
+                top: 10px;
+                right: 10px;
+                padding: 6px;
+                gap: 6px;
+            }
+
+            .btn-zoom {
+                width: 36px;
+                height: 36px;
+                font-size: 18px;
+            }
+
+            #zoom-level {
+                min-width: 45px;
+                font-size: 12px;
+            }
+
+            /* Text content */
+            #text-content {
+                padding: 24px 16px;
+                padding-bottom: 100px; /* Space for toggle button */
+            }
+
+            .text-title {
+                font-size: calc(var(--text-size, 18px) * 1.5);
+            }
+
+            /* Chat adjustments */
+            #chat-messages {
+                padding: 16px;
+                padding-bottom: 100px; /* Space for toggle button */
+            }
+
+            .chat-message.user {
+                margin-left: 20px;
+            }
+
+            .chat-message.assistant {
+                margin-right: 20px;
+            }
+
+            #chat-input-area {
+                padding: 12px;
+            }
+
+            #chat-input {
+                min-height: 60px;
+                font-size: 13px;
+            }
+
+            /* Library panel full width on mobile */
+            #library-panel {
+                width: 100%;
+                left: -100%;
+            }
+
+            /* Add text sheet */
+            #add-text-sheet {
+                padding: 20px 16px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            /* Selection menu */
+            #selection-menu {
+                left: 50% !important;
+                transform: translateX(-50%);
+                top: auto !important;
+                bottom: 100px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .logo {
+                font-size: 18px;
+                gap: 8px;
+            }
+
+            .btn-header {
+                padding: 6px 10px;
+                font-size: 11px;
+            }
+
+            /* Stack some header buttons on very small screens */
+            .header-actions {
+                flex-wrap: wrap;
+            }
+
+            #zoom-controls {
+                padding: 4px;
+                gap: 4px;
+            }
+
+            .btn-zoom {
+                width: 32px;
+                height: 32px;
+                font-size: 16px;
+            }
+
+            #zoom-level {
+                min-width: 40px;
+                font-size: 11px;
+                padding: 0 6px;
+            }
+
+            .btn-view-toggle {
+                padding: 10px 20px;
+                font-size: 13px;
+            }
+
+            #text-content {
+                padding: 20px 12px;
+            }
+
+            .text-line {
+                font-size: var(--text-size, 16px);
+            }
+        }
     </style>
 </head>
 <body>
@@ -634,13 +922,17 @@
     <div id="main-container">
         <!-- Text Panel (Left) -->
         <div id="text-panel">
+            <!-- Zoom Controls -->
+            <div id="zoom-controls">
+                <button class="btn-zoom" onclick="zoomOut()" title="Zoom Out">−</button>
+                <div id="zoom-level">100%</div>
+                <button class="btn-zoom" onclick="zoomIn()" title="Zoom In">+</button>
+            </div>
+
             <div id="text-content">
-                <div class="empty-state">
+                <div class="empty-state" id="initial-empty-state">
                     <h2>Welcome to Poetry Companion</h2>
-                    <p>Add a text to begin exploring literature with AI assistance.</p>
-                    <button class="btn-submit" onclick="openAddTextSheet()" style="max-width: 300px; margin: 20px auto;">
-                        Add Your First Text
-                    </button>
+                    <p>Loading your library...</p>
                 </div>
             </div>
         </div>
@@ -671,6 +963,12 @@
     <!-- Selection Menu (Popup) -->
     <div id="selection-menu">
         <button class="btn-selection" onclick="discussSelection()">→ Discuss this passage</button>
+    </div>
+
+    <!-- Mobile View Toggle -->
+    <div id="view-toggle">
+        <button class="btn-view-toggle active" onclick="switchToTextView()">📖 Text</button>
+        <button class="btn-view-toggle" onclick="switchToChatView()">💬 Chat</button>
     </div>
 
     <!-- Overlay -->
@@ -763,6 +1061,147 @@ Use blank lines to separate stanzas."></textarea>
         let currentHoverLine = null;
         let justFinishedSelection = false;
         let allTexts = [];
+        let currentZoom = 100;
+
+        // Touch/long-press state
+        let longPressTimer = null;
+        let touchStartTime = 0;
+        let touchStartY = 0;
+        let isLongPress = false;
+        const LONG_PRESS_DURATION = 400; // milliseconds
+        const SCROLL_THRESHOLD = 10; // pixels
+
+        // ===== ZOOM CONTROLS =====
+        function loadZoomLevel() {
+            const savedZoom = localStorage.getItem('textZoomLevel');
+            if (savedZoom) {
+                currentZoom = parseInt(savedZoom);
+            } else {
+                currentZoom = 100;
+            }
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const textPanel = document.getElementById('text-panel');
+            const baseFontSize = 18; // Base font size in pixels
+            const newSize = (baseFontSize * currentZoom) / 100;
+            textPanel.style.setProperty('--text-size', `${newSize}px`);
+            document.getElementById('zoom-level').textContent = `${currentZoom}%`;
+            localStorage.setItem('textZoomLevel', currentZoom);
+        }
+
+        function zoomIn() {
+            if (currentZoom < 200) {
+                currentZoom += 10;
+                applyZoom();
+            }
+        }
+
+        function zoomOut() {
+            if (currentZoom > 50) {
+                currentZoom -= 10;
+                applyZoom();
+            }
+        }
+
+        // Load zoom level on page load
+        document.addEventListener('DOMContentLoaded', loadZoomLevel);
+
+        // ===== INITIAL LIBRARY CHECK =====
+        async function checkLibraryOnLoad() {
+            try {
+                const response = await fetch('/poetry/api/texts');
+                const texts = await response.json();
+
+                const emptyStateEl = document.getElementById('initial-empty-state');
+
+                if (texts.length > 0) {
+                    // User has texts - show options to browse or add
+                    emptyStateEl.innerHTML = `
+                        <h2>Welcome to Poetry Companion</h2>
+                        <p>You have ${texts.length} text${texts.length === 1 ? '' : 's'} in your library.</p>
+                        <div style="display: flex; gap: 12px; max-width: 500px; margin: 20px auto; flex-wrap: wrap; justify-content: center;">
+                            <button class="btn-submit" onclick="toggleLibrary()" style="flex: 1; min-width: 200px;">
+                                Browse Library
+                            </button>
+                            <button class="btn-submit" onclick="openAddTextSheet()" style="flex: 1; min-width: 200px; background: var(--cyan);">
+                                + Add New Text
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    // No texts yet - show "first text" message
+                    emptyStateEl.innerHTML = `
+                        <h2>Welcome to Poetry Companion</h2>
+                        <p>Add a text to begin exploring literature with AI assistance.</p>
+                        <button class="btn-submit" onclick="openAddTextSheet()" style="max-width: 300px; margin: 20px auto;">
+                            Add Your First Text
+                        </button>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error checking library:', error);
+                const emptyStateEl = document.getElementById('initial-empty-state');
+                emptyStateEl.innerHTML = `
+                    <h2>Welcome to Poetry Companion</h2>
+                    <p>Unable to load library. Please try refreshing the page.</p>
+                `;
+            }
+        }
+
+        // Check library on page load
+        document.addEventListener('DOMContentLoaded', checkLibraryOnLoad);
+
+        // ===== MOBILE VIEW SWITCHING =====
+        let currentMobileView = 'text'; // 'text' or 'chat'
+
+        function switchToTextView() {
+            currentMobileView = 'text';
+            document.getElementById('text-panel').classList.remove('hidden-mobile');
+            document.getElementById('chat-panel').classList.add('hidden-mobile');
+
+            // Update toggle buttons
+            const toggleBtns = document.querySelectorAll('.btn-view-toggle');
+            toggleBtns[0].classList.add('active');
+            toggleBtns[1].classList.remove('active');
+        }
+
+        function switchToChatView() {
+            currentMobileView = 'chat';
+            document.getElementById('text-panel').classList.add('hidden-mobile');
+            document.getElementById('chat-panel').classList.remove('hidden-mobile');
+
+            // Update toggle buttons
+            const toggleBtns = document.querySelectorAll('.btn-view-toggle');
+            toggleBtns[0].classList.remove('active');
+            toggleBtns[1].classList.add('active');
+        }
+
+        // Initialize mobile view on load
+        function initMobileView() {
+            if (window.innerWidth <= 1024) {
+                switchToTextView();
+            }
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth <= 1024) {
+                // Ensure proper view is shown on mobile
+                if (currentMobileView === 'text') {
+                    switchToTextView();
+                } else {
+                    switchToChatView();
+                }
+            } else {
+                // On desktop, remove mobile classes
+                document.getElementById('text-panel').classList.remove('hidden-mobile');
+                document.getElementById('chat-panel').classList.remove('hidden-mobile');
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', initMobileView);
 
         // ===== LIBRARY PANEL =====
         function toggleLibrary() {
@@ -968,6 +1407,7 @@ Use blank lines to separate stanzas."></textarea>
 
             // Attach selection handlers to each line
             document.querySelectorAll('.text-line').forEach(lineEl => {
+                // Mouse events
                 lineEl.addEventListener('mousedown', (e) => {
                     e.preventDefault();
                     const lineNum = parseInt(e.currentTarget.dataset.lineNumber);
@@ -989,6 +1429,94 @@ Use blank lines to separate stanzas."></textarea>
                         highlightLines(start, end);
                     }
                 });
+
+                // Touch events for mobile
+                lineEl.addEventListener('touchstart', (e) => {
+                    const touch = e.touches[0];
+                    const lineNum = parseInt(e.currentTarget.dataset.lineNumber);
+                    const currentLineEl = e.currentTarget;
+
+                    touchStartTime = Date.now();
+                    touchStartY = touch.clientY;
+                    isLongPress = false;
+
+                    // Clear any existing long press timer
+                    if (longPressTimer) {
+                        clearTimeout(longPressTimer);
+                    }
+
+                    // Add visual feedback class
+                    currentLineEl.classList.add('long-press-active');
+
+                    // Start long press timer
+                    longPressTimer = setTimeout(() => {
+                        // This is a long press - start selection
+                        isLongPress = true;
+                        selectionStart = lineNum;
+                        currentHoverLine = lineNum;
+                        isSelecting = true;
+                        hideSelectionMenu();
+                        highlightLines(lineNum, lineNum);
+
+                        // Haptic feedback if available
+                        if (navigator.vibrate) {
+                            navigator.vibrate(50);
+                        }
+                    }, LONG_PRESS_DURATION);
+                }, { passive: true });
+
+                lineEl.addEventListener('touchmove', (e) => {
+                    const touch = e.touches[0];
+                    const moveDistance = Math.abs(touch.clientY - touchStartY);
+
+                    // If user is scrolling, cancel the long press timer
+                    if (!isLongPress && moveDistance > SCROLL_THRESHOLD) {
+                        if (longPressTimer) {
+                            clearTimeout(longPressTimer);
+                            longPressTimer = null;
+                        }
+                        // Remove visual feedback
+                        e.currentTarget.classList.remove('long-press-active');
+                    }
+
+                    // If already in selection mode, handle selection
+                    if (isSelecting) {
+                        e.preventDefault();
+                        const element = document.elementFromPoint(touch.clientX, touch.clientY);
+
+                        if (element && element.classList.contains('text-line')) {
+                            currentHoverLine = parseInt(element.dataset.lineNumber);
+                            const [start, end] = [
+                                Math.min(selectionStart, currentHoverLine),
+                                Math.max(selectionStart, currentHoverLine)
+                            ];
+                            highlightLines(start, end);
+                        }
+                    }
+                }, { passive: false });
+
+                lineEl.addEventListener('touchend', (e) => {
+                    // Clear the long press timer
+                    if (longPressTimer) {
+                        clearTimeout(longPressTimer);
+                        longPressTimer = null;
+                    }
+
+                    // Remove visual feedback
+                    e.currentTarget.classList.remove('long-press-active');
+
+                    if (isSelecting && isLongPress) {
+                        // This was a selection gesture
+                        e.preventDefault();
+                        handleSelectionEnd(e.changedTouches[0]);
+                    } else {
+                        // This was a short tap - clear any existing selection
+                        clearSelection();
+                        hideSelectionMenu();
+                    }
+
+                    isLongPress = false;
+                }, { passive: false });
             });
         }
 
@@ -997,11 +1525,18 @@ Use blank lines to separate stanzas."></textarea>
             document.querySelectorAll('.text-line.selected').forEach(el => {
                 el.classList.remove('selected');
             });
+            document.querySelectorAll('.text-line.long-press-active').forEach(el => {
+                el.classList.remove('long-press-active');
+            });
             selectedRange = null;
         }
 
         function highlightLines(start, end) {
             clearSelection();
+            // Remove all long-press-active classes
+            document.querySelectorAll('.text-line.long-press-active').forEach(el => {
+                el.classList.remove('long-press-active');
+            });
             for (let i = start; i <= end; i++) {
                 const lineEl = document.querySelector(`.text-line[data-line-number="${i}"]`);
                 if (lineEl) {
@@ -1021,12 +1556,66 @@ Use blank lines to separate stanzas."></textarea>
             document.getElementById('selection-menu').classList.remove('visible');
         }
 
-        function discussSelection() {
+        function handleSelectionEnd(eventOrTouch) {
+            if (!isSelecting) return;
+
+            isSelecting = false;
+
+            // Use currentHoverLine as the end point
+            if (selectionStart !== null && currentHoverLine !== null) {
+                selectionEnd = currentHoverLine;
+
+                const [start, end] = [
+                    Math.min(selectionStart, selectionEnd),
+                    Math.max(selectionStart, selectionEnd)
+                ];
+
+                // Make sure highlighting is set
+                highlightLines(start, end);
+
+                // Get the selected text
+                if (currentText && currentText.content) {
+                    const lines = currentText.content.split('\n');
+                    const selectedText = lines.slice(start - 1, end).join('\n');
+
+                    selectedRange = {
+                        start: start,
+                        end: end,
+                        text: selectedText
+                    };
+
+                    // Set flag to prevent click from hiding menu
+                    justFinishedSelection = true;
+
+                    // Show the menu at the touch/click position
+                    showSelectionMenu(eventOrTouch.clientX, eventOrTouch.clientY);
+
+                    // Reset flag after click event has passed
+                    setTimeout(() => {
+                        justFinishedSelection = false;
+                    }, 100);
+                } else {
+                    console.error('currentText is not available');
+                }
+            }
+
+            // Reset hover line
+            currentHoverLine = null;
+        }
+
+        async function discussSelection() {
             if (selectedRange) {
                 const input = document.getElementById('chat-input');
                 input.value = `Could you help me understand lines ${selectedRange.start}-${selectedRange.end}?`;
-                input.focus();
                 hideSelectionMenu();
+
+                // Switch to chat view on mobile
+                if (window.innerWidth <= 1024) {
+                    switchToChatView();
+                }
+
+                // Send the message directly instead of waiting for user to press enter
+                await sendMessage();
             }
         }
 
@@ -1275,62 +1864,45 @@ Use blank lines to separate stanzas."></textarea>
 
         // Global mouseup to finalize selection
         document.addEventListener('mouseup', (e) => {
-            if (!isSelecting) return;
-
-            isSelecting = false;
-
-            // Use currentHoverLine as the end point
-            if (selectionStart !== null && currentHoverLine !== null) {
-                selectionEnd = currentHoverLine;
-
-                const [start, end] = [
-                    Math.min(selectionStart, selectionEnd),
-                    Math.max(selectionStart, selectionEnd)
-                ];
-
-                // Make sure highlighting is set
-                highlightLines(start, end);
-
-                // Get the selected text
-                if (currentText && currentText.content) {
-                    const lines = currentText.content.split('\n');
-                    const selectedText = lines.slice(start - 1, end).join('\n');
-
-                    selectedRange = {
-                        start: start,
-                        end: end,
-                        text: selectedText
-                    };
-
-                    // Set flag to prevent click from hiding menu
-                    justFinishedSelection = true;
-
-                    // Show the menu
-                    showSelectionMenu(e.clientX, e.clientY);
-
-                    // Reset flag after click event has passed
-                    setTimeout(() => {
-                        justFinishedSelection = false;
-                    }, 100);
-                } else {
-                    console.error('currentText is not available');
-                }
-            }
-
-            // Reset hover line
-            currentHoverLine = null;
+            handleSelectionEnd(e);
         });
 
-        // Click outside selection menu to hide
-        document.addEventListener('click', (e) => {
+        // Handle touch cancellation
+        document.addEventListener('touchcancel', () => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            if (isSelecting) {
+                isSelecting = false;
+                isLongPress = false;
+                currentHoverLine = null;
+            }
+        });
+
+        // ESC key to clear selection (desktop)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                clearSelection();
+                hideSelectionMenu();
+            }
+        });
+
+        // Click/touch outside selection menu to hide
+        function handleOutsideMenuClick(e) {
             // Don't hide menu if we just finished a selection
             if (justFinishedSelection) return;
 
             const menu = document.getElementById('selection-menu');
-            if (!menu.contains(e.target) && !e.target.classList.contains('text-line')) {
+            const target = e.target || (e.touches && e.touches[0] && document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY));
+
+            if (target && !menu.contains(target) && !target.classList.contains('text-line')) {
                 hideSelectionMenu();
             }
-        });
+        }
+
+        document.addEventListener('click', handleOutsideMenuClick);
+        document.addEventListener('touchstart', handleOutsideMenuClick, { passive: true });
 
         // ===== LOGOUT =====
         async function logout() {

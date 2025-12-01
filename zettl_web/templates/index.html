@@ -315,13 +315,13 @@
         }
 
         .cli-cursor {
-            display: inline-block;
+            position: absolute;
             width: 8px;
             height: 2px;
             background: var(--coral);
-            margin-left: 1px;
-            margin-bottom: 4px;
+            pointer-events: none;
             animation: blink 1s step-end infinite;
+            z-index: 10;
         }
 
         @keyframes blink {
@@ -719,7 +719,7 @@
             <span class="cli-prompt">&gt;</span>
             <div class="cli-input-wrapper">
                 <div id="command-input" class="cli-input" contenteditable="true" autocapitalize="none" spellcheck="false"></div>
-                <span class="cli-cursor"></span>
+                <span id="cli-cursor" class="cli-cursor"></span>
             </div>
         </div>
     </div>
@@ -807,7 +807,12 @@
             hintBar.style.display = 'none';
 
             const input = document.getElementById('command-input');
-            input.textContent = prefill;
+            // Replace trailing regular space with non-breaking space for contenteditable
+            if (prefill.endsWith(' ')) {
+                input.textContent = prefill.slice(0, -1) + '\u00A0';
+            } else {
+                input.textContent = prefill;
+            }
             input.focus();
             // Move cursor to end
             if (prefill) {
@@ -820,6 +825,7 @@
             }
 
             updateOptionPills(prefill);
+            setTimeout(updateCursorPosition, 0);
         }
 
         function closeSheet() {
@@ -833,6 +839,10 @@
             sheet.classList.add('hidden');
             overlay.classList.remove('visible');
             hintBar.style.display = 'flex';
+
+            // Hide cursor when sheet is closed
+            const cursor = document.getElementById('cli-cursor');
+            if (cursor) cursor.style.opacity = '0';
 
             // Return focus to body so keyboard shortcuts work immediately
             document.body.focus();
@@ -856,6 +866,69 @@
             range.collapse(false);
             sel.removeAllRanges();
             sel.addRange(range);
+            updateCursorPosition();
+        }
+
+        // Update custom cursor position based on selection
+        function updateCursorPosition() {
+            const input = document.getElementById('command-input');
+            const cursor = document.getElementById('cli-cursor');
+            const sel = window.getSelection();
+
+            if (!cursor || !input) return;
+
+            // Show cursor
+            cursor.style.opacity = '1';
+
+            // If input is empty, position at the baseline
+            if (input.textContent.length === 0) {
+                cursor.style.left = '0px';
+                // Position at baseline (line-height * font-size - cursor height)
+                // line-height is 1.4, font-size is 16px, cursor height is 2px
+                cursor.style.top = '20px';
+                return;
+            }
+
+            try {
+                if (sel.rangeCount > 0 && sel.focusNode) {
+                    const range = sel.getRangeAt(0);
+
+                    // Get the bounding rect directly from the range
+                    const rangeRect = range.getBoundingClientRect();
+                    const inputRect = input.getBoundingClientRect();
+
+                    // Calculate position relative to input
+                    let left = rangeRect.left - inputRect.left;
+                    let top = rangeRect.top - inputRect.top + rangeRect.height - 4;
+
+                    // If range rect has no dimensions (collapsed cursor at start/end)
+                    if (rangeRect.width === 0 && rangeRect.height === 0) {
+                        // Fallback: calculate based on text position
+                        if (sel.focusNode.nodeType === Node.TEXT_NODE && sel.focusOffset > 0) {
+                            const textNode = sel.focusNode;
+                            const offset = sel.focusOffset;
+
+                            // Create a range up to cursor position
+                            const measureRange = document.createRange();
+                            measureRange.setStart(textNode, 0);
+                            measureRange.setEnd(textNode, Math.min(offset, textNode.length));
+
+                            const measureRect = measureRange.getBoundingClientRect();
+                            if (measureRect.width > 0 || measureRect.height > 0) {
+                                left = measureRect.right - inputRect.left;
+                                top = measureRect.top - inputRect.top + measureRect.height - 4;
+                            }
+                        }
+                    }
+
+                    cursor.style.left = Math.max(0, left) + 'px';
+                    cursor.style.top = Math.max(2, top) + 'px';
+                }
+            } catch (e) {
+                // Fallback to baseline position if error - fail silently
+                cursor.style.left = '0px';
+                cursor.style.top = '20px';
+            }
         }
 
         document.addEventListener('keydown', (e) => {
@@ -877,7 +950,8 @@
                     } else if (historyIndex > 0) {
                         historyIndex--;
                     }
-                    cliInput.textContent = commandHistory[historyIndex];
+                    const historyCmd = commandHistory[historyIndex];
+                    cliInput.textContent = historyCmd.endsWith(' ') ? historyCmd.slice(0, -1) + '\u00A0' : historyCmd;
                     setCursorToEnd(cliInput);
                     updateOptionPills(cliInput.textContent);
                     return;
@@ -888,7 +962,8 @@
                     e.preventDefault();
                     if (historyIndex < commandHistory.length - 1) {
                         historyIndex++;
-                        cliInput.textContent = commandHistory[historyIndex];
+                        const historyCmd = commandHistory[historyIndex];
+                        cliInput.textContent = historyCmd.endsWith(' ') ? historyCmd.slice(0, -1) + '\u00A0' : historyCmd;
                     } else {
                         historyIndex = -1;
                         cliInput.textContent = savedInput;
@@ -904,6 +979,7 @@
                     if (e.shiftKey) {
                         // Allow default behavior for newline
                         lastKey = '';
+                        setTimeout(updateCursorPosition, 0);
                         return;
                     }
                     // Plain Enter: submit command
@@ -911,6 +987,11 @@
                     submitCommand();
                     lastKey = '';
                     return;
+                }
+
+                // Update cursor position for any typing in the CLI input
+                if (currentMode === 'INSERT' && e.target === cliInput) {
+                    setTimeout(updateCursorPosition, 0);
                 }
 
                 // Track last key
@@ -973,15 +1054,22 @@
         // ===== COMMAND EXECUTION =====
         function fillCommand(cmd) {
             const input = document.getElementById('command-input');
-            input.textContent = cmd;
+            // Replace trailing regular space with non-breaking space for contenteditable
+            if (cmd.endsWith(' ')) {
+                input.textContent = cmd.slice(0, -1) + '\u00A0';
+            } else {
+                input.textContent = cmd;
+            }
             input.focus();
             setCursorToEnd(input);
             updateOptionPills(cmd);
+            updateCursorPosition();
         }
 
         async function submitCommand() {
             const input = document.getElementById('command-input');
-            const command = input.textContent.trim();
+            // Trim both regular spaces and non-breaking spaces
+            const command = input.textContent.replace(/[\s\u00A0]+$/g, '').replace(/^[\s\u00A0]+/g, '');
 
             if (!command) return;
 
@@ -1141,10 +1229,12 @@
             const input = document.getElementById('command-input');
             // Append option at the end for contenteditable
             const currentText = input.textContent;
-            input.textContent = currentText + ' ' + option + ' ';
+            // Add non-breaking space at the end to ensure it's visible in contenteditable
+            input.textContent = currentText + ' ' + option + '\u00A0';
             input.focus();
             setCursorToEnd(input);
             updateOptionPills(input.textContent);
+            updateCursorPosition();
         }
 
         // ===== CHAT PANEL =====
@@ -1256,10 +1346,50 @@
                 submitCommand();
             }, 500);
 
-            // Add input listener for CLI input to update option pills
+            // Add input listener for CLI input to update option pills and cursor
             const cliInput = document.getElementById('command-input');
             cliInput.addEventListener('input', () => {
                 updateOptionPills(cliInput.textContent);
+                updateCursorPosition();
+            });
+
+            // Add click handler to update cursor position
+            cliInput.addEventListener('click', (e) => {
+                e.target.focus();
+
+                // Check if click was on empty space (not on text)
+                // If so, move cursor to the end
+                setTimeout(() => {
+                    const sel = window.getSelection();
+                    const input = e.target;
+
+                    // If there's text but no selection or clicked outside text, move to end
+                    if (input.textContent.length > 0 &&
+                        (!sel.focusNode || sel.focusNode === input || sel.focusNode.nodeType !== Node.TEXT_NODE)) {
+                        setCursorToEnd(input);
+                    } else {
+                        updateCursorPosition();
+                    }
+                }, 0);
+            });
+
+            // Add focus handler to update cursor position
+            cliInput.addEventListener('focus', () => {
+                setTimeout(updateCursorPosition, 0);
+            });
+
+            // Add selection change handler with throttling
+            let selectionChangeTimeout = null;
+            document.addEventListener('selectionchange', () => {
+                if (document.activeElement === cliInput) {
+                    if (selectionChangeTimeout) {
+                        clearTimeout(selectionChangeTimeout);
+                    }
+                    selectionChangeTimeout = setTimeout(() => {
+                        updateCursorPosition();
+                        selectionChangeTimeout = null;
+                    }, 10);
+                }
             });
         });
 
