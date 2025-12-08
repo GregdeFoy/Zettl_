@@ -65,7 +65,53 @@
             color: white;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 0;
+        }
+
+        /* App Tabs */
+        .app-tabs {
+            display: flex;
+            gap: 0;
+        }
+
+        .app-tab {
+            padding: 12px 20px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+            text-decoration: none;
+            border: 3px solid var(--black);
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .app-tab:first-child {
+            border-right: none;
+        }
+
+        .app-tab.tab-zettl {
+            background: var(--yellow);
+            color: var(--black);
+        }
+
+        .app-tab.tab-verse {
+            background: var(--purple);
+            color: white;
+        }
+
+        .app-tab.active {
+            box-shadow: inset 0 -4px 0 var(--black);
+        }
+
+        .app-tab:not(.active) {
+            opacity: 0.6;
+        }
+
+        .app-tab:not(.active):hover {
+            opacity: 0.85;
+            transform: translateY(-2px);
         }
 
         .header-actions {
@@ -95,6 +141,11 @@
         .btn-header:active {
             transform: translate(1px, 1px);
             box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-icon {
+            padding: 10px 12px;
+            font-size: 16px;
         }
 
         /* ===== MAIN LAYOUT (SPLIT SCREEN) ===== */
@@ -738,6 +789,11 @@
                 font-size: 20px;
             }
 
+            .app-tab {
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+
             .header-actions {
                 gap: 6px;
             }
@@ -745,6 +801,11 @@
             .btn-header {
                 padding: 8px 12px;
                 font-size: 12px;
+            }
+
+            .btn-icon {
+                padding: 8px 10px;
+                font-size: 14px;
             }
 
             /* Hide one panel at a time on mobile */
@@ -863,9 +924,19 @@
                 gap: 8px;
             }
 
+            .app-tab {
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+
             .btn-header {
                 padding: 6px 10px;
                 font-size: 11px;
+            }
+
+            .btn-icon {
+                padding: 6px 8px;
+                font-size: 13px;
             }
 
             /* Stack some header buttons on very small screens */
@@ -908,13 +979,17 @@
 <body>
     <!-- Header -->
     <div id="header">
-        <div class="logo">📖 VERSE</div>
+        <div class="logo">
+            <div class="app-tabs">
+                <a href="/" class="app-tab tab-zettl">Zettl</a>
+                <a href="/poetry" class="app-tab tab-verse active">Verse</a>
+            </div>
+        </div>
         <div class="header-actions">
             <button class="btn-header" onclick="toggleLibrary()">LIBRARY</button>
-            <button class="btn-header" onclick="openAddTextSheet()">+ NEW TEXT</button>
-            <button class="btn-header" onclick="window.location.href='/'">NOTES</button>
-            <button class="btn-header" onclick="window.location.href='/settings'">SETTINGS</button>
-            <button class="btn-header" onclick="logout()">LOGOUT</button>
+            <button class="btn-header" onclick="openAddTextSheet()">+ NEW</button>
+            <button class="btn-header btn-icon" onclick="window.location.href='/settings'" title="Settings">⚙</button>
+            <button class="btn-header btn-icon" onclick="logout()" title="Logout">↪</button>
         </div>
     </div>
 

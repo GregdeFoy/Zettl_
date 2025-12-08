@@ -71,10 +71,55 @@
             font-family: 'Space Grotesk', sans-serif;
             font-size: 32px;
             font-weight: 700;
-            transform: rotate(-2deg);
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 0;
+        }
+
+        /* App Tabs */
+        .app-tabs {
+            display: flex;
+            gap: 0;
+        }
+
+        .app-tab {
+            padding: 12px 20px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+            text-decoration: none;
+            border: 3px solid var(--black);
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .app-tab:first-child {
+            border-right: none;
+        }
+
+        .app-tab.tab-zettl {
+            background: var(--yellow);
+            color: var(--black);
+        }
+
+        .app-tab.tab-verse {
+            background: var(--purple);
+            color: white;
+        }
+
+        .app-tab.active {
+            box-shadow: inset 0 -4px 0 var(--black);
+        }
+
+        .app-tab:not(.active) {
+            opacity: 0.6;
+        }
+
+        .app-tab:not(.active):hover {
+            opacity: 0.85;
+            transform: translateY(-2px);
         }
 
         #mode-indicator {
@@ -84,6 +129,12 @@
             font-size: 14px;
             box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.2);
             transition: all 0.2s;
+            margin-left: 16px;
+        }
+
+        .btn-icon {
+            padding: 10px 12px;
+            font-size: 16px;
         }
 
         .mode-normal {
@@ -494,14 +545,25 @@
                 font-size: 24px;
             }
 
+            .app-tab {
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+
             #mode-indicator {
-                font-size: 12px;
-                padding: 6px 12px;
+                font-size: 10px;
+                padding: 4px 8px;
+                margin-left: 8px;
             }
 
             .btn-header {
                 font-size: 12px;
                 padding: 8px 12px;
+            }
+
+            .btn-icon {
+                padding: 8px 10px;
+                font-size: 14px;
             }
 
             #chat-panel {
@@ -521,6 +583,26 @@
             .quick-cmd {
                 padding: 5px 10px;
                 font-size: 11px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .app-tab {
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+
+            #mode-indicator {
+                display: none;
+            }
+
+            .header-actions {
+                gap: 6px;
+            }
+
+            .btn-header:not(.btn-icon) {
+                font-size: 10px;
+                padding: 6px 10px;
             }
         }
 
@@ -619,6 +701,13 @@
             font-family: 'JetBrains Mono', monospace;
         }
 
+        .link-inline {
+            color: #9333EA;
+            font-size: 13px;
+            font-weight: 500;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
         .pipe-sep {
             color: #666;
             font-weight: 400;
@@ -628,6 +717,7 @@
         /* Override markdown code styling to not interfere with inline elements */
         .markdown-content .note-id-inline,
         .markdown-content .tag-inline,
+        .markdown-content .link-inline,
         .markdown-content .pipe-sep {
             background: transparent;
             padding: 0;
@@ -665,12 +755,17 @@
 <body tabindex="0">
     <!-- Header -->
     <div id="header">
-        <div class="logo">ZETTL <span id="mode-indicator" class="mode-normal">NORMAL</span></div>
+        <div class="logo">
+            <div class="app-tabs">
+                <a href="/" class="app-tab tab-zettl active">Zettl</a>
+                <a href="/poetry" class="app-tab tab-verse">Verse</a>
+            </div>
+            <span id="mode-indicator" class="mode-normal">NORMAL</span>
+        </div>
         <div class="header-actions">
-            <button class="btn-header" onclick="window.location.href='/poetry'">VERSE</button>
             <button class="btn-header" onclick="toggleChat()">CHAT</button>
-            <button class="btn-header" onclick="window.location.href='/settings'">SETTINGS</button>
-            <button class="btn-header" onclick="logout()">LOGOUT</button>
+            <button class="btn-header btn-icon" onclick="window.location.href='/settings'" title="Settings">⚙</button>
+            <button class="btn-header btn-icon" onclick="logout()" title="Logout">↪</button>
         </div>
     </div>
 

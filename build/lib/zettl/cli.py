@@ -2017,18 +2017,41 @@ def todo_cmd(content, donetoday, show_all, cancel, tag, link, custom_id, full):
                 console.print(ZettlFormatter.warning(f"No todos found with all tags: '{filter_str}'."))
                 return
 
-        # Group notes by their tags (categories) - using pre-loaded tags
-        active_todos_by_category = {}
-        done_todos_by_category = {}
-        canceled_todos_by_category = {}
-        uncategorized_active = []
-        uncategorized_done = []
-        uncategorized_canceled = []
+        # Two-level grouping: first by link, then by tags within each link
+        # Structure: {link_id: {tag_category: [notes]}}
+        active_todos_by_link = {}
+        done_todos_by_link = {}
+        canceled_todos_by_link = {}
+
+        # Track todos without links (also grouped by tags)
+        unlinked_active = {}
+        unlinked_done = {}
+        unlinked_canceled = {}
 
         # Track unique note IDs to count them at the end
         unique_active_ids = set()
         unique_done_ids = set()
         unique_canceled_ids = set()
+
+        # Cache for linked notes to avoid repeated lookups
+        link_cache = {}
+
+        def get_category_key(note_tags, filter_tags):
+            """Get the category key from tags, excluding system tags."""
+            excluded_tags = ['todo', 'done', 'cancel']
+            if filter_tags:
+                excluded_tags.extend([f.lower() for f in filter_tags])
+            categories = [t for t in note_tags if t.lower() not in excluded_tags]
+            return " - ".join(sorted(categories)) if categories else "_uncategorized_"
+
+        def add_to_link_group(link_dict, link_id, category, note):
+            """Add a note to a two-level link->category structure."""
+            if link_id not in link_dict:
+                link_dict[link_id] = {}
+            if category not in link_dict[link_id]:
+                link_dict[link_id][category] = []
+            if note not in link_dict[link_id][category]:
+                link_dict[link_id][category].append(note)
 
         for note in todo_notes:
             note_id = note['id']
@@ -2057,37 +2080,46 @@ def todo_cmd(content, donetoday, show_all, cancel, tag, link, custom_id, full):
             else:
                 unique_active_ids.add(note_id)
 
-            # Find category tags (everything except 'todo', 'done', 'cancel', and the filter tags)
-            excluded_tags = ['todo', 'done', 'cancel']
-            if tag:
-                excluded_tags.extend([f.lower() for f in tag])
+            # Get category key for this note
+            category = get_category_key(note_tags, tag)
 
-            categories = [t for t in note_tags if t.lower() not in excluded_tags]
+            # Get links for this note (both incoming and outgoing)
+            if note_id not in link_cache:
+                try:
+                    linked_notes = notes_manager.get_related_notes(note_id)
+                    link_cache[note_id] = linked_notes
+                except Exception:
+                    link_cache[note_id] = []
 
-            if not categories:
-                # This todo has no category tags
+            linked_notes = link_cache[note_id]
+
+            if not linked_notes:
+                # No links - add to unlinked group (still organized by tags)
                 if is_canceled:
-                    uncategorized_canceled.append(note)
+                    if category not in unlinked_canceled:
+                        unlinked_canceled[category] = []
+                    if note not in unlinked_canceled[category]:
+                        unlinked_canceled[category].append(note)
                 elif is_done:
-                    uncategorized_done.append(note)
+                    if category not in unlinked_done:
+                        unlinked_done[category] = []
+                    if note not in unlinked_done[category]:
+                        unlinked_done[category].append(note)
                 else:
-                    uncategorized_active.append(note)
+                    if category not in unlinked_active:
+                        unlinked_active[category] = []
+                    if note not in unlinked_active[category]:
+                        unlinked_active[category].append(note)
             else:
-                # Create a combined category key from all tags
-                combined_category = " - ".join(sorted(categories))
-
-                if is_canceled:
-                    if combined_category not in canceled_todos_by_category:
-                        canceled_todos_by_category[combined_category] = []
-                    canceled_todos_by_category[combined_category].append(note)
-                elif is_done:
-                    if combined_category not in done_todos_by_category:
-                        done_todos_by_category[combined_category] = []
-                    done_todos_by_category[combined_category].append(note)
-                else:
-                    if combined_category not in active_todos_by_category:
-                        active_todos_by_category[combined_category] = []
-                    active_todos_by_category[combined_category].append(note)
+                # Group by each linked note, then by category
+                for linked_note in linked_notes:
+                    link_id = linked_note['id']
+                    if is_canceled:
+                        add_to_link_group(canceled_todos_by_link, link_id, category, note)
+                    elif is_done:
+                        add_to_link_group(done_todos_by_link, link_id, category, note)
+                    else:
+                        add_to_link_group(active_todos_by_link, link_id, category, note)
 
         # Build the header message
         header_parts = ["Todos"]
@@ -2095,93 +2127,78 @@ def todo_cmd(content, donetoday, show_all, cancel, tag, link, custom_id, full):
             filter_str = "', '".join(tag)
             header_parts.append(f"tagged with '{filter_str}'")
 
-        # Display todos by category
-        if (not active_todos_by_category and not uncategorized_active and
-            (not show_all and not donetoday or (not done_todos_by_category and not uncategorized_done)) and
-            (not cancel or (not canceled_todos_by_category and not uncategorized_canceled))):
+        # Check if there are any todos to display
+        if (not active_todos_by_link and not unlinked_active and
+            (not show_all and not donetoday or (not done_todos_by_link and not unlinked_done)) and
+            (not cancel or (not canceled_todos_by_link and not unlinked_canceled))):
             console.print(ZettlFormatter.warning("No todos match your criteria."))
             return
 
-        # Helper function to display a group of todos
-        def display_todos_group(category_dict, uncategorized_list, header_text):
+        def format_category(category):
+            """Format a category string with tags."""
+            if category == "_uncategorized_":
+                return None
+            if " - " in category:
+                tags_list = [t.strip() for t in category.split(" - ") if t.strip()]
+                formatted_tags = [ZettlFormatter.tag(t) for t in tags_list if t]
+                return " ".join(formatted_tags)
+            return ZettlFormatter.tag(category)
+
+        def display_notes_list(notes_list, indent="  "):
+            """Display a list of notes with given indentation."""
+            for note in notes_list:
+                console.print(indent, end="")
+                if full:
+                    ZettlFormatter.render_note(note, tags=[], mode='full')
+                else:
+                    ZettlFormatter.render_note(note, tags=[], mode='preview')
+                console.print()
+
+        def display_two_level_group(link_dict, unlinked_dict, header_text):
+            """Display todos in two-level hierarchy: link -> tags -> notes."""
             if header_text:
                 console.print(header_text)
 
-            if category_dict:
-                for category, notes in sorted(category_dict.items()):
-                    if not category or not category.strip():
-                        continue
+            # Display linked todos first
+            for link_id in sorted(link_dict.keys()):
+                categories = link_dict[link_id]
+                console.print(f"\n{ZettlFormatter.link(link_id)}")
 
-                    if " - " in category:
-                        # For combined categories, format each tag separately
-                        tags_list = [t.strip() for t in category.split(" - ") if t.strip()]
-                        if not tags_list:
-                            continue
-                        formatted_tags = []
-                        for tag_name in tags_list:
-                            if tag_name and tag_name.strip():  # Additional safety check
-                                formatted_tags.append(ZettlFormatter.tag(tag_name))
-                        if not formatted_tags:  # Skip if all tags filtered out
-                            continue
-                        category_display = " - ".join(formatted_tags)
-                        console.print(f"\n{category_display}")
+                for category in sorted(categories.keys()):
+                    notes = categories[category]
+                    cat_display = format_category(category)
+                    if cat_display:
+                        console.print(f"  {cat_display}")
+                        display_notes_list(notes, indent="    ")
                     else:
-                        # For single categories, use the original format
-                        if category and category.strip():  # Only print if non-empty
-                            console.print(f"\n{ZettlFormatter.tag(category)}")
+                        display_notes_list(notes, indent="  ")
 
-                    for note in notes:
-                        # Get non-category tags for this note
-                        note_tags = note.get('all_tags', [])
-                        excluded = ['todo', 'done', 'cancel', 'idea', 'note']
-                        if tag:
-                            excluded.extend([f.lower() for f in tag])
-                        # Exclude the category tags we're already showing
-                        category_tags_lower = [c.lower() for c in category.split(" - ")]
-                        display_tags = [t for t in note_tags if t.lower() not in excluded and t.lower() not in category_tags_lower]
-
-                        # Render note with indentation
-                        console.print("  ", end="")
-                        if full:
-                            ZettlFormatter.render_note(note, tags=display_tags, mode='full')
-                        else:
-                            ZettlFormatter.render_note(note, tags=display_tags, mode='preview')
-                        console.print()  # Empty line between notes
-
-            if uncategorized_list:
-                console.print("\nUncategorized")
-                for note in uncategorized_list:
-                    # Get non-system tags
-                    note_tags = note.get('all_tags', [])
-                    excluded = ['todo', 'done', 'cancel', 'idea', 'note']
-                    if tag:
-                        excluded.extend([f.lower() for f in tag])
-                    display_tags = [t for t in note_tags if t.lower() not in excluded]
-
-                    # Render note with indentation
-                    console.print("  ", end="")
-                    if full:
-                        ZettlFormatter.render_note(note, tags=display_tags, mode='full')
+            # Display unlinked todos
+            if unlinked_dict:
+                console.print(f"\n[dim]Unlinked[/dim]")
+                for category in sorted(unlinked_dict.keys()):
+                    notes = unlinked_dict[category]
+                    cat_display = format_category(category)
+                    if cat_display:
+                        console.print(f"  {cat_display}")
+                        display_notes_list(notes, indent="    ")
                     else:
-                        ZettlFormatter.render_note(note, tags=display_tags, mode='preview')
-                    console.print()  # Empty line between notes
+                        display_notes_list(notes, indent="  ")
 
-        # Display active todos first
-        if active_todos_by_category or uncategorized_active:
+        # Display active todos
+        if active_todos_by_link or unlinked_active:
             active_header = ZettlFormatter.header(f"ACTIVE {' '.join(header_parts).upper()} ({len(unique_active_ids)})")
-            display_todos_group(active_todos_by_category, uncategorized_active, active_header)
+            display_two_level_group(active_todos_by_link, unlinked_active, active_header)
 
-        # Display all done todos if requested
-        if (show_all or donetoday) and (done_todos_by_category or uncategorized_done):
+        # Display done todos if requested
+        if (show_all or donetoday) and (done_todos_by_link or unlinked_done):
             done_header = ZettlFormatter.header(f"COMPLETED {' '.join(header_parts).upper()} ({len(unique_done_ids)})")
-            console.print(f"\n{done_header}")
-            display_todos_group(done_todos_by_category, uncategorized_done, "")
+            display_two_level_group(done_todos_by_link, unlinked_done, f"\n{done_header}")
 
         # Display canceled todos if requested
-        if cancel and (canceled_todos_by_category or uncategorized_canceled):
+        if cancel and (canceled_todos_by_link or unlinked_canceled):
             canceled_header = ZettlFormatter.header(f"CANCELED {' '.join(header_parts).upper()} ({len(unique_canceled_ids)})")
-            console.print(f"\n{canceled_header}")
-            display_todos_group(canceled_todos_by_category, uncategorized_canceled, "")
+            display_two_level_group(canceled_todos_by_link, unlinked_canceled, f"\n{canceled_header}")
 
     except Exception as e:
         console.print(ZettlFormatter.error(str(e)))

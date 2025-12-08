@@ -59,6 +59,16 @@ class ZettlFormatter:
             return f"[bright_yellow]\\[{tag_text}][/bright_yellow]"
 
     @classmethod
+    def link(cls, link_id):
+        """Format a link reference."""
+        if cls._mode == 'web':
+            # Web: use custom span with styling for links
+            return f'<span class="link-inline">@{link_id}</span>'
+        else:
+            # Bright magenta for links to distinguish from tags (yellow)
+            return f"[bright_magenta]@{link_id}[/bright_magenta]"
+
+    @classmethod
     def error(cls, text):
         """Format an error message."""
         if cls._mode == 'web':
