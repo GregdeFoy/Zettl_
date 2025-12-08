@@ -45,6 +45,10 @@ if secret_key_file and os.path.exists(secret_key_file):
 else:
     app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24))
 
+# Make sessions persistent (survive browser close) - 30 day expiry
+app.config['SESSION_PERMANENT'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+
 # Auth service configuration
 AUTH_URL = os.getenv('AUTH_URL', 'http://auth-service:3001')
 JWT_SECRET_FILE = os.getenv('JWT_SECRET_FILE')
@@ -618,7 +622,8 @@ def login():
 
         if response.status_code == 200:
             data = response.json()
-            # Store tokens in session
+            # Store tokens in session (permanent = survives browser close)
+            session.permanent = True
             session['access_token'] = data['accessToken']
             session['refresh_token'] = data['refreshToken']
             session['user'] = data['user']
