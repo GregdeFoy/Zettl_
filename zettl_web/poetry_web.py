@@ -6,7 +6,7 @@ import os
 import json
 import logging
 import requests
-from flask import Blueprint, request, jsonify, render_template, session
+from flask import Blueprint, request, jsonify, render_template, session, Response, stream_with_context
 from functools import wraps
 from datetime import datetime
 import uuid
@@ -345,6 +345,167 @@ def conversation_messages(conversation_id):
         )
 
         return jsonify({'response': assistant_response})
+
+
+@poetry_bp.route('/api/conversations/<conversation_id>/messages/stream', methods=['POST'])
+@jwt_required
+def stream_conversation_message(conversation_id):
+    """Stream a message response for a conversation using Server-Sent Events"""
+    jwt_token = session.get('access_token')
+    headers = {
+        'Authorization': f'Bearer {jwt_token}',
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+    }
+
+    data = request.json
+    message = data.get('message')
+    selected_range = data.get('selected_range')
+
+    # Get conversation and text details
+    conv_response = requests.get(
+        f'{POSTGREST_URL}/text_conversations',
+        headers=headers,
+        params={'id': f'eq.{conversation_id}'}
+    )
+
+    if not conv_response.json():
+        return jsonify({'error': 'Conversation not found'}), 404
+
+    conversation = conv_response.json()[0]
+    text_id = conversation['text_id']
+
+    # Get full text
+    text_response = requests.get(
+        f'{POSTGREST_URL}/texts',
+        headers=headers,
+        params={'id': f'eq.{text_id}'}
+    )
+
+    if not text_response.json():
+        return jsonify({'error': 'Text not found'}), 404
+
+    text = text_response.json()[0]
+
+    # Get conversation history
+    history_response = requests.get(
+        f'{POSTGREST_URL}/text_messages',
+        headers=headers,
+        params={
+            'conversation_id': f'eq.{conversation_id}',
+            'order': 'created_at.asc',
+            'limit': '50'
+        }
+    )
+    history = history_response.json()
+
+    # Save user message immediately
+    user_msg_data = {
+        'conversation_id': conversation_id,
+        'role': 'user',
+        'content': message,
+        'selected_range': json.dumps(selected_range) if selected_range else None
+    }
+    requests.post(
+        f'{POSTGREST_URL}/text_messages',
+        headers=headers,
+        json=user_msg_data
+    )
+
+    def generate():
+        """Generator function for streaming response"""
+        from anthropic import Anthropic
+        from flask import session as flask_session
+
+        AUTH_URL = os.getenv('AUTH_URL', 'http://auth-service:3001')
+
+        # Build system prompt
+        system_prompt = build_literary_system_prompt(text, selected_range)
+
+        # Build conversation history for Claude
+        claude_messages = []
+        for msg in history:
+            claude_messages.append({
+                'role': msg['role'],
+                'content': msg['content']
+            })
+
+        # Add current user message
+        if selected_range:
+            user_content = f"[Selected lines {selected_range['start']}-{selected_range['end']}]\n\n{message}"
+        else:
+            user_content = message
+
+        claude_messages.append({
+            'role': 'user',
+            'content': user_content
+        })
+
+        # Get Claude API key
+        try:
+            url = f'{AUTH_URL}/api/auth/settings/claude-key'
+            response = requests.get(
+                url,
+                headers={'Authorization': f'Bearer {jwt_token}'},
+                timeout=5
+            )
+            if response.status_code != 200:
+                yield f"data: {json.dumps({'error': 'Failed to fetch API key'})}\n\n"
+                return
+
+            claude_api_key = response.json().get('claude_api_key')
+            if not claude_api_key:
+                yield f"data: {json.dumps({'error': 'No Claude API key configured'})}\n\n"
+                return
+
+        except Exception as e:
+            logger.error(f"Could not fetch Claude API key: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            return
+
+        # Stream from Claude
+        try:
+            client = Anthropic(api_key=claude_api_key)
+            full_response = ""
+
+            with client.messages.stream(
+                model="claude-sonnet-4-5-20250929",
+                max_tokens=2000,
+                system=system_prompt,
+                messages=claude_messages,
+                temperature=0.7
+            ) as stream:
+                for text_chunk in stream.text_stream:
+                    full_response += text_chunk
+                    yield f"data: {json.dumps({'chunk': text_chunk})}\n\n"
+
+            # Signal completion
+            yield f"data: {json.dumps({'done': True})}\n\n"
+
+            # Save assistant message to database
+            assistant_msg_data = {
+                'conversation_id': conversation_id,
+                'role': 'assistant',
+                'content': full_response
+            }
+            requests.post(
+                f'{POSTGREST_URL}/text_messages',
+                headers=headers,
+                json=assistant_msg_data
+            )
+
+        except Exception as e:
+            logger.error(f"Streaming error: {e}", exc_info=True)
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no'
+        }
+    )
 
 
 # ===== HELPER FUNCTIONS =====
