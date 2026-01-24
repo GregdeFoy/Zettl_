@@ -111,6 +111,34 @@ def texts_api():
         return jsonify({'error': str(e)}), 500
 
 
+@poetry_bp.route('/api/texts/from-url', methods=['POST'])
+@jwt_required
+def texts_from_url():
+    """Extract text metadata from a URL using LLM"""
+    try:
+        data = request.json
+        url = data.get('url')
+
+        if not url:
+            return jsonify({'error': 'URL is required'}), 400
+
+        token = session.get('access_token')
+        logger.info(f"Extracting text from URL: {url}")
+
+        # Fetch and extract using LLM
+        extracted = fetch_and_extract_text_from_url(url, token)
+
+        logger.info(f"Extracted text: {extracted.get('title')}")
+        return jsonify(extracted), 200
+
+    except ValueError as e:
+        logger.warning(f"Extraction failed: {str(e)}")
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        logger.error(f"Error in texts_from_url: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 @poetry_bp.route('/api/texts/<text_id>', methods=['GET', 'PUT', 'DELETE'])
 @jwt_required
 def text_detail(text_id):
@@ -320,6 +348,97 @@ def conversation_messages(conversation_id):
 
 
 # ===== HELPER FUNCTIONS =====
+
+def fetch_and_extract_text_from_url(url, jwt_token):
+    """Fetch content from URL and use LLM to extract poem/text metadata"""
+    from anthropic import Anthropic
+
+    AUTH_URL = os.getenv('AUTH_URL', 'http://auth-service:3001')
+
+    # Fetch URL content
+    try:
+        response = requests.get(url, timeout=30, headers={
+            'User-Agent': 'Mozilla/5.0 (compatible; Zettl/1.0; +https://zettl.app)'
+        })
+        response.raise_for_status()
+        html_content = response.text
+    except requests.RequestException as e:
+        logger.error(f"Failed to fetch URL {url}: {e}")
+        raise ValueError(f"Could not fetch URL: {str(e)}")
+
+    # Get Claude API key
+    try:
+        key_response = requests.get(
+            f'{AUTH_URL}/api/auth/settings/claude-key',
+            headers={'Authorization': f'Bearer {jwt_token}'},
+            timeout=5
+        )
+        if key_response.status_code != 200:
+            raise ValueError("Failed to fetch Claude API key")
+        claude_api_key = key_response.json().get('claude_api_key')
+        if not claude_api_key:
+            raise ValueError("No Claude API key configured")
+    except Exception as e:
+        logger.error(f"Could not fetch Claude API key: {e}")
+        raise ValueError(f"API key error: {str(e)}")
+
+    # Use Claude to extract text metadata
+    client = Anthropic(api_key=claude_api_key)
+
+    extraction_prompt = """Analyze this webpage content and extract the literary text (poem, speech, prose, etc.) along with its metadata.
+
+Return a JSON object with these fields:
+- title: The title of the work (required)
+- author: The author's name (if available)
+- content: The full text content with line breaks preserved (required)
+- year: The year of creation/publication (integer, if available)
+- text_type: One of "poem", "speech", or "prose"
+- source_language: Language code like "en", "de", "fr", "es", etc.
+- source: The source/publication info (can use the URL if nothing better)
+
+Focus on extracting the actual literary text, removing navigation, ads, and other webpage clutter.
+If you cannot find a literary text on the page, set title to null.
+
+Return ONLY the JSON object, no markdown formatting or explanation."""
+
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=4000,
+            messages=[{
+                'role': 'user',
+                'content': f"URL: {url}\n\nWebpage content:\n{html_content[:50000]}\n\n{extraction_prompt}"
+            }],
+            temperature=0.3
+        )
+
+        # Extract JSON from response
+        response_text = response.content[0].text.strip()
+
+        # Try to parse JSON (handle potential markdown code blocks)
+        if response_text.startswith('```'):
+            # Remove markdown code block
+            lines = response_text.split('\n')
+            response_text = '\n'.join(lines[1:-1])
+
+        extracted = json.loads(response_text)
+
+        if not extracted.get('title'):
+            raise ValueError("Could not find a literary text on this page")
+
+        # Add source URL if not set
+        if not extracted.get('source'):
+            extracted['source'] = url
+
+        return extracted
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse LLM response as JSON: {e}")
+        raise ValueError("Could not parse extracted data")
+    except Exception as e:
+        logger.error(f"LLM extraction error: {e}")
+        raise ValueError(f"Extraction error: {str(e)}")
+
 
 def parse_text_structure(content, text_type):
     """Parse text content into structured metadata"""

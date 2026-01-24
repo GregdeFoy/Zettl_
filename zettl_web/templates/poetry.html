@@ -519,6 +519,103 @@
             margin-top: 8px;
         }
 
+        /* URL Import Section */
+        .import-section {
+            background: var(--cyan);
+            border: 3px solid var(--black);
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+
+        .import-section-header {
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .import-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .import-row .form-input {
+            flex: 1;
+        }
+
+        .btn-import {
+            padding: 10px 20px;
+            background: var(--purple);
+            color: white;
+            border: 3px solid var(--black);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .btn-import:hover {
+            background: var(--coral);
+            transform: translate(-2px, -2px);
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-import:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .import-status {
+            margin-top: 12px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .import-status.visible {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .import-status.error {
+            color: var(--coral);
+        }
+
+        .import-status.success {
+            color: var(--green);
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 20px 0;
+            font-weight: 700;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 2px dashed #ccc;
+        }
+
+        .divider::before {
+            margin-right: 12px;
+        }
+
+        .divider::after {
+            margin-left: 12px;
+        }
+
         /* Empty State */
         .empty-state {
             text-align: center;
@@ -1063,6 +1160,25 @@
     <div id="add-text-sheet" class="hidden">
         <h2 style="font-family: 'Space Grotesk', sans-serif; margin-bottom: 20px;">Add New Text</h2>
 
+        <!-- URL Import Section -->
+        <div class="import-section">
+            <div class="import-section-header">
+                <span>Import from URL</span>
+            </div>
+            <div class="import-row">
+                <input type="url" class="form-input" id="import-url" placeholder="https://www.poetryfoundation.org/poems/...">
+                <button type="button" class="btn-import" onclick="importFromUrl()" id="btn-import">
+                    Import
+                </button>
+            </div>
+            <div class="import-status" id="import-status">
+                <div class="loading" id="import-spinner"></div>
+                <span id="import-status-text">Fetching and analyzing...</span>
+            </div>
+        </div>
+
+        <div class="divider">OR ENTER MANUALLY</div>
+
         <form id="add-text-form" onsubmit="submitText(event)">
             <div class="form-group">
                 <label class="form-label">Title *</label>
@@ -1406,6 +1522,115 @@ Use blank lines to separate stanzas."></textarea>
             document.getElementById('add-text-sheet').classList.add('hidden');
             document.getElementById('overlay').classList.remove('visible');
             document.getElementById('add-text-form').reset();
+            // Also reset import section
+            document.getElementById('import-url').value = '';
+            hideImportStatus();
+        }
+
+        // ===== URL IMPORT =====
+        function showImportStatus(message, isError = false, isLoading = true) {
+            const status = document.getElementById('import-status');
+            const statusText = document.getElementById('import-status-text');
+            const spinner = document.getElementById('import-spinner');
+
+            status.classList.add('visible');
+            status.classList.remove('error', 'success');
+            spinner.style.display = isLoading ? 'inline-block' : 'none';
+
+            if (isError) {
+                status.classList.add('error');
+            }
+            statusText.textContent = message;
+        }
+
+        function hideImportStatus() {
+            const status = document.getElementById('import-status');
+            status.classList.remove('visible', 'error', 'success');
+        }
+
+        async function importFromUrl() {
+            const urlInput = document.getElementById('import-url');
+            const url = urlInput.value.trim();
+            const importBtn = document.getElementById('btn-import');
+
+            if (!url) {
+                showImportStatus('Please enter a URL', true, false);
+                return;
+            }
+
+            // Validate URL format
+            try {
+                new URL(url);
+            } catch {
+                showImportStatus('Please enter a valid URL', true, false);
+                return;
+            }
+
+            // Show loading state
+            importBtn.disabled = true;
+            importBtn.textContent = 'Importing...';
+            showImportStatus('Fetching and analyzing page...');
+
+            try {
+                const response = await fetch('/poetry/api/texts/from-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to import');
+                }
+
+                // Populate form fields with extracted data
+                if (data.title) {
+                    document.getElementById('input-title').value = data.title;
+                }
+                if (data.author) {
+                    document.getElementById('input-author').value = data.author;
+                }
+                if (data.source_language) {
+                    const langSelect = document.getElementById('input-language');
+                    // Check if the language option exists
+                    const langOption = langSelect.querySelector(`option[value="${data.source_language}"]`);
+                    if (langOption) {
+                        langSelect.value = data.source_language;
+                    }
+                }
+                if (data.text_type) {
+                    const typeSelect = document.getElementById('input-type');
+                    const typeOption = typeSelect.querySelector(`option[value="${data.text_type}"]`);
+                    if (typeOption) {
+                        typeSelect.value = data.text_type;
+                    }
+                }
+                if (data.year) {
+                    document.getElementById('input-year').value = data.year;
+                }
+                if (data.source) {
+                    document.getElementById('input-source').value = data.source;
+                }
+                if (data.content) {
+                    document.getElementById('input-content').value = data.content;
+                }
+
+                // Show success (no spinner)
+                showImportStatus('Imported! Review the details below and click "Add Text" to save.', false, false);
+                const status = document.getElementById('import-status');
+                status.classList.add('success');
+
+                // Scroll to the form
+                document.getElementById('input-title').scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            } catch (error) {
+                console.error('Import error:', error);
+                showImportStatus(error.message || 'Failed to import from URL', true, false);
+            } finally {
+                importBtn.disabled = false;
+                importBtn.textContent = 'Import';
+            }
         }
 
         async function submitText(event) {
